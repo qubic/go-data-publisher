@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const prefix = "QUBIC_ARCHIVER"
+const prefix = "QUBIC_GO_DATA_PUBLISHER"
 
 func main() {
 	if err := run(); err != nil {
@@ -42,7 +42,7 @@ func run() error {
 	var cfg struct {
 		InternalStoreFolder                 string        `conf:"default:store"`
 		ArchiverGrpcHost                    string        `conf:"default:127.0.0.1:6001"`
-		ServerListenAddr                    string        `conf:"default:127.0.0.1:8000"`
+		ServerListenAddr                    string        `conf:"default:0.0.0.0:8000"`
 		ArchiverReadTimeout                 time.Duration `conf:"default:20s"`
 		ElasticSearchAddress                string        `conf:"default:http://127.0.0.1:9200"`
 		ElasticSearchWriteTimeout           time.Duration `conf:"default:5m"`

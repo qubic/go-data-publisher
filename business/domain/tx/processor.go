@@ -179,6 +179,7 @@ func (p *Processor) processBatch(startTick uint32, epochTickIntervals entities.P
 	ctx, cancel := context.WithTimeout(context.Background(), p.publishTimeout)
 	defer cancel()
 
+	p.logger.Infow("Publishing transactions", "nr_transactions", len(batchTxToInsert), "epoch", epoch, "tick", tick)
 	err = p.publisher.PublishTransactions(ctx, batchTxToInsert)
 	if err != nil {
 		return 0, fmt.Errorf("inserting batch: %v", err)

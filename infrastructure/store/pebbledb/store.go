@@ -82,7 +82,7 @@ func (ps *Store) GetLastProcessedTickForAllEpochs() (map[uint32]uint32, error) {
 		}
 
 		epochNumber := binary.BigEndian.Uint32(key[1:])
-		tickNumber := binary.LittleEndian.Uint32(value)
+		tickNumber := binary.BigEndian.Uint32(value)
 		ticksPerEpoch[epochNumber] = tickNumber
 	}
 
