@@ -80,12 +80,15 @@ func (p *Processor) runCycle(nrWorkers int) error {
 	var startedWorkers atomic.Int32
 
 	for _, epochIntervals := range epochs {
-		p.waitWorkerToFreeUp(nrWorkers, &startedWorkers)
-
 		startingTick, ok := startingTicksForEpochs[epochIntervals.Epoch]
 		if !ok {
 			return fmt.Errorf("starting tick not found for epoch %d", epochIntervals.Epoch)
 		}
+		if startingTick == 0 {
+			continue
+		}
+
+		p.waitWorkerToFreeUp(nrWorkers, &startedWorkers)
 
 		startedWorkers.Add(1)
 		go func() {
@@ -142,6 +145,7 @@ func (p *Processor) getStartingTicksForEpochs(epochsIntervals []entities.Process
 		}
 
 		if lastProcessedTick == epochIntervals.Intervals[len(epochIntervals.Intervals)-1].LastProcessedTick {
+			startingTicks[epochIntervals.Epoch] = 0
 			continue
 		}
 
