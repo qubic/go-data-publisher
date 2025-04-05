@@ -120,7 +120,7 @@ func run() error {
 			http.Error(w, fmt.Sprintf("getting last processed tick for all epochs: %v", err), http.StatusInternalServerError)
 			return
 		}
-		response := map[interface{}]interface{}{
+		response := map[string]map[uint32]uint32{
 			"lastProcessedTicks": epochsLastProcessedTick,
 		}
 		data, err := json.Marshal(response)
