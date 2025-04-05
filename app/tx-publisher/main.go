@@ -41,12 +41,13 @@ func run() error {
 
 	var cfg struct {
 		InternalStoreFolder                 string        `conf:"default:store"`
-		ArchiverHost                        string        `conf:"default:127.0.0.1:6001"`
-		ServerListenAddr                    string        `conf:"default:127.0.0.1:9876"`
-		ArchiverReadTimeout                 time.Duration `conf:"default:10s"`
+		ArchiverGrpcHost                    string        `conf:"default:127.0.0.1:6001"`
+		ServerListenAddr                    string        `conf:"default:127.0.0.1:8000"`
+		ArchiverReadTimeout                 time.Duration `conf:"default:20s"`
 		ElasticSearchAddress                string        `conf:"default:http://127.0.0.1:9200"`
 		ElasticSearchWriteTimeout           time.Duration `conf:"default:5m"`
-		BatchSize                           int           `conf:"default:10000"`
+		ElasticPushRetries                  int           `conf:"default:20"`
+		BatchSize                           int           `conf:"default:100"`
 		NrWorkers                           int           `conf:"default:20"`
 		OverrideLastProcessedTick           bool          `conf:"default:false"`
 		OverrideLastProcessedTickEpochValue uint32        `conf:"default:155"`
@@ -90,12 +91,12 @@ func run() error {
 		}
 	}
 
-	esClient, err := elastic.NewClient(cfg.ElasticSearchAddress, "transactions", cfg.ElasticSearchWriteTimeout)
+	esClient, err := elastic.NewClient(cfg.ElasticSearchAddress, "transactions", cfg.ElasticSearchWriteTimeout, elastic.WithPushRetries(cfg.ElasticPushRetries))
 	if err != nil {
 		return fmt.Errorf("creating elasticsearch tx inserter: %v", err)
 	}
 
-	archiverClient, err := archiver.NewClient(cfg.ArchiverHost)
+	archiverClient, err := archiver.NewClient(cfg.ArchiverGrpcHost)
 	if err != nil {
 		return fmt.Errorf("creating archiver client: %v", err)
 	}

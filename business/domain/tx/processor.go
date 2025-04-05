@@ -157,7 +157,7 @@ func (p *Processor) processEpoch(startTick uint32, epochTickIntervals entities.P
 	for {
 		lastProcessedTick, err := p.processBatch(startTick, epochTickIntervals)
 		if err != nil {
-			p.logger.Errorw("error processing batch", "epoch", epochTickIntervals.Epoch, "startTick", startTick, "error", err)
+			p.logger.Errorw("error processing batch", "epoch", epochTickIntervals.Epoch, "startTick", startTick, "error", fmt.Errorf("processing batch: %v", err))
 			continue
 		}
 
@@ -190,9 +190,6 @@ func (p *Processor) processBatch(startTick uint32, epochTickIntervals entities.P
 }
 
 func (p *Processor) gatherTxBatch(epoch, startTick uint32, epochTickIntervals entities.ProcessedTickIntervalsPerEpoch) ([]entities.Tx, uint32, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), p.fetchTimeout)
-	defer cancel()
-
 	batchTxToInsert := make([]entities.Tx, 0, p.batchSize+1024)
 	var tick uint32
 
@@ -202,7 +199,12 @@ func (p *Processor) gatherTxBatch(epoch, startTick uint32, epochTickIntervals en
 				continue
 			}
 
-			txs, err := p.fetcher.GetTickTransactions(ctx, tick)
+			txs, err := func() ([]entities.Tx, error) {
+				ctx, cancel := context.WithTimeout(context.Background(), p.fetchTimeout)
+				defer cancel()
+
+				return p.fetcher.GetTickTransactions(ctx, tick)
+			}()
 			if errors.Is(err, entities.ErrEmptyTick) {
 				if tick == interval.LastProcessedTick {
 					return batchTxToInsert, tick, nil
@@ -212,7 +214,7 @@ func (p *Processor) gatherTxBatch(epoch, startTick uint32, epochTickIntervals en
 			}
 
 			if err != nil {
-				p.logger.Errorw("error processing tick; retrying...", "epoch", epoch, "tick", tick, "error", err)
+				p.logger.Errorw("error processing tick; retrying...", "epoch", epoch, "tick", tick, "error", fmt.Errorf("getting transactions: %v", err))
 				tick--
 				continue
 			}
@@ -225,12 +227,4 @@ func (p *Processor) gatherTxBatch(epoch, startTick uint32, epochTickIntervals en
 	}
 
 	return batchTxToInsert, tick, nil
-}
-
-type ProcessorOption func(*Processor)
-
-func WithBatchSize(batchSize int) ProcessorOption {
-	return func(p *Processor) {
-		p.batchSize = batchSize
-	}
 }

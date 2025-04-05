@@ -5,11 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cockroachdb/pebble"
+	"github.com/qubic/go-data-publisher/entities"
 	"path/filepath"
 	"strconv"
 )
-
-var ErrNotFound = errors.New("store resource not found")
 
 const maxTickNumber = ^uint32(0)
 
@@ -49,7 +48,7 @@ func (ps *Store) GetLastProcessedTick(epoch uint32) (tick uint32, err error) {
 
 	value, closer, err := ps.db.Get(key)
 	if errors.Is(err, pebble.ErrNotFound) {
-		return 0, ErrNotFound
+		return 0, entities.ErrStoreEntityNotFound
 	}
 
 	if err != nil {

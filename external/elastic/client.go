@@ -7,17 +7,33 @@ import (
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/qubic/go-data-publisher/entities"
+	"log"
 	"net/http"
 	"time"
 )
 
 type Client struct {
-	port     string
-	index    string
-	esClient *elasticsearch.Client
+	port           string
+	index          string
+	esClient       *elasticsearch.Client
+	publishRetries int
 }
 
-func NewClient(address, index string, timeout time.Duration) (*Client, error) {
+type ClientOption func(*Client)
+
+func WithPushRetries(nr int) ClientOption {
+	return func(p *Client) {
+		p.publishRetries = nr
+	}
+}
+
+func NewClient(address, index string, timeout time.Duration, opts ...ClientOption) (*Client, error) {
+	client := Client{}
+	for _, opt := range opts {
+		opt(&client)
+	}
+
+	client.index = index
 	cfg := elasticsearch.Config{
 		Addresses: []string{address},
 		Transport: &http.Transport{
@@ -31,13 +47,38 @@ func NewClient(address, index string, timeout time.Duration) (*Client, error) {
 		return nil, fmt.Errorf("creating elasticsearch client: %v", err)
 	}
 
-	return &Client{
-		index:    index,
-		esClient: esClient,
-	}, nil
+	client.esClient = esClient
+
+	return &client, nil
 }
 
 func (es *Client) PublishTransactions(ctx context.Context, txs []entities.Tx) error {
+	if len(txs) == 0 {
+		return nil
+	}
+
+	var lastErr error
+	for i := 0; i < es.publishRetries; i++ {
+		err := es.publish(ctx, txs)
+		if err != nil {
+			log.Printf("Error inserting batch. Retrying... %s", err.Error())
+			lastErr = err
+			continue
+		} else {
+			lastErr = nil
+			break
+		}
+
+	}
+
+	if lastErr != nil {
+		return fmt.Errorf("inserting tx batch with retry: %v", lastErr)
+	}
+
+	return nil
+}
+
+func (es *Client) publish(ctx context.Context, txs []entities.Tx) error {
 	var buf bytes.Buffer
 
 	for _, tx := range txs {
