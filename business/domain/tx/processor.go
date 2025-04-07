@@ -96,9 +96,9 @@ func (p *Processor) runCycle(nrWorkers int) error {
 
 			err = p.processEpoch(startingTick, epochIntervals)
 			if err != nil {
-				p.logger.Errorw("error processing epoch", "epoch", epochIntervals.Epoch, "error", err)
+				p.logger.Errorw("error processing cycle for epoch", "epoch", epochIntervals.Epoch, "error", err)
 			} else {
-				p.logger.Infow("Finished processing epoch", "epoch", epochIntervals.Epoch)
+				p.logger.Infow("Finished processing cycle for epoch", "epoch", epochIntervals.Epoch)
 			}
 		}()
 	}
@@ -165,8 +165,16 @@ func (p *Processor) processEpoch(startTick uint32, epochTickIntervals entities.P
 			continue
 		}
 
+		// if lastProcessedTick is equal to the last tick from intervals, we are done
+		lastTickFromIntervals := epochTickIntervals.Intervals[len(epochTickIntervals.Intervals)-1].LastProcessedTick
+		if lastProcessedTick == lastTickFromIntervals {
+			break
+		}
+
 		startTick = lastProcessedTick + 1
 	}
+
+	return nil
 }
 
 func (p *Processor) processBatch(startTick uint32, epochTickIntervals entities.ProcessedTickIntervalsPerEpoch) (uint32, error) {
