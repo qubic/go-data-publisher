@@ -21,6 +21,7 @@ var ErrMock = errors.New("mock error")
 type MockFetcher struct {
 	processedTickIntervalsPerEpoch []entities.ProcessedTickIntervalsPerEpoch
 	shouldError                    bool
+	emptyTicks                     []uint32
 }
 
 func (mf *MockFetcher) GetProcessedTickIntervalsPerEpoch(ctx context.Context) ([]entities.ProcessedTickIntervalsPerEpoch, error) {
@@ -36,6 +37,10 @@ func (mf *MockFetcher) GetTickTransactions(ctx context.Context, tick uint32) ([]
 
 	if mf.shouldError {
 		return nil, ErrMock
+	}
+
+	if mf.emptyTicks != nil && slices.Contains(mf.emptyTicks, tick) {
+		return nil, entities.ErrEmptyTick
 	}
 
 	return []entities.Tx{
@@ -72,34 +77,6 @@ func (mp *MockPublisher) PublishTransactions(ctx context.Context, txs []entities
 }
 
 func TestTxProcessor_RunCycle(t *testing.T) {
-
-	fetcher := MockFetcher{
-		processedTickIntervalsPerEpoch: []entities.ProcessedTickIntervalsPerEpoch{
-			{
-				Epoch: 100,
-				Intervals: []entities.ProcessedTickInterval{
-					{
-						InitialProcessedTick: 10000001,
-						LastProcessedTick:    10000002,
-					},
-				},
-			},
-			{
-				Epoch: 103,
-				Intervals: []entities.ProcessedTickInterval{
-					{
-						InitialProcessedTick: 40000001,
-						LastProcessedTick:    40000002,
-					},
-					{
-						InitialProcessedTick: 50000016,
-						LastProcessedTick:    50000017,
-					},
-				},
-			},
-		},
-	}
-	publisher := MockPublisher{}
 
 	expected := []entities.Tx{
 
@@ -182,6 +159,34 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 			MoneyFlew:  true,
 		},
 	}
+
+	fetcher := MockFetcher{
+		processedTickIntervalsPerEpoch: []entities.ProcessedTickIntervalsPerEpoch{
+			{
+				Epoch: 100,
+				Intervals: []entities.ProcessedTickInterval{
+					{
+						InitialProcessedTick: 10000001,
+						LastProcessedTick:    10000002,
+					},
+				},
+			},
+			{
+				Epoch: 103,
+				Intervals: []entities.ProcessedTickInterval{
+					{
+						InitialProcessedTick: 40000001,
+						LastProcessedTick:    40000002,
+					},
+					{
+						InitialProcessedTick: 50000016,
+						LastProcessedTick:    50000017,
+					},
+				},
+			},
+		},
+	}
+	publisher := MockPublisher{}
 
 	dbDir, err := os.MkdirTemp("", "pebble_test")
 	require.NoError(t, err)
@@ -454,4 +459,224 @@ func TestTxProcessor_ProcessBatch(t *testing.T) {
 
 		})
 	}
+}
+
+func TestTxProcessor_GatherTxBatch(t *testing.T) {
+
+	fetcher := MockFetcher{}
+	publisher := MockPublisher{}
+
+	dbDir, err := os.MkdirTemp("", "pebble_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(dbDir)
+	store, err := pebbledb.NewProcessorStore(dbDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, time.Second, store, 100, logger.Sugar())
+
+	testData := []struct {
+		name               string
+		epochTickIntervals entities.ProcessedTickIntervalsPerEpoch
+		emptyTicks         []uint32
+		expectedTxs        []entities.Tx
+	}{
+		{
+			name: "TestLastIntervalTickIsEmpty",
+			epochTickIntervals: entities.ProcessedTickIntervalsPerEpoch{
+				Epoch: 100,
+				Intervals: []entities.ProcessedTickInterval{
+					{
+						InitialProcessedTick: 10000000,
+						LastProcessedTick:    10000003,
+					},
+				},
+			},
+			emptyTicks: []uint32{10000003},
+			expectedTxs: []entities.Tx{
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 10000000,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 10000001,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 10000002,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+			},
+		},
+		{
+			name: "TestEmptyTickInMiddleOfInterval",
+			epochTickIntervals: entities.ProcessedTickIntervalsPerEpoch{
+				Epoch: 100,
+				Intervals: []entities.ProcessedTickInterval{
+					{
+						InitialProcessedTick: 10000000,
+						LastProcessedTick:    10000003,
+					},
+				},
+			},
+			emptyTicks: []uint32{10000001},
+			expectedTxs: []entities.Tx{
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 10000000,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 10000002,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 10000003,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+			},
+		},
+		{
+			name: "TestNoEmptyTicks",
+			epochTickIntervals: entities.ProcessedTickIntervalsPerEpoch{
+				Epoch: 100,
+				Intervals: []entities.ProcessedTickInterval{
+					{
+						InitialProcessedTick: 10000000,
+						LastProcessedTick:    10000003,
+					},
+				},
+			},
+			emptyTicks: []uint32{},
+			expectedTxs: []entities.Tx{
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 10000000,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 10000001,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 10000002,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 10000003,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+			},
+		},
+	}
+
+	for _, testRun := range testData {
+		t.Run(testRun.name, func(t *testing.T) {
+
+			fetcher.emptyTicks = testRun.emptyTicks
+
+			epoch := testRun.epochTickIntervals.Epoch
+			startTick := testRun.epochTickIntervals.Intervals[0].InitialProcessedTick
+
+			gotTxs, _, err := txProcessor.gatherTxBatch(epoch, startTick, testRun.epochTickIntervals)
+			require.NoError(t, err)
+
+			if diff := cmp.Diff(testRun.expectedTxs, gotTxs); diff != "" {
+				t.Fatalf("Unexpected result: %v", diff)
+			}
+
+		})
+	}
+
 }
