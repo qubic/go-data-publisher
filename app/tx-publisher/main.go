@@ -47,6 +47,9 @@ func run() error {
 		ElasticSearchAddress                string        `conf:"default:http://127.0.0.1:9200"`
 		ElasticSearchWriteTimeout           time.Duration `conf:"default:5m"`
 		ElasticPushRetries                  int           `conf:"default:20"`
+		ElasticUsername                     string        `conf:"default:elastic"`
+		ElasticPassword                     string        `conf:"default:password"`
+		ElasticIndex                        string        `conf:"default:qubic-transactions-v1"`
 		BatchSize                           int           `conf:"default:100"`
 		NrWorkers                           int           `conf:"default:20"`
 		OverrideLastProcessedTick           bool          `conf:"default:false"`
@@ -91,7 +94,7 @@ func run() error {
 		}
 	}
 
-	esClient, err := elastic.NewClient(cfg.ElasticSearchAddress, "transactions", cfg.ElasticSearchWriteTimeout, elastic.WithPushRetries(cfg.ElasticPushRetries))
+	esClient, err := elastic.NewClient(cfg.ElasticSearchAddress, cfg.ElasticIndex, cfg.ElasticSearchWriteTimeout, elastic.WithPushRetries(cfg.ElasticPushRetries), elastic.WithBasicAuth(cfg.ElasticUsername, cfg.ElasticPassword))
 	if err != nil {
 		return fmt.Errorf("creating elasticsearch tx inserter: %v", err)
 	}

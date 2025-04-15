@@ -13,6 +13,8 @@ import (
 )
 
 type Client struct {
+	username       string
+	password       string
 	port           string
 	index          string
 	esClient       *elasticsearch.Client
@@ -24,6 +26,13 @@ type ClientOption func(*Client)
 func WithPushRetries(nr int) ClientOption {
 	return func(p *Client) {
 		p.publishRetries = nr
+	}
+}
+
+func WithBasicAuth(username, password string) ClientOption {
+	return func(p *Client) {
+		p.username = username
+		p.password = password
 	}
 }
 
@@ -40,6 +49,10 @@ func NewClient(address, index string, timeout time.Duration, opts ...ClientOptio
 			MaxIdleConnsPerHost:   10,
 			ResponseHeaderTimeout: timeout,
 		},
+	}
+	if client.username != "" && client.password != "" {
+		cfg.Username = client.username
+		cfg.Password = client.password
 	}
 
 	esClient, err := elasticsearch.NewClient(cfg)

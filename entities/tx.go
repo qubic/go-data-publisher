@@ -1,11 +1,11 @@
 package entities
 
 type Tx struct {
-	TxID       string `json:"txID"`
-	SourceID   string `json:"sourceID"`
-	DestID     string `json:"destID"`
+	TxID       string `json:"transactionHash"`
+	SourceID   string `json:"source"`
+	DestID     string `json:"destination"`
 	Amount     int64  `json:"amount"`
-	TickNumber uint32 `json:"tickNumber"`
+	TickNumber uint32 `json:"tick"`
 	InputType  uint32 `json:"inputType"`
 	InputSize  uint32 `json:"inputSize"`
 	Input      string `json:"input"`
