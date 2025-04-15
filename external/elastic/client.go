@@ -3,6 +3,7 @@ package elastic
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
@@ -48,6 +49,7 @@ func NewClient(address, index string, timeout time.Duration, opts ...ClientOptio
 		Transport: &http.Transport{
 			MaxIdleConnsPerHost:   10,
 			ResponseHeaderTimeout: timeout,
+			TLSClientConfig:       &tls.Config{InsecureSkipVerify: true},
 		},
 	}
 	if client.username != "" && client.password != "" {
