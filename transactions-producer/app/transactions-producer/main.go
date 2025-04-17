@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"github.com/ardanlabs/conf"
 	"github.com/pkg/errors"
-	"github.com/qubic/transactions-producer/domain"
 	"github.com/qubic/transactions-producer/external/archiver"
-	"github.com/qubic/transactions-producer/external/elastic"
 	"github.com/qubic/transactions-producer/infrastructure/store/pebbledb"
+	"github.com/twmb/franz-go/pkg/kgo"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"log"
@@ -34,7 +33,7 @@ func run() error {
 
 	logger, err := config.Build()
 	if err != nil {
-		fmt.Errorf("creating logger: %v", err)
+		return fmt.Errorf("creating logger: %v", err)
 	}
 	defer logger.Sync()
 	sLogger := logger.Sugar()
@@ -44,17 +43,19 @@ func run() error {
 		ArchiverGrpcHost                    string        `conf:"default:127.0.0.1:6001"`
 		ServerListenAddr                    string        `conf:"default:0.0.0.0:8000"`
 		ArchiverReadTimeout                 time.Duration `conf:"default:20s"`
-		ElasticSearchAddress                string        `conf:"default:http://127.0.0.1:9200"`
-		ElasticSearchWriteTimeout           time.Duration `conf:"default:5m"`
-		ElasticPushRetries                  int           `conf:"default:20"`
-		ElasticUsername                     string        `conf:"default:elastic"`
-		ElasticPassword                     string        `conf:"default:password"`
-		ElasticIndex                        string        `conf:"default:qubic-transactions-v1"`
+		PublishWriteTimeout                 time.Duration `conf:"default:5m"`
 		BatchSize                           int           `conf:"default:100"`
 		NrWorkers                           int           `conf:"default:20"`
 		OverrideLastProcessedTick           bool          `conf:"default:false"`
 		OverrideLastProcessedTickEpochValue uint32        `conf:"default:155"`
 		OverrideLastProcessedTickValue      uint32        `conf:"default:22669394"`
+		Kafka                               struct {
+			BootstrapServers []string `conf:"default:localhost:9092"`
+
+			// Assuming we would want to publish more than transactions,
+			// we should either have multiple topics, or a single one, with logic to differentiate between record types.
+			TxTopic string `conf:"default:qubic-kafka-tx"`
+		}
 	}
 
 	if err := conf.Parse(os.Args[1:], prefix, &cfg); err != nil {
@@ -94,17 +95,23 @@ func run() error {
 		}
 	}
 
-	esClient, err := elastic.NewClient(cfg.ElasticSearchAddress, cfg.ElasticIndex, cfg.ElasticSearchWriteTimeout, elastic.WithPushRetries(cfg.ElasticPushRetries), elastic.WithBasicAuth(cfg.ElasticUsername, cfg.ElasticPassword))
+	kcl, err := kgo.NewClient(
+		// The default should eventually be removed after implementing publishing for multiple types of data.
+		kgo.DefaultProduceTopic(cfg.Kafka.TxTopic),
+		kgo.SeedBrokers(cfg.Kafka.BootstrapServers...),
+		kgo.ProducerBatchCompression(kgo.ZstdCompression()),
+	)
 	if err != nil {
-		return fmt.Errorf("creating elasticsearch tx inserter: %v", err)
+		return errors.Wrap(err, "creating kafka client")
 	}
+	kafkaClient := kafka.NewClient(kcl)
 
 	archiverClient, err := archiver.NewClient(cfg.ArchiverGrpcHost)
 	if err != nil {
 		return fmt.Errorf("creating archiver client: %v", err)
 	}
 
-	proc := domain.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, esClient, cfg.ElasticSearchWriteTimeout, procStore, cfg.BatchSize, sLogger)
+	proc := tx.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, kafkaClient, cfg.PublishWriteTimeout, procStore, cfg.BatchSize, sLogger)
 	if err != nil {
 		return fmt.Errorf("creating processor: %v", err)
 	}
