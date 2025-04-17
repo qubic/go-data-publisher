@@ -42,7 +42,7 @@ func run() error {
 
 	var cfg struct {
 		InternalStoreFolder                 string        `conf:"default:store"`
-		ArchiverGrpcHost                    string        `conf:"default:qubic-staging02:8010"`
+		ArchiverGrpcHost                    string        `conf:"default:localhost:6001"`
 		ServerListenAddr                    string        `conf:"default:0.0.0.0:8000"`
 		ArchiverReadTimeout                 time.Duration `conf:"default:20s"`
 		PublishWriteTimeout                 time.Duration `conf:"default:5m"`
