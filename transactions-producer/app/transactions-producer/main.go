@@ -5,8 +5,15 @@ import (
 	"fmt"
 	"github.com/ardanlabs/conf"
 	"github.com/pkg/errors"
+<<<<<<< HEAD:transactions-producer/app/transactions-producer/main.go
 	"github.com/qubic/transactions-producer/external/archiver"
 	"github.com/qubic/transactions-producer/infrastructure/store/pebbledb"
+=======
+	"github.com/qubic/go-data-publisher/business/domain/tx"
+	"github.com/qubic/go-data-publisher/external/archiver"
+	"github.com/qubic/go-data-publisher/external/kafka"
+	"github.com/qubic/go-data-publisher/infrastructure/store/pebbledb"
+>>>>>>> 0a7a39a (Implement kafka publisher.):app/tx-publisher/main.go
 	"github.com/twmb/franz-go/pkg/kgo"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -40,7 +47,7 @@ func run() error {
 
 	var cfg struct {
 		InternalStoreFolder                 string        `conf:"default:store"`
-		ArchiverGrpcHost                    string        `conf:"default:127.0.0.1:6001"`
+		ArchiverGrpcHost                    string        `conf:"default:qubic-staging02:8010"`
 		ServerListenAddr                    string        `conf:"default:0.0.0.0:8000"`
 		ArchiverReadTimeout                 time.Duration `conf:"default:20s"`
 		PublishWriteTimeout                 time.Duration `conf:"default:5m"`
