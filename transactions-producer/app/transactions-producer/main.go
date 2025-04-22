@@ -5,16 +5,14 @@ import (
 	"fmt"
 	"github.com/ardanlabs/conf"
 	"github.com/pkg/errors"
-<<<<<<< HEAD:transactions-producer/app/transactions-producer/main.go
-	"github.com/qubic/transactions-producer/external/archiver"
-	"github.com/qubic/transactions-producer/infrastructure/store/pebbledb"
-=======
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/go-data-publisher/business/domain/tx"
 	"github.com/qubic/go-data-publisher/external/archiver"
 	"github.com/qubic/go-data-publisher/external/kafka"
 	"github.com/qubic/go-data-publisher/infrastructure/store/pebbledb"
->>>>>>> 0a7a39a (Implement kafka publisher.):app/tx-publisher/main.go
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/plugin/kprom"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"log"
@@ -61,8 +59,10 @@ func run() error {
 
 			// Assuming we would want to publish more than transactions,
 			// we should either have multiple topics, or a single one, with logic to differentiate between record types.
-			TxTopic string `conf:"default:qubic-kafka-tx"`
+			TxTopic string `conf:"default:qubic-transactions"`
 		}
+		MetricsNamespace string `conf:"default:qubic-kafka"`
+		MetricsHost      string `conf:"default:0.0.0.0:9999"`
 	}
 
 	if err := conf.Parse(os.Args[1:], prefix, &cfg); err != nil {
@@ -102,7 +102,11 @@ func run() error {
 		}
 	}
 
+	kafkaMetrics := kprom.NewMetrics(cfg.MetricsNamespace,
+		kprom.Registerer(prometheus.DefaultRegisterer),
+		kprom.Gatherer(prometheus.DefaultGatherer))
 	kcl, err := kgo.NewClient(
+		kgo.WithHooks(kafkaMetrics),
 		// The default should eventually be removed after implementing publishing for multiple types of data.
 		kgo.DefaultProduceTopic(cfg.Kafka.TxTopic),
 		kgo.SeedBrokers(cfg.Kafka.BootstrapServers...),
@@ -129,6 +133,12 @@ func run() error {
 	procErrors := make(chan error, 1)
 	go func() {
 		procErrors <- proc.Start(cfg.NrWorkers)
+	}()
+
+	go func() {
+		log.Printf("Metrics endpoint available at [http://%s/metrics]", cfg.MetricsHost)
+		http.Handle("/metrics", promhttp.Handler())
+		log.Fatal(http.ListenAndServe(cfg.MetricsHost, nil))
 	}()
 
 	http.HandleFunc("/v1/status", func(w http.ResponseWriter, r *http.Request) {
