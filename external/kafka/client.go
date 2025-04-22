@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/qubic/go-data-publisher/entities"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -30,16 +31,17 @@ func (kc *Client) PublishTransactions(ctx context.Context, txs []entities.Tx) er
 	errorChannel := make(chan error, len(txs))
 
 	for _, tx := range txs {
-		wg.Add(1)
 
 		record, err := createTxRecord(tx)
 		if err != nil {
-			return fmt.Errorf("creating kafka record for transaction: %w", err)
+			log.Printf("Error while creating transaction record: %v", err)
+			errorChannel <- err
+			break
 		}
 
+		wg.Add(1)
 		kc.kcl.Produce(ctx, record, func(_ *kgo.Record, err error) {
 			defer wg.Done()
-
 			if err != nil {
 				log.Printf("Error while producing transaction record: %v", err)
 				errorChannel <- err
@@ -48,12 +50,13 @@ func (kc *Client) PublishTransactions(ctx context.Context, txs []entities.Tx) er
 			errorChannel <- nil
 		})
 	}
+
 	wg.Wait()
 	close(errorChannel)
 
 	for err := range errorChannel {
 		if err != nil {
-			return fmt.Errorf("producing transaction record: %w", err)
+			return errors.New("encountered errors while producing transaction records")
 		}
 	}
 
