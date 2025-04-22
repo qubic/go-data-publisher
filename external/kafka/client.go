@@ -6,12 +6,13 @@ import (
 	"fmt"
 	"github.com/qubic/go-data-publisher/entities"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"log"
 	"sync"
 )
 
 type KafkaClient interface {
 	Produce(ctx context.Context, r *kgo.Record, promise func(*kgo.Record, error))
-	ProduceSync(ctx context.Context, rs ...*kgo.Record) kgo.ProduceResults
+	//ProduceSync(ctx context.Context, rs ...*kgo.Record) kgo.ProduceResults
 }
 type Client struct {
 	kcl KafkaClient
@@ -40,6 +41,7 @@ func (kc *Client) PublishTransactions(ctx context.Context, txs []entities.Tx) er
 			defer wg.Done()
 
 			if err != nil {
+				log.Printf("Error while producing transaction record: %v", err)
 				errorChannel <- err
 				return
 			}
