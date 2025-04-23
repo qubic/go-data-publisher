@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -91,7 +92,8 @@ func createTxRecord(tx entities.Tx) (*kgo.Record, error) {
 	if err != nil {
 		return nil, fmt.Errorf("marshalling transaction to json: %w", err)
 	}
-	key := []byte(tx.TxID)
+	key := make([]byte, 4)
+	binary.LittleEndian.PutUint32(key, tx.TickNumber)
 
 	return &kgo.Record{
 		Key:   key,
