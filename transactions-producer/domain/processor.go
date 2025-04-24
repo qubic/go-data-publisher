@@ -1,22 +1,22 @@
-package tx
+package domain
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/qubic/go-data-publisher/entities"
+	entities2 "github.com/qubic/transactions-producer/entities"
 	"go.uber.org/zap"
 	"sync/atomic"
 	"time"
 )
 
 type Fetcher interface {
-	GetProcessedTickIntervalsPerEpoch(ctx context.Context) ([]entities.ProcessedTickIntervalsPerEpoch, error)
-	GetTickTransactions(ctx context.Context, tick uint32) ([]entities.Tx, error)
+	GetProcessedTickIntervalsPerEpoch(ctx context.Context) ([]entities2.ProcessedTickIntervalsPerEpoch, error)
+	GetTickTransactions(ctx context.Context, tick uint32) ([]entities2.Tx, error)
 }
 
 type Publisher interface {
-	PublishTickTransactions(ctx context.Context, tickTransactions []entities.TickTransactions) error
+	PublishTickTransactions(ctx context.Context, tickTransactions []entities2.TickTransactions) error
 }
 
 type statusStore interface {
@@ -130,12 +130,12 @@ func (p *Processor) waitWorkerToFreeUp(nrWorkers int, startedWorkers *atomic.Int
 	}
 }
 
-func (p *Processor) getStartingTicksForEpochs(epochsIntervals []entities.ProcessedTickIntervalsPerEpoch) (map[uint32]uint32, error) {
+func (p *Processor) getStartingTicksForEpochs(epochsIntervals []entities2.ProcessedTickIntervalsPerEpoch) (map[uint32]uint32, error) {
 	startingTicks := make(map[uint32]uint32)
 
 	for _, epochIntervals := range epochsIntervals {
 		lastProcessedTick, err := p.statusStore.GetLastProcessedTick(epochIntervals.Epoch)
-		if errors.Is(err, entities.ErrStoreEntityNotFound) {
+		if errors.Is(err, entities2.ErrStoreEntityNotFound) {
 			startingTicks[epochIntervals.Epoch] = epochIntervals.Intervals[0].InitialProcessedTick
 			continue
 		}
@@ -155,7 +155,7 @@ func (p *Processor) getStartingTicksForEpochs(epochsIntervals []entities.Process
 	return startingTicks, nil
 }
 
-func (p *Processor) processEpoch(startTick uint32, epochTickIntervals entities.ProcessedTickIntervalsPerEpoch) error {
+func (p *Processor) processEpoch(startTick uint32, epochTickIntervals entities2.ProcessedTickIntervalsPerEpoch) error {
 	p.logger.Infow("Starting epoch processor", "epoch", epochTickIntervals.Epoch, "startTick", startTick)
 
 	for {
@@ -177,7 +177,7 @@ func (p *Processor) processEpoch(startTick uint32, epochTickIntervals entities.P
 	return nil
 }
 
-func (p *Processor) processBatch(startTick uint32, epochTickIntervals entities.ProcessedTickIntervalsPerEpoch) (uint32, error) {
+func (p *Processor) processBatch(startTick uint32, epochTickIntervals entities2.ProcessedTickIntervalsPerEpoch) (uint32, error) {
 	epoch := epochTickIntervals.Epoch
 
 	tickTransactionsBatch, tick, err := p.gatherTickTransactionsBatch(epoch, startTick, epochTickIntervals)
@@ -202,9 +202,9 @@ func (p *Processor) processBatch(startTick uint32, epochTickIntervals entities.P
 	return tick, nil
 }
 
-func (p *Processor) gatherTickTransactionsBatch(epoch, startTick uint32, epochTickIntervals entities.ProcessedTickIntervalsPerEpoch) ([]entities.TickTransactions, uint32, error) {
+func (p *Processor) gatherTickTransactionsBatch(epoch, startTick uint32, epochTickIntervals entities2.ProcessedTickIntervalsPerEpoch) ([]entities2.TickTransactions, uint32, error) {
 
-	var tickTransactionsBatch []entities.TickTransactions
+	var tickTransactionsBatch []entities2.TickTransactions
 
 	var tick uint32
 
@@ -214,7 +214,7 @@ func (p *Processor) gatherTickTransactionsBatch(epoch, startTick uint32, epochTi
 				continue
 			}
 
-			transactions, err := func() ([]entities.Tx, error) {
+			transactions, err := func() ([]entities2.Tx, error) {
 				ctx, cancel := context.WithTimeout(context.Background(), p.fetchTimeout)
 				defer cancel()
 
@@ -222,15 +222,15 @@ func (p *Processor) gatherTickTransactionsBatch(epoch, startTick uint32, epochTi
 			}()
 
 			if err != nil {
-				if !errors.Is(err, entities.ErrEmptyTick) {
+				if !errors.Is(err, entities2.ErrEmptyTick) {
 					p.logger.Errorw("error processing tick; retrying...", "epoch", epoch, "tick", tick, "error", fmt.Errorf("getting transactions: %v", err))
 					tick--
 					continue
 				}
-				transactions = []entities.Tx{}
+				transactions = []entities2.Tx{}
 			}
 
-			tickTransactions := entities.TickTransactions{
+			tickTransactions := entities2.TickTransactions{
 				TickNumber:   tick,
 				Epoch:        epoch,
 				Transactions: transactions,

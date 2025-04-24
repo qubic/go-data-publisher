@@ -2,7 +2,7 @@ FROM golang:1.24 AS builder
 ENV CGO_ENABLED=0
 
 WORKDIR /src
-COPY . /src
+COPY .. /src
 
 RUN go build -o "./bin/tx-publisher" "./app/tx-publisher"
 

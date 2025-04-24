@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cockroachdb/pebble"
-	"github.com/qubic/go-data-publisher/entities"
+	"github.com/qubic/transactions-producer/entities"
 	"path/filepath"
 	"strconv"
 )

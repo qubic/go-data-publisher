@@ -1,4 +1,4 @@
-module github.com/qubic/go-data-publisher
+module github.com/qubic/transactions-producer
 
 go 1.24.0
 

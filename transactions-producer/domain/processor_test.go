@@ -1,13 +1,13 @@
-package tx
+package domain
 
 import (
 	cmp2 "cmp"
 	"context"
 	"errors"
 	"github.com/google/go-cmp/cmp"
+	entities2 "github.com/qubic/transactions-producer/entities"
+	"github.com/qubic/transactions-producer/infrastructure/store/pebbledb"
 
-	"github.com/qubic/go-data-publisher/entities"
-	"github.com/qubic/go-data-publisher/infrastructure/store/pebbledb"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"os"
@@ -19,12 +19,12 @@ import (
 var ErrMock = errors.New("mock error")
 
 type MockFetcher struct {
-	processedTickIntervalsPerEpoch []entities.ProcessedTickIntervalsPerEpoch
+	processedTickIntervalsPerEpoch []entities2.ProcessedTickIntervalsPerEpoch
 	shouldError                    bool
 	emptyTicks                     []uint32
 }
 
-func (mf *MockFetcher) GetProcessedTickIntervalsPerEpoch(_ context.Context) ([]entities.ProcessedTickIntervalsPerEpoch, error) {
+func (mf *MockFetcher) GetProcessedTickIntervalsPerEpoch(_ context.Context) ([]entities2.ProcessedTickIntervalsPerEpoch, error) {
 
 	if mf.shouldError {
 		return nil, ErrMock
@@ -33,17 +33,17 @@ func (mf *MockFetcher) GetProcessedTickIntervalsPerEpoch(_ context.Context) ([]e
 	return mf.processedTickIntervalsPerEpoch, nil
 }
 
-func (mf *MockFetcher) GetTickTransactions(_ context.Context, tick uint32) ([]entities.Tx, error) {
+func (mf *MockFetcher) GetTickTransactions(_ context.Context, tick uint32) ([]entities2.Tx, error) {
 
 	if mf.shouldError {
 		return nil, ErrMock
 	}
 
 	if mf.emptyTicks != nil && slices.Contains(mf.emptyTicks, tick) {
-		return nil, entities.ErrEmptyTick
+		return nil, entities2.ErrEmptyTick
 	}
 
-	return []entities.Tx{
+	return []entities2.Tx{
 		{
 			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -61,11 +61,11 @@ func (mf *MockFetcher) GetTickTransactions(_ context.Context, tick uint32) ([]en
 }
 
 type MockPublisher struct {
-	publishedTickTransactions []entities.TickTransactions
+	publishedTickTransactions []entities2.TickTransactions
 	shouldError               bool
 }
 
-func (mp *MockPublisher) PublishTickTransactions(_ context.Context, tickTransactions []entities.TickTransactions) error {
+func (mp *MockPublisher) PublishTickTransactions(_ context.Context, tickTransactions []entities2.TickTransactions) error {
 
 	if mp.shouldError {
 		return ErrMock
@@ -78,11 +78,11 @@ func (mp *MockPublisher) PublishTickTransactions(_ context.Context, tickTransact
 
 func TestTxProcessor_RunCycle(t *testing.T) {
 
-	expected := []entities.TickTransactions{
+	expected := []entities2.TickTransactions{
 		{
 			Epoch:      100,
 			TickNumber: 10000001,
-			Transactions: []entities.Tx{
+			Transactions: []entities2.Tx{
 				{
 					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -101,7 +101,7 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 		{
 			Epoch:      100,
 			TickNumber: 10000002,
-			Transactions: []entities.Tx{
+			Transactions: []entities2.Tx{
 				{
 					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -120,7 +120,7 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 		{
 			Epoch:      103,
 			TickNumber: 40000001,
-			Transactions: []entities.Tx{
+			Transactions: []entities2.Tx{
 				{
 					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -139,7 +139,7 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 		{
 			Epoch:      103,
 			TickNumber: 40000002,
-			Transactions: []entities.Tx{
+			Transactions: []entities2.Tx{
 				{
 					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -158,7 +158,7 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 		{
 			Epoch:      103,
 			TickNumber: 50000016,
-			Transactions: []entities.Tx{
+			Transactions: []entities2.Tx{
 				{
 					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -177,7 +177,7 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 		{
 			Epoch:      103,
 			TickNumber: 50000017,
-			Transactions: []entities.Tx{
+			Transactions: []entities2.Tx{
 				{
 					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -196,10 +196,10 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 	}
 
 	fetcher := MockFetcher{
-		processedTickIntervalsPerEpoch: []entities.ProcessedTickIntervalsPerEpoch{
+		processedTickIntervalsPerEpoch: []entities2.ProcessedTickIntervalsPerEpoch{
 			{
 				Epoch: 100,
-				Intervals: []entities.ProcessedTickInterval{
+				Intervals: []entities2.ProcessedTickInterval{
 					{
 						InitialProcessedTick: 10000001,
 						LastProcessedTick:    10000002,
@@ -208,7 +208,7 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 			},
 			{
 				Epoch: 103,
-				Intervals: []entities.ProcessedTickInterval{
+				Intervals: []entities2.ProcessedTickInterval{
 					{
 						InitialProcessedTick: 40000001,
 						LastProcessedTick:    40000002,
@@ -242,7 +242,7 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 	got := publisher.publishedTickTransactions
 
 	// Make sure the results are sorted by tick number, as the data is added asynchronously
-	slices.SortFunc(got, func(a, b entities.TickTransactions) int {
+	slices.SortFunc(got, func(a, b entities2.TickTransactions) int {
 		return cmp2.Compare(a.TickNumber, b.TickNumber)
 	})
 
@@ -273,15 +273,15 @@ func TestTxProcessor_GetStartingTicksForEpochs(t *testing.T) {
 
 	testData := []struct {
 		name           string
-		epochIntervals []entities.ProcessedTickIntervalsPerEpoch
+		epochIntervals []entities2.ProcessedTickIntervalsPerEpoch
 		expected       map[uint32]uint32
 	}{
 		{
 			name: "TestStartingTickForEpochs_1",
-			epochIntervals: []entities.ProcessedTickIntervalsPerEpoch{
+			epochIntervals: []entities2.ProcessedTickIntervalsPerEpoch{
 				{
 					Epoch: 100,
-					Intervals: []entities.ProcessedTickInterval{
+					Intervals: []entities2.ProcessedTickInterval{
 						{
 							InitialProcessedTick: 10000000,
 							LastProcessedTick:    10000001,
@@ -290,7 +290,7 @@ func TestTxProcessor_GetStartingTicksForEpochs(t *testing.T) {
 				},
 				{
 					Epoch: 101,
-					Intervals: []entities.ProcessedTickInterval{
+					Intervals: []entities2.ProcessedTickInterval{
 						{
 							InitialProcessedTick: 23154312,
 							LastProcessedTick:    23343121,
@@ -303,7 +303,7 @@ func TestTxProcessor_GetStartingTicksForEpochs(t *testing.T) {
 				},
 				{
 					Epoch: 102,
-					Intervals: []entities.ProcessedTickInterval{
+					Intervals: []entities2.ProcessedTickInterval{
 						{
 							InitialProcessedTick: 25000001,
 							LastProcessedTick:    26000000,
@@ -312,7 +312,7 @@ func TestTxProcessor_GetStartingTicksForEpochs(t *testing.T) {
 				},
 				{
 					Epoch: 103,
-					Intervals: []entities.ProcessedTickInterval{
+					Intervals: []entities2.ProcessedTickInterval{
 						{
 							InitialProcessedTick: 26000001,
 							LastProcessedTick:    26000020,
@@ -329,10 +329,10 @@ func TestTxProcessor_GetStartingTicksForEpochs(t *testing.T) {
 		},
 		{
 			name: "TestStartingTickForEpochs_2",
-			epochIntervals: []entities.ProcessedTickIntervalsPerEpoch{
+			epochIntervals: []entities2.ProcessedTickIntervalsPerEpoch{
 				{
 					Epoch: 200,
-					Intervals: []entities.ProcessedTickInterval{
+					Intervals: []entities2.ProcessedTickInterval{
 						{
 							InitialProcessedTick: 15678915,
 							LastProcessedTick:    16947864,
@@ -341,7 +341,7 @@ func TestTxProcessor_GetStartingTicksForEpochs(t *testing.T) {
 				},
 				{
 					Epoch: 201,
-					Intervals: []entities.ProcessedTickInterval{
+					Intervals: []entities2.ProcessedTickInterval{
 						{
 							InitialProcessedTick: 18764568,
 							LastProcessedTick:    19748735,
@@ -398,16 +398,16 @@ func TestTxProcessor_ProcessBatch(t *testing.T) {
 		shouldFetcherError   bool
 		shouldPublisherError bool
 		errorExpected        bool
-		epochTickIntervals   entities.ProcessedTickIntervalsPerEpoch
+		epochTickIntervals   entities2.ProcessedTickIntervalsPerEpoch
 	}{
 		{
 			name:                 "TestNoDependencyError",
 			shouldFetcherError:   false,
 			shouldPublisherError: false,
 			errorExpected:        false,
-			epochTickIntervals: entities.ProcessedTickIntervalsPerEpoch{
+			epochTickIntervals: entities2.ProcessedTickIntervalsPerEpoch{
 				Epoch: 100,
-				Intervals: []entities.ProcessedTickInterval{
+				Intervals: []entities2.ProcessedTickInterval{
 					{
 						InitialProcessedTick: 10000001,
 						LastProcessedTick:    10000002,
@@ -444,9 +444,9 @@ func TestTxProcessor_ProcessBatch(t *testing.T) {
 			shouldFetcherError:   false,
 			shouldPublisherError: true,
 			errorExpected:        true,
-			epochTickIntervals: entities.ProcessedTickIntervalsPerEpoch{
+			epochTickIntervals: entities2.ProcessedTickIntervalsPerEpoch{
 				Epoch: 100,
-				Intervals: []entities.ProcessedTickInterval{
+				Intervals: []entities2.ProcessedTickInterval{
 					{
 						InitialProcessedTick: 10000001,
 						LastProcessedTick:    10000002,
@@ -515,15 +515,15 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 
 	testData := []struct {
 		name                     string
-		epochTickIntervals       entities.ProcessedTickIntervalsPerEpoch
+		epochTickIntervals       entities2.ProcessedTickIntervalsPerEpoch
 		emptyTicks               []uint32
-		expectedTickTransactions []entities.TickTransactions
+		expectedTickTransactions []entities2.TickTransactions
 	}{
 		{
 			name: "TestLastIntervalTickIsEmpty",
-			epochTickIntervals: entities.ProcessedTickIntervalsPerEpoch{
+			epochTickIntervals: entities2.ProcessedTickIntervalsPerEpoch{
 				Epoch: 100,
-				Intervals: []entities.ProcessedTickInterval{
+				Intervals: []entities2.ProcessedTickInterval{
 					{
 						InitialProcessedTick: 10000000,
 						LastProcessedTick:    10000003,
@@ -531,11 +531,11 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 				},
 			},
 			emptyTicks: []uint32{10000003},
-			expectedTickTransactions: []entities.TickTransactions{
+			expectedTickTransactions: []entities2.TickTransactions{
 				{
 					Epoch:      100,
 					TickNumber: 10000000,
-					Transactions: []entities.Tx{
+					Transactions: []entities2.Tx{
 						{
 							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -554,7 +554,7 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 				{
 					Epoch:      100,
 					TickNumber: 10000001,
-					Transactions: []entities.Tx{
+					Transactions: []entities2.Tx{
 						{
 							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -573,7 +573,7 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 				{
 					Epoch:      100,
 					TickNumber: 10000002,
-					Transactions: []entities.Tx{
+					Transactions: []entities2.Tx{
 						{
 							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -592,15 +592,15 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 				{
 					Epoch:        100,
 					TickNumber:   10000003,
-					Transactions: []entities.Tx{},
+					Transactions: []entities2.Tx{},
 				},
 			},
 		},
 		{
 			name: "TestEmptyTickInMiddleOfInterval",
-			epochTickIntervals: entities.ProcessedTickIntervalsPerEpoch{
+			epochTickIntervals: entities2.ProcessedTickIntervalsPerEpoch{
 				Epoch: 100,
-				Intervals: []entities.ProcessedTickInterval{
+				Intervals: []entities2.ProcessedTickInterval{
 					{
 						InitialProcessedTick: 10000000,
 						LastProcessedTick:    10000003,
@@ -608,11 +608,11 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 				},
 			},
 			emptyTicks: []uint32{10000001},
-			expectedTickTransactions: []entities.TickTransactions{
+			expectedTickTransactions: []entities2.TickTransactions{
 				{
 					Epoch:      100,
 					TickNumber: 10000000,
-					Transactions: []entities.Tx{
+					Transactions: []entities2.Tx{
 						{
 							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -631,12 +631,12 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 				{
 					Epoch:        100,
 					TickNumber:   10000001,
-					Transactions: []entities.Tx{},
+					Transactions: []entities2.Tx{},
 				},
 				{
 					Epoch:      100,
 					TickNumber: 10000002,
-					Transactions: []entities.Tx{
+					Transactions: []entities2.Tx{
 						{
 							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -655,7 +655,7 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 				{
 					Epoch:      100,
 					TickNumber: 10000003,
-					Transactions: []entities.Tx{
+					Transactions: []entities2.Tx{
 						{
 							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -675,9 +675,9 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 		},
 		{
 			name: "TestNoEmptyTicks",
-			epochTickIntervals: entities.ProcessedTickIntervalsPerEpoch{
+			epochTickIntervals: entities2.ProcessedTickIntervalsPerEpoch{
 				Epoch: 100,
-				Intervals: []entities.ProcessedTickInterval{
+				Intervals: []entities2.ProcessedTickInterval{
 					{
 						InitialProcessedTick: 10000000,
 						LastProcessedTick:    10000003,
@@ -685,11 +685,11 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 				},
 			},
 			emptyTicks: []uint32{},
-			expectedTickTransactions: []entities.TickTransactions{
+			expectedTickTransactions: []entities2.TickTransactions{
 				{
 					Epoch:      100,
 					TickNumber: 10000000,
-					Transactions: []entities.Tx{
+					Transactions: []entities2.Tx{
 						{
 							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -708,7 +708,7 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 				{
 					Epoch:      100,
 					TickNumber: 10000001,
-					Transactions: []entities.Tx{
+					Transactions: []entities2.Tx{
 						{
 							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -727,7 +727,7 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 				{
 					Epoch:      100,
 					TickNumber: 10000002,
-					Transactions: []entities.Tx{
+					Transactions: []entities2.Tx{
 						{
 							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -746,7 +746,7 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 				{
 					Epoch:      100,
 					TickNumber: 10000003,
-					Transactions: []entities.Tx{
+					Transactions: []entities2.Tx{
 						{
 							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
