@@ -26,14 +26,14 @@ func NewClient(kafkaClient KafkaClient) *Client {
 	}
 }
 
-func (kc *Client) PublishTransactions(ctx context.Context, txs []entities.Tx) error {
+func (kc *Client) PublishTransactions(ctx context.Context, txs []entities.Tx, epoch uint32) error {
 
 	wg := sync.WaitGroup{}
 	errorChannel := make(chan error, len(txs))
 
 	for _, tx := range txs {
 
-		record, err := createTxRecord(tx)
+		record, err := createTxRecord(tx, epoch)
 		if err != nil {
 			log.Printf("Error while creating transaction record: %v", err)
 			errorChannel <- err
@@ -86,7 +86,7 @@ func (kc *Client) PublishTransactions(ctx context.Context, txs []entities.Tx) er
 	return nil
 }*/
 
-func createTxRecord(tx entities.Tx) (*kgo.Record, error) {
+func createTxRecord(tx entities.Tx, epoch uint32) (*kgo.Record, error) {
 
 	payload, err := json.Marshal(tx)
 	if err != nil {
@@ -95,9 +95,17 @@ func createTxRecord(tx entities.Tx) (*kgo.Record, error) {
 	key := make([]byte, 4)
 	binary.LittleEndian.PutUint32(key, tx.TickNumber)
 
+	epochHeaderValue := make([]byte, 4)
+	binary.LittleEndian.PutUint32(epochHeaderValue, epoch)
+	epochHeader := kgo.RecordHeader{
+		Key:   "epoch",
+		Value: epochHeaderValue,
+	}
+
 	return &kgo.Record{
-		Key:   key,
-		Value: payload,
+		Headers: []kgo.RecordHeader{epochHeader},
+		Key:     key,
+		Value:   payload,
 	}, nil
 
 }

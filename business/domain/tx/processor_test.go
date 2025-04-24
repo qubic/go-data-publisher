@@ -24,7 +24,7 @@ type MockFetcher struct {
 	emptyTicks                     []uint32
 }
 
-func (mf *MockFetcher) GetProcessedTickIntervalsPerEpoch(ctx context.Context) ([]entities.ProcessedTickIntervalsPerEpoch, error) {
+func (mf *MockFetcher) GetProcessedTickIntervalsPerEpoch(_ context.Context) ([]entities.ProcessedTickIntervalsPerEpoch, error) {
 
 	if mf.shouldError {
 		return nil, ErrMock
@@ -33,7 +33,7 @@ func (mf *MockFetcher) GetProcessedTickIntervalsPerEpoch(ctx context.Context) ([
 	return mf.processedTickIntervalsPerEpoch, nil
 }
 
-func (mf *MockFetcher) GetTickTransactions(ctx context.Context, tick uint32) ([]entities.Tx, error) {
+func (mf *MockFetcher) GetTickTransactions(_ context.Context, tick uint32) ([]entities.Tx, error) {
 
 	if mf.shouldError {
 		return nil, ErrMock
@@ -65,7 +65,7 @@ type MockPublisher struct {
 	shouldError  bool
 }
 
-func (mp *MockPublisher) PublishTransactions(ctx context.Context, txs []entities.Tx) error {
+func (mp *MockPublisher) PublishTransactions(_ context.Context, txs []entities.Tx, _ uint32) error {
 
 	if mp.shouldError {
 		return ErrMock
