@@ -1,4 +1,4 @@
-package tx
+package domain
 
 import (
 	cmp2 "cmp"
