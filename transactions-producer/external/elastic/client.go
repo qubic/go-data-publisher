@@ -67,7 +67,7 @@ func NewClient(address, index string, timeout time.Duration, opts ...ClientOptio
 	return &client, nil
 }
 
-func (es *Client) PublishTransactions(ctx context.Context, txs []entities.Tx) error {
+func (es *Client) PublishTransactions(ctx context.Context, txs []entities.Tx, _ uint32) error {
 	if len(txs) == 0 {
 		return nil
 	}

@@ -207,7 +207,7 @@ func TestClient_PublishTransactions(t *testing.T) {
 				shouldError: testRun.shouldError,
 			})
 
-			err := kc.PublishTransactions(context.Background(), testRun.transactions)
+			err := kc.PublishTransactions(context.Background(), testRun.transactions, 100)
 
 			if testRun.shouldError {
 				assert.Error(t, err)
