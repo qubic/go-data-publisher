@@ -14,7 +14,6 @@ import (
 
 type KafkaClient interface {
 	Produce(ctx context.Context, r *kgo.Record, promise func(*kgo.Record, error))
-	//ProduceSync(ctx context.Context, rs ...*kgo.Record) kgo.ProduceResults
 }
 type Client struct {
 	kcl KafkaClient
@@ -63,28 +62,6 @@ func (kc *Client) PublishTickTransactions(ctx context.Context, tickTransactions 
 
 	return nil
 }
-
-// Sync version
-/*func (kc *Client) PublishTransactions(ctx context.Context, txs []entities.Tx) error {
-
-	var records []*kgo.Record
-
-	for _, tx := range txs {
-		record, err := createTickTransactionsRecord(tx)
-		if err != nil {
-			return fmt.Errorf("creating kafka record for transaction: %w", err)
-		}
-		records = append(records, record)
-	}
-
-	results := kc.kcl.ProduceSync(ctx, records...)
-	err := results.FirstErr()
-	if err != nil {
-		return fmt.Errorf("kafka error: %w", err)
-	}
-
-	return nil
-}*/
 
 func createTickTransactionsRecord(tx entities.TickTransactions) (*kgo.Record, error) {
 
