@@ -61,102 +61,137 @@ func (mf *MockFetcher) GetTickTransactions(_ context.Context, tick uint32) ([]en
 }
 
 type MockPublisher struct {
-	publishedTxs []entities.Tx
-	shouldError  bool
+	publishedTickTransactions []entities.TickTransactions
+	shouldError               bool
 }
 
-func (mp *MockPublisher) PublishTransactions(_ context.Context, txs []entities.Tx, _ uint32) error {
+func (mp *MockPublisher) PublishTickTransactions(_ context.Context, tickTransactions []entities.TickTransactions) error {
 
 	if mp.shouldError {
 		return ErrMock
 	}
 
-	mp.publishedTxs = append(mp.publishedTxs, txs...)
+	mp.publishedTickTransactions = append(mp.publishedTickTransactions, tickTransactions...)
 
 	return nil
 }
 
 func TestTxProcessor_RunCycle(t *testing.T) {
 
-	expected := []entities.Tx{
-
+	expected := []entities.TickTransactions{
 		{
-			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-			DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Amount:     100,
+			Epoch:      100,
 			TickNumber: 10000001,
-			InputType:  0,
-			InputSize:  0,
-			Input:      "",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Transactions: []entities.Tx{
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 10000001,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+			},
 		},
 		{
-			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-			DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Amount:     100,
+			Epoch:      100,
 			TickNumber: 10000002,
-			InputType:  0,
-			InputSize:  0,
-			Input:      "",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Transactions: []entities.Tx{
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 10000002,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+			},
 		},
 		{
-			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-			DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Amount:     100,
+			Epoch:      103,
 			TickNumber: 40000001,
-			InputType:  0,
-			InputSize:  0,
-			Input:      "",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Transactions: []entities.Tx{
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 40000001,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+			},
 		},
 		{
-			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-			DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Amount:     100,
+			Epoch:      103,
 			TickNumber: 40000002,
-			InputType:  0,
-			InputSize:  0,
-			Input:      "",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Transactions: []entities.Tx{
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 40000002,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+			},
 		},
 		{
-			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-			DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Amount:     100,
+			Epoch:      103,
 			TickNumber: 50000016,
-			InputType:  0,
-			InputSize:  0,
-			Input:      "",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Transactions: []entities.Tx{
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 50000016,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+			},
 		},
 		{
-			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-			DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Amount:     100,
+			Epoch:      103,
 			TickNumber: 50000017,
-			InputType:  0,
-			InputSize:  0,
-			Input:      "",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Transactions: []entities.Tx{
+				{
+					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+					Amount:     100,
+					TickNumber: 50000017,
+					InputType:  0,
+					InputSize:  0,
+					Input:      "",
+					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+					Timestamp:  1744610180,
+					MoneyFlew:  true,
+				},
+			},
 		},
 	}
 
@@ -202,12 +237,12 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 
 	err = txProcessor.runCycle(2)
 	require.NoError(t, err)
-	require.Equal(t, 6, len(publisher.publishedTxs))
+	require.Equal(t, 6, len(publisher.publishedTickTransactions))
 
-	got := publisher.publishedTxs
+	got := publisher.publishedTickTransactions
 
 	// Make sure the results are sorted by tick number, as the data is added asynchronously
-	slices.SortFunc(got, func(a, b entities.Tx) int {
+	slices.SortFunc(got, func(a, b entities.TickTransactions) int {
 		return cmp2.Compare(a.TickNumber, b.TickNumber)
 	})
 
@@ -384,7 +419,7 @@ func TestTxProcessor_ProcessBatch(t *testing.T) {
 				},
 			},
 		},
-		// Error on fetcher cannot be tested, as gatherTxBatch keeps on retrying in case of error.
+		// Error on fetcher cannot be tested, as gatherTickTransactionsBatch keeps on retrying in case of error.
 		/*{
 			name:                 "TestFetcherError",
 			shouldFetcherError:   true,
@@ -461,7 +496,7 @@ func TestTxProcessor_ProcessBatch(t *testing.T) {
 	}
 }
 
-func TestTxProcessor_GatherTxBatch(t *testing.T) {
+func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 
 	fetcher := MockFetcher{}
 	publisher := MockPublisher{}
@@ -479,10 +514,10 @@ func TestTxProcessor_GatherTxBatch(t *testing.T) {
 	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, time.Second, store, 100, logger.Sugar())
 
 	testData := []struct {
-		name               string
-		epochTickIntervals entities.ProcessedTickIntervalsPerEpoch
-		emptyTicks         []uint32
-		expectedTxs        []entities.Tx
+		name                     string
+		epochTickIntervals       entities.ProcessedTickIntervalsPerEpoch
+		emptyTicks               []uint32
+		expectedTickTransactions []entities.TickTransactions
 	}{
 		{
 			name: "TestLastIntervalTickIsEmpty",
@@ -496,45 +531,68 @@ func TestTxProcessor_GatherTxBatch(t *testing.T) {
 				},
 			},
 			emptyTicks: []uint32{10000003},
-			expectedTxs: []entities.Tx{
+			expectedTickTransactions: []entities.TickTransactions{
 				{
-					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-					Amount:     100,
+					Epoch:      100,
 					TickNumber: 10000000,
-					InputType:  0,
-					InputSize:  0,
-					Input:      "",
-					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-					Timestamp:  1744610180,
-					MoneyFlew:  true,
+					Transactions: []entities.Tx{
+						{
+							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+							Amount:     100,
+							TickNumber: 10000000,
+							InputType:  0,
+							InputSize:  0,
+							Input:      "",
+							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+							Timestamp:  1744610180,
+							MoneyFlew:  true,
+						},
+					},
 				},
 				{
-					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-					Amount:     100,
+					Epoch:      100,
 					TickNumber: 10000001,
-					InputType:  0,
-					InputSize:  0,
-					Input:      "",
-					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-					Timestamp:  1744610180,
-					MoneyFlew:  true,
+					Transactions: []entities.Tx{
+						{
+							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+							Amount:     100,
+							TickNumber: 10000001,
+							InputType:  0,
+							InputSize:  0,
+							Input:      "",
+							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+							Timestamp:  1744610180,
+							MoneyFlew:  true,
+						},
+					},
 				},
 				{
-					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-					Amount:     100,
+					Epoch:      100,
 					TickNumber: 10000002,
-					InputType:  0,
-					InputSize:  0,
-					Input:      "",
-					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-					Timestamp:  1744610180,
-					MoneyFlew:  true,
+					Transactions: []entities.Tx{
+						{
+							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+							Amount:     100,
+							TickNumber: 10000002,
+							InputType:  0,
+							InputSize:  0,
+							Input:      "",
+							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+							Timestamp:  1744610180,
+							MoneyFlew:  true,
+						},
+					},
+				},
+				{
+					Epoch:        100,
+					TickNumber:   10000003,
+					Transactions: []entities.Tx{},
 				},
 			},
 		},
@@ -550,45 +608,68 @@ func TestTxProcessor_GatherTxBatch(t *testing.T) {
 				},
 			},
 			emptyTicks: []uint32{10000001},
-			expectedTxs: []entities.Tx{
+			expectedTickTransactions: []entities.TickTransactions{
 				{
-					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-					Amount:     100,
+					Epoch:      100,
 					TickNumber: 10000000,
-					InputType:  0,
-					InputSize:  0,
-					Input:      "",
-					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-					Timestamp:  1744610180,
-					MoneyFlew:  true,
+					Transactions: []entities.Tx{
+						{
+							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+							Amount:     100,
+							TickNumber: 10000000,
+							InputType:  0,
+							InputSize:  0,
+							Input:      "",
+							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+							Timestamp:  1744610180,
+							MoneyFlew:  true,
+						},
+					},
 				},
 				{
-					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-					Amount:     100,
+					Epoch:        100,
+					TickNumber:   10000001,
+					Transactions: []entities.Tx{},
+				},
+				{
+					Epoch:      100,
 					TickNumber: 10000002,
-					InputType:  0,
-					InputSize:  0,
-					Input:      "",
-					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-					Timestamp:  1744610180,
-					MoneyFlew:  true,
+					Transactions: []entities.Tx{
+						{
+							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+							Amount:     100,
+							TickNumber: 10000002,
+							InputType:  0,
+							InputSize:  0,
+							Input:      "",
+							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+							Timestamp:  1744610180,
+							MoneyFlew:  true,
+						},
+					},
 				},
 				{
-					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-					Amount:     100,
+					Epoch:      100,
 					TickNumber: 10000003,
-					InputType:  0,
-					InputSize:  0,
-					Input:      "",
-					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-					Timestamp:  1744610180,
-					MoneyFlew:  true,
+					Transactions: []entities.Tx{
+						{
+							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+							Amount:     100,
+							TickNumber: 10000003,
+							InputType:  0,
+							InputSize:  0,
+							Input:      "",
+							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+							Timestamp:  1744610180,
+							MoneyFlew:  true,
+						},
+					},
 				},
 			},
 		},
@@ -604,58 +685,82 @@ func TestTxProcessor_GatherTxBatch(t *testing.T) {
 				},
 			},
 			emptyTicks: []uint32{},
-			expectedTxs: []entities.Tx{
+			expectedTickTransactions: []entities.TickTransactions{
 				{
-					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-					Amount:     100,
+					Epoch:      100,
 					TickNumber: 10000000,
-					InputType:  0,
-					InputSize:  0,
-					Input:      "",
-					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-					Timestamp:  1744610180,
-					MoneyFlew:  true,
+					Transactions: []entities.Tx{
+						{
+							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+							Amount:     100,
+							TickNumber: 10000000,
+							InputType:  0,
+							InputSize:  0,
+							Input:      "",
+							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+							Timestamp:  1744610180,
+							MoneyFlew:  true,
+						},
+					},
 				},
 				{
-					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-					Amount:     100,
+					Epoch:      100,
 					TickNumber: 10000001,
-					InputType:  0,
-					InputSize:  0,
-					Input:      "",
-					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-					Timestamp:  1744610180,
-					MoneyFlew:  true,
+					Transactions: []entities.Tx{
+						{
+							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+							Amount:     100,
+							TickNumber: 10000001,
+							InputType:  0,
+							InputSize:  0,
+							Input:      "",
+							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+							Timestamp:  1744610180,
+							MoneyFlew:  true,
+						},
+					},
 				},
 				{
-					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-					Amount:     100,
+					Epoch:      100,
 					TickNumber: 10000002,
-					InputType:  0,
-					InputSize:  0,
-					Input:      "",
-					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-					Timestamp:  1744610180,
-					MoneyFlew:  true,
+					Transactions: []entities.Tx{
+						{
+							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+							Amount:     100,
+							TickNumber: 10000002,
+							InputType:  0,
+							InputSize:  0,
+							Input:      "",
+							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+							Timestamp:  1744610180,
+							MoneyFlew:  true,
+						},
+					},
 				},
 				{
-					TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-					SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-					DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-					Amount:     100,
+					Epoch:      100,
 					TickNumber: 10000003,
-					InputType:  0,
-					InputSize:  0,
-					Input:      "",
-					Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-					Timestamp:  1744610180,
-					MoneyFlew:  true,
+					Transactions: []entities.Tx{
+						{
+							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+							Amount:     100,
+							TickNumber: 10000003,
+							InputType:  0,
+							InputSize:  0,
+							Input:      "",
+							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+							Timestamp:  1744610180,
+							MoneyFlew:  true,
+						},
+					},
 				},
 			},
 		},
@@ -669,10 +774,10 @@ func TestTxProcessor_GatherTxBatch(t *testing.T) {
 			epoch := testRun.epochTickIntervals.Epoch
 			startTick := testRun.epochTickIntervals.Intervals[0].InitialProcessedTick
 
-			gotTxs, _, err := txProcessor.gatherTxBatch(epoch, startTick, testRun.epochTickIntervals)
+			gotTxs, _, err := txProcessor.gatherTickTransactionsBatch(epoch, startTick, testRun.epochTickIntervals)
 			require.NoError(t, err)
 
-			if diff := cmp.Diff(testRun.expectedTxs, gotTxs); diff != "" {
+			if diff := cmp.Diff(testRun.expectedTickTransactions, gotTxs); diff != "" {
 				t.Fatalf("Unexpected result: %v", diff)
 			}
 

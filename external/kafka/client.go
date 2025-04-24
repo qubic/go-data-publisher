@@ -26,16 +26,16 @@ func NewClient(kafkaClient KafkaClient) *Client {
 	}
 }
 
-func (kc *Client) PublishTransactions(ctx context.Context, txs []entities.Tx, epoch uint32) error {
+func (kc *Client) PublishTickTransactions(ctx context.Context, tickTransactions []entities.TickTransactions) error {
 
 	wg := sync.WaitGroup{}
-	errorChannel := make(chan error, len(txs))
+	errorChannel := make(chan error, len(tickTransactions))
 
-	for _, tx := range txs {
+	for _, tick := range tickTransactions {
 
-		record, err := createTxRecord(tx, epoch)
+		record, err := createTickTransactionsRecord(tick)
 		if err != nil {
-			log.Printf("Error while creating transaction record: %v", err)
+			log.Printf("Error while creating tick transactions record: %v", err)
 			errorChannel <- err
 			break
 		}
@@ -57,7 +57,7 @@ func (kc *Client) PublishTransactions(ctx context.Context, txs []entities.Tx, ep
 
 	for err := range errorChannel {
 		if err != nil {
-			return errors.New("encountered errors while producing transaction records")
+			return errors.New("encountered errors while producing tick transaction records")
 		}
 	}
 
@@ -70,7 +70,7 @@ func (kc *Client) PublishTransactions(ctx context.Context, txs []entities.Tx, ep
 	var records []*kgo.Record
 
 	for _, tx := range txs {
-		record, err := createTxRecord(tx)
+		record, err := createTickTransactionsRecord(tx)
 		if err != nil {
 			return fmt.Errorf("creating kafka record for transaction: %w", err)
 		}
@@ -86,7 +86,7 @@ func (kc *Client) PublishTransactions(ctx context.Context, txs []entities.Tx, ep
 	return nil
 }*/
 
-func createTxRecord(tx entities.Tx, epoch uint32) (*kgo.Record, error) {
+func createTickTransactionsRecord(tx entities.TickTransactions) (*kgo.Record, error) {
 
 	payload, err := json.Marshal(tx)
 	if err != nil {
@@ -95,17 +95,9 @@ func createTxRecord(tx entities.Tx, epoch uint32) (*kgo.Record, error) {
 	key := make([]byte, 4)
 	binary.LittleEndian.PutUint32(key, tx.TickNumber)
 
-	epochHeaderValue := make([]byte, 4)
-	binary.LittleEndian.PutUint32(epochHeaderValue, epoch)
-	epochHeader := kgo.RecordHeader{
-		Key:   "epoch",
-		Value: epochHeaderValue,
-	}
-
 	return &kgo.Record{
-		Headers: []kgo.RecordHeader{epochHeader},
-		Key:     key,
-		Value:   payload,
+		Key:   key,
+		Value: payload,
 	}, nil
 
 }

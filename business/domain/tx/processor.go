@@ -16,7 +16,7 @@ type Fetcher interface {
 }
 
 type Publisher interface {
-	PublishTransactions(ctx context.Context, txs []entities.Tx, epoch uint32) error
+	PublishTickTransactions(ctx context.Context, tickTransactions []entities.TickTransactions) error
 }
 
 type statusStore interface {
@@ -180,15 +180,15 @@ func (p *Processor) processEpoch(startTick uint32, epochTickIntervals entities.P
 func (p *Processor) processBatch(startTick uint32, epochTickIntervals entities.ProcessedTickIntervalsPerEpoch) (uint32, error) {
 	epoch := epochTickIntervals.Epoch
 
-	batchTxToInsert, tick, err := p.gatherTxBatch(epoch, startTick, epochTickIntervals)
+	tickTransactionsBatch, tick, err := p.gatherTickTransactionsBatch(epoch, startTick, epochTickIntervals)
 	if err != nil {
-		return 0, fmt.Errorf("gathering tx batch: %v", err)
+		return 0, fmt.Errorf("gathering tick tx batch: %v", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), p.publishTimeout)
 	defer cancel()
 
-	p.logger.Infow("Publishing transactions", "nr_transactions", len(batchTxToInsert), "epoch", epoch, "tick", tick)
-	err = p.publisher.PublishTransactions(ctx, batchTxToInsert, epoch)
+	p.logger.Infow("Publishing tick transactions", "nr_transactions", len(tickTransactionsBatch), "epoch", epoch, "tick", tick)
+	err = p.publisher.PublishTickTransactions(ctx, tickTransactionsBatch)
 	if err != nil {
 		return 0, fmt.Errorf("inserting batch: %v", err)
 	}
@@ -202,42 +202,46 @@ func (p *Processor) processBatch(startTick uint32, epochTickIntervals entities.P
 	return tick, nil
 }
 
-func (p *Processor) gatherTxBatch(epoch, startTick uint32, epochTickIntervals entities.ProcessedTickIntervalsPerEpoch) ([]entities.Tx, uint32, error) {
-	batchTxToInsert := make([]entities.Tx, 0, p.batchSize+1024)
+func (p *Processor) gatherTickTransactionsBatch(epoch, startTick uint32, epochTickIntervals entities.ProcessedTickIntervalsPerEpoch) ([]entities.TickTransactions, uint32, error) {
+
+	var tickTransactionsBatch []entities.TickTransactions
+
 	var tick uint32
 
-	for _, interval := range epochTickIntervals.Intervals {
+	for intervalIndex, interval := range epochTickIntervals.Intervals {
 		for tick = interval.InitialProcessedTick; tick <= interval.LastProcessedTick; tick++ {
 			if tick < startTick {
 				continue
 			}
 
-			txs, err := func() ([]entities.Tx, error) {
+			transactions, err := func() ([]entities.Tx, error) {
 				ctx, cancel := context.WithTimeout(context.Background(), p.fetchTimeout)
 				defer cancel()
 
 				return p.fetcher.GetTickTransactions(ctx, tick)
 			}()
-			if errors.Is(err, entities.ErrEmptyTick) {
-				if tick == interval.LastProcessedTick {
-					return batchTxToInsert, tick, nil
-				}
-
-				continue
-			}
 
 			if err != nil {
-				p.logger.Errorw("error processing tick; retrying...", "epoch", epoch, "tick", tick, "error", fmt.Errorf("getting transactions: %v", err))
-				tick--
-				continue
+				if !errors.Is(err, entities.ErrEmptyTick) {
+					p.logger.Errorw("error processing tick; retrying...", "epoch", epoch, "tick", tick, "error", fmt.Errorf("getting transactions: %v", err))
+					tick--
+					continue
+				}
+				transactions = []entities.Tx{}
 			}
 
-			batchTxToInsert = append(batchTxToInsert, txs...)
-			if len(batchTxToInsert) >= p.batchSize || tick == interval.LastProcessedTick {
-				return batchTxToInsert, tick, nil
+			tickTransactions := entities.TickTransactions{
+				TickNumber:   tick,
+				Epoch:        epoch,
+				Transactions: transactions,
+			}
+			tickTransactionsBatch = append(tickTransactionsBatch, tickTransactions)
+
+			if len(tickTransactionsBatch) >= p.batchSize || (intervalIndex == len(epochTickIntervals.Intervals)-1) && tick == interval.LastProcessedTick {
+				return tickTransactionsBatch, tick, nil
 			}
 		}
 	}
 
-	return batchTxToInsert, tick, nil
+	return tickTransactionsBatch, tick, nil
 }
