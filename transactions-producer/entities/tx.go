@@ -5,10 +5,10 @@ type Tx struct {
 	SourceID   string `json:"source"`
 	DestID     string `json:"destination"`
 	Amount     int64  `json:"amount"`
-	TickNumber uint32 `json:"tick"`
+	TickNumber uint32 `json:"tickNumber"`
 	InputType  uint32 `json:"inputType"`
 	InputSize  uint32 `json:"inputSize"`
-	Input      string `json:"input"`
+	Input      string `json:"inputData"`
 	Signature  string `json:"signature"`
 	Timestamp  uint64 `json:"timestamp"`
 	MoneyFlew  bool   `json:"moneyFlew"`
