@@ -1,5 +1,13 @@
-on: [push, pull_request]
-name: Go Test
+on:
+  push:
+    paths:
+      - 'transactions-producer/**'
+  pull_request:
+    paths:
+      - 'transactions-producer/**'
+
+name: Tx Producer go test
+
 jobs:
   test-nocache:
     strategy:
@@ -14,3 +22,4 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: false
       - run: go test ./...
+        working-directory: transactions-producer

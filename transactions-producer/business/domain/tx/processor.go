@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/qubic/go-data-publisher/entities"
+	"github.com/qubic/transactions-producer/entities"
 	"go.uber.org/zap"
 	"sync/atomic"
 	"time"

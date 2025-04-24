@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/qubic/go-archiver/protobuff"
-	"github.com/qubic/go-data-publisher/entities"
+	"github.com/qubic/transactions-producer/entities"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )

@@ -3,7 +3,7 @@ package archiver
 import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/qubic/go-archiver/protobuff"
-	"github.com/qubic/go-data-publisher/entities"
+	"github.com/qubic/transactions-producer/entities"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
