@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/qubic/go-data-publisher/entities"
+	"github.com/qubic/transactions-producer/entities"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"log"
 	"sync"

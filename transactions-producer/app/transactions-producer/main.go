@@ -7,10 +7,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/qubic/go-data-publisher/business/domain/tx"
-	"github.com/qubic/go-data-publisher/external/archiver"
-	"github.com/qubic/go-data-publisher/external/kafka"
-	"github.com/qubic/go-data-publisher/infrastructure/store/pebbledb"
+	"github.com/qubic/transactions-producer/domain"
+	"github.com/qubic/transactions-producer/external/archiver"
+	"github.com/qubic/transactions-producer/external/kafka"
+	"github.com/qubic/transactions-producer/infrastructure/store/pebbledb"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/plugin/kprom"
 	"go.uber.org/zap"
@@ -122,7 +122,7 @@ func run() error {
 		return fmt.Errorf("creating archiver client: %v", err)
 	}
 
-	proc := tx.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, kafkaClient, cfg.PublishWriteTimeout, procStore, cfg.BatchSize, sLogger)
+	proc := domain.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, kafkaClient, cfg.PublishWriteTimeout, procStore, cfg.BatchSize, sLogger)
 	if err != nil {
 		return fmt.Errorf("creating processor: %v", err)
 	}

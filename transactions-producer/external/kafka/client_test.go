@@ -3,7 +3,7 @@ package kafka
 import (
 	"context"
 	"errors"
-	"github.com/qubic/go-data-publisher/entities"
+	"github.com/qubic/transactions-producer/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"testing"
