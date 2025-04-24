@@ -6,8 +6,8 @@ import (
 	"errors"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/qubic/go-data-publisher/entities"
-	"github.com/qubic/go-data-publisher/infrastructure/store/pebbledb"
+	"github.com/qubic/transactions-producer/entities"
+	"github.com/qubic/transactions-producer/infrastructure/store/pebbledb"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"os"
