@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/ardanlabs/conf"
 	"github.com/pkg/errors"
-	"github.com/qubic/transactions-producer/business/domain/tx"
+	"github.com/qubic/transactions-producer/domain"
 	"github.com/qubic/transactions-producer/external/archiver"
 	"github.com/qubic/transactions-producer/external/elastic"
 	"github.com/qubic/transactions-producer/infrastructure/store/pebbledb"
@@ -104,7 +104,7 @@ func run() error {
 		return fmt.Errorf("creating archiver client: %v", err)
 	}
 
-	proc := tx.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, esClient, cfg.ElasticSearchWriteTimeout, procStore, cfg.BatchSize, sLogger)
+	proc := domain.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, esClient, cfg.ElasticSearchWriteTimeout, procStore, cfg.BatchSize, sLogger)
 	if err != nil {
 		return fmt.Errorf("creating processor: %v", err)
 	}
