@@ -9,12 +9,11 @@ import (
 	"testing"
 )
 
-type MockKafkaClient struct {
+type mockProduce struct {
 	shouldError bool
 }
 
-func (mkc *MockKafkaClient) Produce(_ context.Context, _ *kgo.Record, promise func(*kgo.Record, error)) {
-
+func (mkc mockProduce) ProduceFunc(_ context.Context, _ *kgo.Record, promise func(*kgo.Record, error)) {
 	if mkc.shouldError {
 		go promise(nil, errors.New("dummy error"))
 		return
@@ -203,11 +202,9 @@ func TestClient_PublishTransactions(t *testing.T) {
 	for _, testRun := range testData {
 		t.Run(testRun.name, func(t *testing.T) {
 
-			kc := NewClient(&MockKafkaClient{
-				shouldError: testRun.shouldError,
-			})
-
-			err := kc.PublishTransactions(context.Background(), testRun.transactions, 100)
+			kc := Client{}
+			mp := mockProduce{shouldError: testRun.shouldError}
+			err := kc.publishTransactions(context.Background(), testRun.transactions, 100, mp.ProduceFunc)
 
 			if testRun.shouldError {
 				assert.Error(t, err)

@@ -12,22 +12,23 @@ import (
 	"sync"
 )
 
-type KafkaClient interface {
-	Produce(ctx context.Context, r *kgo.Record, promise func(*kgo.Record, error))
-	//ProduceSync(ctx context.Context, rs ...*kgo.Record) kgo.ProduceResults
-}
 type Client struct {
-	kcl KafkaClient
+	kcl *kgo.Client
 }
 
-func NewClient(kafkaClient KafkaClient) *Client {
+func NewClient(kafkaClient *kgo.Client) *Client {
 	return &Client{
 		kcl: kafkaClient,
 	}
 }
 
 func (kc *Client) PublishTransactions(ctx context.Context, txs []entities.Tx, epoch uint32) error {
+	return kc.publishTransactions(ctx, txs, epoch, kc.kcl.Produce)
+}
 
+type produceFunc func(ctx context.Context, r *kgo.Record, promise func(*kgo.Record, error))
+
+func (kc *Client) publishTransactions(ctx context.Context, txs []entities.Tx, epoch uint32, produceFunc produceFunc) error {
 	wg := sync.WaitGroup{}
 	errorChannel := make(chan error, len(txs))
 
@@ -41,7 +42,7 @@ func (kc *Client) PublishTransactions(ctx context.Context, txs []entities.Tx, ep
 		}
 
 		wg.Add(1)
-		kc.kcl.Produce(ctx, record, func(_ *kgo.Record, err error) {
+		produceFunc(ctx, record, func(_ *kgo.Record, err error) {
 			defer wg.Done()
 			if err != nil {
 				log.Printf("Error while producing transaction record: %v", err)
