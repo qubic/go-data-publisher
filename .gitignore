@@ -3,4 +3,11 @@
 !*/
 
 *.idea/
+.iml
 vendor/
+
+# log file
+*.log
+
+# temporary files
+*~

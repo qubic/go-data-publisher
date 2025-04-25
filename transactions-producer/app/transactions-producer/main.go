@@ -46,7 +46,6 @@ func run() error {
 	var cfg struct {
 		InternalStoreFolder                 string        `conf:"default:store"`
 		ArchiverGrpcHost                    string        `conf:"default:127.0.0.1:6001"`
-		ServerListenAddr                    string        `conf:"default:0.0.0.0:8000"`
 		ArchiverReadTimeout                 time.Duration `conf:"default:20s"`
 		PublishWriteTimeout                 time.Duration `conf:"default:5m"`
 		BatchSize                           int           `conf:"default:100"`
@@ -56,13 +55,10 @@ func run() error {
 		OverrideLastProcessedTickValue      uint32        `conf:"default:22669394"`
 		Kafka                               struct {
 			BootstrapServers []string `conf:"default:localhost:9092"`
-
-			// Assuming we would want to publish more than transactions,
-			// we should either have multiple topics, or a single one, with logic to differentiate between record types.
-			TxTopic string `conf:"default:qubic-transactions"`
+			TxTopic          string   `conf:"default:qubic-transactions"`
 		}
 		MetricsNamespace string `conf:"default:qubic-kafka"`
-		MetricsHost      string `conf:"default:0.0.0.0:9999"`
+		MetricsPort      int    `conf:"default:9999"`
 	}
 
 	if err := conf.Parse(os.Args[1:], prefix, &cfg); err != nil {
@@ -135,37 +131,31 @@ func run() error {
 		procErrors <- proc.Start(cfg.NrWorkers)
 	}()
 
-	go func() {
-		log.Printf("Metrics endpoint available at [http://%s/metrics]", cfg.MetricsHost)
-		http.Handle("/metrics", promhttp.Handler())
-		log.Fatal(http.ListenAndServe(cfg.MetricsHost, nil))
-	}()
-
-	http.HandleFunc("/v1/status", func(w http.ResponseWriter, r *http.Request) {
-		epochsLastProcessedTick, err := procStore.GetLastProcessedTickForAllEpochs()
-		if err != nil {
-			http.Error(w, fmt.Sprintf("getting last processed tick for all epochs: %v", err), http.StatusInternalServerError)
-			return
-		}
-		response := map[string]map[uint32]uint32{
-			"lastProcessedTicks": epochsLastProcessedTick,
-		}
-		data, err := json.Marshal(response)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("marshalling response: %v", err), http.StatusInternalServerError)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, err = w.Write(data)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("writing response: %v", err), http.StatusInternalServerError)
-			return
-		}
-	})
-
 	serverErr := make(chan error, 1)
-
 	go func() {
-		serverErr <- http.ListenAndServe(cfg.ServerListenAddr, nil)
+		log.Printf("main: Starting status and metrics endpoint on port [%d]", cfg.MetricsPort)
+		http.HandleFunc("/v1/status", func(w http.ResponseWriter, r *http.Request) {
+			epochsLastProcessedTick, err := procStore.GetLastProcessedTickForAllEpochs()
+			if err != nil {
+				http.Error(w, fmt.Sprintf("getting last processed tick for all epochs: %v", err), http.StatusInternalServerError)
+				return
+			}
+			response := map[string]map[uint32]uint32{
+				"lastProcessedTicks": epochsLastProcessedTick,
+			}
+			data, err := json.Marshal(response)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("marshalling response: %v", err), http.StatusInternalServerError)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, err = w.Write(data)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("writing response: %v", err), http.StatusInternalServerError)
+				return
+			}
+		})
+		http.Handle("/metrics", promhttp.Handler())
+		serverErr <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.MetricsPort), nil)
 	}()
 
 	for {
