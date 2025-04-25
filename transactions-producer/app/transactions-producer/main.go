@@ -111,6 +111,7 @@ func run() error {
 	if err != nil {
 		return errors.Wrap(err, "creating kafka client")
 	}
+
 	kafkaClient := kafka.NewClient(kcl)
 
 	archiverClient, err := archiver.NewClient(cfg.ArchiverGrpcHost)
@@ -118,7 +119,8 @@ func run() error {
 		return fmt.Errorf("creating archiver client: %v", err)
 	}
 
-	proc := domain.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, kafkaClient, cfg.PublishWriteTimeout, procStore, cfg.BatchSize, sLogger)
+	metrics := domain.NewMetrics(cfg.MetricsNamespace)
+	proc := domain.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, kafkaClient, cfg.PublishWriteTimeout, procStore, cfg.BatchSize, sLogger, metrics)
 	if err != nil {
 		return fmt.Errorf("creating processor: %v", err)
 	}

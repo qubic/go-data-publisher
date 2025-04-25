@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"github.com/google/go-cmp/cmp"
-
 	"github.com/qubic/transactions-producer/entities"
 	"github.com/qubic/transactions-producer/infrastructure/store/pebbledb"
 	"github.com/stretchr/testify/require"
@@ -16,6 +15,7 @@ import (
 	"time"
 )
 
+var metrics = NewMetrics("test")
 var ErrMock = errors.New("mock error")
 
 type MockFetcher struct {
@@ -233,7 +233,7 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 
-	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, time.Second, store, 100, logger.Sugar())
+	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, time.Second, store, 100, logger.Sugar(), metrics)
 
 	err = txProcessor.runCycle(2)
 	require.NoError(t, err)
@@ -269,7 +269,7 @@ func TestTxProcessor_GetStartingTicksForEpochs(t *testing.T) {
 	err = store.SetLastProcessedTick(103, 26000001)
 	require.NoError(t, err)
 
-	txProcessor := NewProcessor(nil, 0, nil, 0, store, 0, nil)
+	txProcessor := NewProcessor(nil, 0, nil, 0, store, 0, nil, metrics)
 
 	testData := []struct {
 		name           string
@@ -391,7 +391,7 @@ func TestTxProcessor_ProcessBatch(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 
-	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, time.Second, store, 100, logger.Sugar())
+	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, time.Second, store, 100, logger.Sugar(), metrics)
 
 	testData := []struct {
 		name                 string
@@ -511,7 +511,7 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 
-	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, time.Second, store, 100, logger.Sugar())
+	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, time.Second, store, 100, logger.Sugar(), metrics)
 
 	testData := []struct {
 		name                     string

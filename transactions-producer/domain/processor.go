@@ -33,6 +33,7 @@ type Processor struct {
 	statusStore    statusStore
 	batchSize      int
 	logger         *zap.SugaredLogger
+	syncMetrics    *Metrics
 }
 
 func NewProcessor(
@@ -43,6 +44,7 @@ func NewProcessor(
 	statusStore statusStore,
 	batchSize int,
 	logger *zap.SugaredLogger,
+	metrics *Metrics,
 ) *Processor {
 	return &Processor{
 		fetcher:        fetcher,
@@ -52,6 +54,7 @@ func NewProcessor(
 		statusStore:    statusStore,
 		batchSize:      batchSize,
 		logger:         logger,
+		syncMetrics:    metrics,
 	}
 }
 
@@ -158,6 +161,9 @@ func (p *Processor) getStartingTicksForEpochs(epochsIntervals []entities.Process
 func (p *Processor) processEpoch(startTick uint32, epochTickIntervals entities.ProcessedTickIntervalsPerEpoch) error {
 	p.logger.Infow("Starting epoch processor", "epoch", epochTickIntervals.Epoch, "startTick", startTick)
 
+	lastTickFromIntervals := epochTickIntervals.Intervals[len(epochTickIntervals.Intervals)-1].LastProcessedTick
+	p.syncMetrics.SetSourceTick(epochTickIntervals.Epoch, lastTickFromIntervals) // this will fluctuate on initial sync because multiple epochs are synced in parallel
+
 	for {
 		lastProcessedTick, err := p.processBatch(startTick, epochTickIntervals)
 		if err != nil {
@@ -166,7 +172,6 @@ func (p *Processor) processEpoch(startTick uint32, epochTickIntervals entities.P
 		}
 
 		// if lastProcessedTick is equal to the last tick from intervals, we are done
-		lastTickFromIntervals := epochTickIntervals.Intervals[len(epochTickIntervals.Intervals)-1].LastProcessedTick
 		if lastProcessedTick == lastTickFromIntervals {
 			break
 		}
@@ -187,11 +192,15 @@ func (p *Processor) processBatch(startTick uint32, epochTickIntervals entities.P
 	ctx, cancel := context.WithTimeout(context.Background(), p.publishTimeout)
 	defer cancel()
 
-	p.logger.Infow("Publishing tick transactions", "nr_transactions", len(tickTransactionsBatch), "epoch", epoch, "tick", tick)
+	batchSize := len(tickTransactionsBatch)
+	p.logger.Infow("Publishing tick transactions", "nr_ticks", batchSize, "epoch", epoch, "tick", tick)
 	err = p.publisher.PublishTickTransactions(ctx, tickTransactionsBatch)
 	if err != nil {
 		return 0, fmt.Errorf("inserting batch: %v", err)
 	}
+	p.syncMetrics.IncProcessedTicks(batchSize)
+	p.syncMetrics.IncProcessedMessages(batchSize)
+	p.syncMetrics.SetProcessedTick(epochTickIntervals.Epoch, tick)
 
 	p.logger.Infow("Storing last processed tick", "epoch", epoch, "tick", tick)
 	err = p.statusStore.SetLastProcessedTick(epoch, tick)
