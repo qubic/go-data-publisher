@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/ardanlabs/conf"
 	"github.com/elastic/go-elasticsearch/v8"
@@ -114,7 +115,7 @@ func run() error {
 	var elasticClient consume.ElasticDocumentClient
 	if cfg.Elastic.Stub {
 		log.Printf("[WARN] main: Using stub ES client.")
-		elasticClient = &extern.FakeElasticClient{}
+		elasticClient = &ElasticClientStub{}
 	} else {
 		elasticClient = extern.NewElasticClient(esClient, cfg.Elastic.IndexName)
 	}
@@ -149,9 +150,9 @@ func run() error {
 			log.Println("main: Received shutdown signal, shutting down...")
 			return nil
 		case err := <-procError:
-			return fmt.Errorf("processing error: %v", err)
+			return fmt.Errorf("[ERROR] processing error: %v", err)
 		case err := <-serverError:
-			return fmt.Errorf("error starting server: %v", err)
+			return fmt.Errorf("[ERROR] starting server: %v", err)
 		}
 	}
 }
@@ -172,4 +173,11 @@ func calculateBackoff() func(i int) time.Duration {
 
 func randomMillis() time.Duration {
 	return time.Duration(rand.Intn(1000)) * time.Millisecond
+}
+
+type ElasticClientStub struct {
+}
+
+func (c *ElasticClientStub) BulkIndex(_ context.Context, _ []extern.EsDocument) error {
+	return nil
 }

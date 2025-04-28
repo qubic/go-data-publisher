@@ -3,15 +3,16 @@ package consume
 import (
 	"context"
 	"errors"
-	elastic2 "github.com/qubic/go-transactions-consumer/extern"
-	metrics2 "github.com/qubic/go-transactions-consumer/metrics"
+	"github.com/qubic/go-transactions-consumer/extern"
+	"github.com/qubic/go-transactions-consumer/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"log"
 	"testing"
 )
 
-var metrics = metrics2.NewMetrics("foo")
-var elastic = &elastic2.FakeElasticClient{}
+var m = metrics.NewMetrics("foo")
+var elastic = &FakeElasticClient{}
 
 type FakeKafkaClient struct {
 	partitionErr error
@@ -26,6 +27,16 @@ func (fkc *FakeKafkaClient) CommitUncommittedOffsets(_ context.Context) error {
 	return nil
 }
 
+type FakeElasticClient struct {
+	LatestBatch []extern.EsDocument
+}
+
+func (c *FakeElasticClient) BulkIndex(_ context.Context, data []extern.EsDocument) error {
+	log.Printf("Bulk index [%d] documents.", len(data))
+	c.LatestBatch = data
+	return nil
+}
+
 func TestTransactionConsumer_ConsumeBatch(t *testing.T) {
 	kafkaClient := &FakeKafkaClient{
 		value: []byte(`{"epoch":123,"tickNumber":456,"transactions":[{"hash":"transaction-hash","source":"source-identity","destination":"destination-identity","amount":1,"tickNumber":2,"inputType":3,"inputSize":4,"inputData":"input-data","signature":"signature","timestamp":5,"moneyFlew":true}]}`),
@@ -33,7 +44,7 @@ func TestTransactionConsumer_ConsumeBatch(t *testing.T) {
 	transactionConsumer := &TransactionConsumer{
 		kafkaClient:   kafkaClient,
 		elasticClient: elastic,
-		metrics:       metrics,
+		metrics:       m,
 		currentTick:   0,
 		currentEpoch:  0,
 	}
@@ -54,8 +65,8 @@ func TestTransactionConsumer_GivenFetchError_ThenError(t *testing.T) {
 	}
 	transactionConsumer := &TransactionConsumer{
 		kafkaClient:   kafkaClient,
-		elasticClient: &elastic2.FakeElasticClient{},
-		metrics:       metrics,
+		elasticClient: &FakeElasticClient{},
+		metrics:       m,
 		currentTick:   0,
 		currentEpoch:  0,
 	}
@@ -70,8 +81,8 @@ func TestTransactionConsumer_GivenInvalidJson_ThenError(t *testing.T) {
 	}
 	transactionConsumer := &TransactionConsumer{
 		kafkaClient:   kafkaClient,
-		elasticClient: &elastic2.FakeElasticClient{},
-		metrics:       metrics,
+		elasticClient: &FakeElasticClient{},
+		metrics:       m,
 		currentTick:   0,
 		currentEpoch:  0,
 	}
