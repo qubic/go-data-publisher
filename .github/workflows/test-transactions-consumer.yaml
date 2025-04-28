@@ -1,13 +1,12 @@
 on:
   push:
     paths:
-      - 'transactions-producer/**'
+      - 'transactions-consumer/**'
   pull_request:
     paths:
-      - 'transactions-producer/**'
+      - 'transactions-consumer/**'
 
-name: Test transactions producer
-
+name: Test transactions consumer
 jobs:
   test-nocache:
     strategy:
@@ -21,5 +20,5 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache: false
-      - run: go test ./...
-        working-directory: transactions-producer
+      - run: go test -p 1 -tags ci ./...
+        working-directory: transactions-consumer
