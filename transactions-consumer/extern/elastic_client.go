@@ -1,4 +1,4 @@
-package consume
+package extern
 
 import (
 	"bytes"
@@ -10,10 +10,6 @@ import (
 	"runtime"
 	"time"
 )
-
-type ElasticDocumentClient interface {
-	BulkIndex(ctx context.Context, data []EsDocument) error
-}
 
 type ElasticClient struct {
 	esClient  *elasticsearch.Client
@@ -28,8 +24,8 @@ func NewElasticClient(esClient *elasticsearch.Client, indexName string) *Elastic
 }
 
 type EsDocument struct {
-	id      string
-	payload []byte
+	Id      string
+	Payload []byte
 }
 
 func (c *ElasticClient) BulkIndex(ctx context.Context, data []EsDocument) error {
@@ -46,15 +42,15 @@ func (c *ElasticClient) BulkIndex(ctx context.Context, data []EsDocument) error 
 	for _, d := range data {
 		item := esutil.BulkIndexerItem{
 			Action:       "index",
-			DocumentID:   d.id,
+			DocumentID:   d.Id,
 			RequireAlias: true,
-			Body:         bytes.NewReader(d.payload),
+			Body:         bytes.NewReader(d.Payload),
 			OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
 				msg := "Error indexing document"
 				if err != nil {
-					log.Printf("%s [%s]: %s: [%s]", msg, d.id, string(d.payload), err)
+					log.Printf("%s [%s]: %s: [%s]", msg, d.Id, string(d.Payload), err)
 				} else {
-					log.Printf("%s [%s]: %s: [%s: %s]", msg, d.id, string(d.payload), res.Error.Type, res.Error.Reason)
+					log.Printf("%s [%s]: %s: [%s: %s]", msg, d.Id, string(d.Payload), res.Error.Type, res.Error.Reason)
 				}
 			},
 		}

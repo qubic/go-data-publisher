@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/pkg/errors"
+	"github.com/qubic/go-transactions-consumer/extern"
+	metrics2 "github.com/qubic/go-transactions-consumer/metrics"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"log"
 	"time"
@@ -14,10 +16,14 @@ type KafkaClient interface {
 	CommitUncommittedOffsets(ctx context.Context) error
 }
 
+type ElasticDocumentClient interface {
+	BulkIndex(ctx context.Context, data []extern.EsDocument) error
+}
+
 type TransactionConsumer struct {
 	kafkaClient   KafkaClient
 	elasticClient ElasticDocumentClient
-	metrics       *Metrics
+	metrics       *metrics2.Metrics
 	currentTick   uint32
 	currentEpoch  uint32
 }
@@ -42,7 +48,7 @@ type Transaction struct {
 	MoneyFlew bool   `json:"moneyFlew"`
 }
 
-func NewTransactionConsumer(client KafkaClient, elasticClient ElasticDocumentClient, metrics *Metrics) *TransactionConsumer {
+func NewTransactionConsumer(client KafkaClient, elasticClient ElasticDocumentClient, metrics *metrics2.Metrics) *TransactionConsumer {
 	return &TransactionConsumer{
 		kafkaClient:   client,
 		metrics:       metrics,
@@ -76,7 +82,7 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 		return -1, errors.New("Error fetching records")
 	}
 
-	var documents []EsDocument
+	var documents []extern.EsDocument
 	iter := fetches.RecordIter()
 	for !iter.Done() {
 		record := iter.Next()
@@ -92,9 +98,9 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 			if err != nil {
 				return -1, errors.Wrapf(err, "Error unmarshalling transaction %+v", transaction)
 			}
-			documents = append(documents, EsDocument{
-				id:      transaction.Hash,
-				payload: val,
+			documents = append(documents, extern.EsDocument{
+				Id:      transaction.Hash,
+				Payload: val,
 			})
 		}
 

@@ -1,4 +1,4 @@
-package consume
+package metrics
 
 import (
 	"fmt"

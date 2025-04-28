@@ -8,6 +8,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/go-transactions-consumer/consume"
+	"github.com/qubic/go-transactions-consumer/extern"
+	"github.com/qubic/go-transactions-consumer/metrics"
 	"github.com/qubic/go-transactions-consumer/status"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/plugin/kprom"
@@ -112,12 +114,12 @@ func run() error {
 	var elasticClient consume.ElasticDocumentClient
 	if cfg.Elastic.Stub {
 		log.Printf("[WARN] main: Using stub ES client.")
-		elasticClient = &consume.FakeElasticClient{}
+		elasticClient = &extern.FakeElasticClient{}
 	} else {
-		elasticClient = consume.NewElasticClient(esClient, cfg.Elastic.IndexName)
+		elasticClient = extern.NewElasticClient(esClient, cfg.Elastic.IndexName)
 	}
-	metrics := consume.NewMetrics(cfg.Broker.MetricsNamespace)
-	consumer := consume.NewTransactionConsumer(kcl, elasticClient, metrics)
+	met := metrics.NewMetrics(cfg.Broker.MetricsNamespace)
+	consumer := consume.NewTransactionConsumer(kcl, elasticClient, met)
 	procError := make(chan error, 1)
 	if cfg.Sync.Enabled {
 		go func() {

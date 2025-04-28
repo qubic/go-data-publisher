@@ -3,13 +3,15 @@ package consume
 import (
 	"context"
 	"errors"
+	elastic2 "github.com/qubic/go-transactions-consumer/extern"
+	metrics2 "github.com/qubic/go-transactions-consumer/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"testing"
 )
 
-var metrics = NewMetrics("foo")
-var elastic = &FakeElasticClient{}
+var metrics = metrics2.NewMetrics("foo")
+var elastic = &elastic2.FakeElasticClient{}
 
 type FakeKafkaClient struct {
 	partitionErr error
@@ -41,8 +43,8 @@ func TestTransactionConsumer_ConsumeBatch(t *testing.T) {
 	assert.Equal(t, 1, count)
 	assert.Equal(t, uint32(123), transactionConsumer.currentEpoch)
 	assert.Equal(t, uint32(456), transactionConsumer.currentTick)
-	assert.Equal(t, "transaction-hash", elastic.LatestBatch[0].id)
-	assert.Equal(t, []byte(`{"hash":"transaction-hash","source":"source-identity","destination":"destination-identity","amount":1,"tickNumber":2,"inputType":3,"inputSize":4,"inputData":"input-data","signature":"signature","timestamp":5,"moneyFlew":true}`), elastic.LatestBatch[0].payload)
+	assert.Equal(t, "transaction-hash", elastic.LatestBatch[0].Id)
+	assert.Equal(t, []byte(`{"hash":"transaction-hash","source":"source-identity","destination":"destination-identity","amount":1,"tickNumber":2,"inputType":3,"inputSize":4,"inputData":"input-data","signature":"signature","timestamp":5,"moneyFlew":true}`), elastic.LatestBatch[0].Payload)
 }
 
 func TestTransactionConsumer_GivenFetchError_ThenError(t *testing.T) {
@@ -52,7 +54,7 @@ func TestTransactionConsumer_GivenFetchError_ThenError(t *testing.T) {
 	}
 	transactionConsumer := &TransactionConsumer{
 		kafkaClient:   kafkaClient,
-		elasticClient: &FakeElasticClient{},
+		elasticClient: &elastic2.FakeElasticClient{},
 		metrics:       metrics,
 		currentTick:   0,
 		currentEpoch:  0,
@@ -68,7 +70,7 @@ func TestTransactionConsumer_GivenInvalidJson_ThenError(t *testing.T) {
 	}
 	transactionConsumer := &TransactionConsumer{
 		kafkaClient:   kafkaClient,
-		elasticClient: &FakeElasticClient{},
+		elasticClient: &elastic2.FakeElasticClient{},
 		metrics:       metrics,
 		currentTick:   0,
 		currentEpoch:  0,
