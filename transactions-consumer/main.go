@@ -118,8 +118,8 @@ func run() error {
 	} else {
 		elasticClient = extern.NewElasticClient(esClient, cfg.Elastic.IndexName)
 	}
-	met := metrics.NewMetrics(cfg.Broker.MetricsNamespace)
-	consumer := consume.NewTransactionConsumer(kcl, elasticClient, met)
+	processingMetrics := metrics.NewMetrics(cfg.Broker.MetricsNamespace)
+	consumer := consume.NewTransactionConsumer(kcl, elasticClient, processingMetrics)
 	procError := make(chan error, 1)
 	if cfg.Sync.Enabled {
 		go func() {
@@ -135,8 +135,8 @@ func run() error {
 	// status and metrics endpoint
 	serverError := make(chan error, 1)
 	go func() {
-		log.Printf("main: Starting status and metrics endpoint on port [%d].", cfg.Broker.MetricsPort)
-		http.Handle("/status", &status.Handler{})
+		log.Printf("main: Starting health and metrics endpoint on port [%d].", cfg.Broker.MetricsPort)
+		http.HandleFunc("/health", status.Health)
 		http.Handle("/metrics", promhttp.Handler())
 		serverError <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.Broker.MetricsPort), nil)
 	}()
