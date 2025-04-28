@@ -1,6 +1,24 @@
-*
-!*.*
-!*/
-
 *.idea/
+.iml
 vendor/
+
+# zipped packages
+*.gz
+*.tgz
+
+# log file
+*.log
+
+# ca certificate
+certs
+http_ca.crt
+
+# local config files
+.env
+*local*
+
+# transaction-consumer specific
+transactions-consumer/store
+
+# transaction-processor specific
+tx-processor-store/
