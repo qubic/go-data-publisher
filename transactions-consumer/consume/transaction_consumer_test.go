@@ -15,8 +15,9 @@ var m = metrics.NewMetrics("foo")
 var elastic = &FakeElasticClient{}
 
 type FakeKafkaClient struct {
-	partitionErr error
-	value        []byte
+	partitionErr          error
+	value                 []byte
+	processingStatusCount int
 }
 
 func (fkc *FakeKafkaClient) PollRecords(_ context.Context, _ int) kgo.Fetches {
@@ -26,6 +27,13 @@ func (fkc *FakeKafkaClient) PollRecords(_ context.Context, _ int) kgo.Fetches {
 func (fkc *FakeKafkaClient) CommitUncommittedOffsets(_ context.Context) error {
 	return nil
 }
+
+func (fkc *FakeKafkaClient) ProduceSync(_ context.Context, _ ...*kgo.Record) kgo.ProduceResults {
+	fkc.processingStatusCount++
+	return kgo.ProduceResults{}
+}
+
+func (fkc *FakeKafkaClient) AllowRebalance() {}
 
 type FakeElasticClient struct {
 	LatestBatch []extern.EsDocument
@@ -56,6 +64,7 @@ func TestTransactionConsumer_ConsumeBatch(t *testing.T) {
 	assert.Equal(t, uint32(456), transactionConsumer.currentTick)
 	assert.Equal(t, "transaction-hash", elastic.LatestBatch[0].Id)
 	assert.Equal(t, []byte(`{"hash":"transaction-hash","source":"source-identity","destination":"destination-identity","amount":1,"tickNumber":2,"inputType":3,"inputSize":4,"inputData":"input-data","signature":"signature","timestamp":5,"moneyFlew":true}`), elastic.LatestBatch[0].Payload)
+	assert.Equal(t, 1, kafkaClient.processingStatusCount)
 }
 
 func TestTransactionConsumer_GivenFetchError_ThenError(t *testing.T) {
@@ -73,6 +82,7 @@ func TestTransactionConsumer_GivenFetchError_ThenError(t *testing.T) {
 
 	_, err := transactionConsumer.consumeBatch()
 	assert.ErrorContains(t, err, "Error fetching records")
+	assert.Equal(t, 0, kafkaClient.processingStatusCount)
 }
 
 func TestTransactionConsumer_GivenInvalidJson_ThenError(t *testing.T) {

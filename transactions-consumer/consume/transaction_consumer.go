@@ -14,6 +14,8 @@ import (
 type KafkaClient interface {
 	PollRecords(ctx context.Context, maxPollRecords int) kgo.Fetches
 	CommitUncommittedOffsets(ctx context.Context) error
+	ProduceSync(ctx context.Context, r ...*kgo.Record) kgo.ProduceResults
+	AllowRebalance()
 }
 
 type ElasticDocumentClient interface {
@@ -72,6 +74,7 @@ func (c *TransactionConsumer) Consume() error {
 
 func (c *TransactionConsumer) consumeBatch() (int, error) {
 	ctx := context.Background()
+	defer c.kafkaClient.AllowRebalance()            // because of the configured kgo.BlockRebalanceOnPoll() option
 	fetches := c.kafkaClient.PollRecords(ctx, 1000) // batch process max x messages in one run
 	if errs := fetches.Errors(); len(errs) > 0 {
 		// Only non-retryable errors are returned.
@@ -82,6 +85,7 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 		return -1, errors.New("Error fetching records")
 	}
 
+	var tickNumbers []uint32
 	var documents []extern.EsDocument
 	iter := fetches.RecordIter()
 	for !iter.Done() {
@@ -104,6 +108,8 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 			})
 		}
 
+		tickNumbers = append(tickNumbers, tickTransactions.TickNumber)
+
 		// on the initial sync metrics will be wrong because the publisher publishes multiple epochs in parallel, but we
 		// only track the latest epoch here
 		if tickTransactions.TickNumber > c.currentTick {
@@ -116,15 +122,36 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 
 	err := c.elasticClient.BulkIndex(ctx, documents)
 	if err != nil {
-		return -1, errors.Wrapf(err, "Error bulk indexing [%d] documents.", len(documents))
+		return -1, errors.Wrapf(err, "bulk indexing [%d] documents.", len(documents))
 	}
 	c.metrics.SetProcessedTick(c.currentEpoch, c.currentTick)
 
+	err = c.publishProcessingInformation(tickNumbers)
+	if err != nil {
+		return -1, errors.Wrap(err, "publishing status information")
+	}
+
 	err = c.kafkaClient.CommitUncommittedOffsets(ctx)
 	if err != nil {
-		return -1, errors.Wrap(err, "Error committing offsets")
+		return -1, errors.Wrap(err, "committing offsets")
 	}
+
 	return len(documents), nil
+}
+
+func (c *TransactionConsumer) publishProcessingInformation(tickNumbers []uint32) error {
+	if len(tickNumbers) > 0 {
+		tickNumbersJson, err := json.Marshal(tickNumbers)
+		if err != nil {
+			return errors.Wrapf(err, "marshalling tick numbers %v", tickNumbers) // should never happen
+		}
+		record := &kgo.Record{Value: tickNumbersJson}
+		err = c.kafkaClient.ProduceSync(nil, record).FirstErr()
+		if err != nil {
+			return errors.Wrap(err, "producing status record")
+		}
+	}
+	return nil
 }
 
 func unmarshalTickTransactions(record *kgo.Record, tickTransactions *TickTransactions) error {

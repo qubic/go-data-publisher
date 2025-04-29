@@ -45,11 +45,12 @@ func run() error {
 			Stub        bool     `conf:"optional"` // only for testing
 		}
 		Broker struct {
-			BootstrapServers string `conf:"default:localhost:9092"`
-			MetricsPort      int    `conf:"default:9999"`
-			MetricsNamespace string `conf:"default:qubic-kafka"`
-			ConsumeTopic     string `conf:"default:qubic-transactions"`
-			ConsumerGroup    string `conf:"default:qubic-elastic"`
+			BootstrapServers   string `conf:"default:localhost:9092"`
+			MetricsPort        int    `conf:"default:9999"`
+			MetricsNamespace   string `conf:"default:qubic-kafka"`
+			ConsumeTopic       string `conf:"default:qubic-transactions"`
+			ConsumerGroup      string `conf:"default:qubic-elastic"`
+			ReturnChannelTopic string `conf:"optional"`
 		}
 		Sync struct {
 			Enabled bool `conf:"default:true"` // only for testing
@@ -83,6 +84,13 @@ func run() error {
 	}
 	log.Printf("main: Config :\n%v\n", out)
 
+	var returnTopicName string
+	if len(cfg.Broker.ReturnChannelTopic) > 0 {
+		returnTopicName = cfg.Broker.ReturnChannelTopic
+	} else {
+		returnTopicName = cfg.Broker.ConsumeTopic + "-processed"
+	}
+
 	m := kprom.NewMetrics(cfg.Broker.MetricsNamespace,
 		kprom.Registerer(prometheus.DefaultRegisterer),
 		kprom.Gatherer(prometheus.DefaultGatherer))
@@ -91,7 +99,10 @@ func run() error {
 		kgo.SeedBrokers(cfg.Broker.BootstrapServers),
 		kgo.ConsumeTopics(cfg.Broker.ConsumeTopic),
 		kgo.ConsumerGroup(cfg.Broker.ConsumerGroup),
+		kgo.BlockRebalanceOnPoll(),
 		kgo.DisableAutoCommit(),
+		kgo.DefaultProduceTopic(returnTopicName),
+		kgo.ProducerBatchCompression(kgo.ZstdCompression()),
 	)
 	if err != nil {
 		log.Fatal(err)
