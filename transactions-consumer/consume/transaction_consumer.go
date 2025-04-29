@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/pkg/errors"
-	"github.com/qubic/go-transactions-consumer/extern"
-	metrics2 "github.com/qubic/go-transactions-consumer/metrics"
+	"github.com/qubic/transactions-consumer/extern"
+	"github.com/qubic/transactions-consumer/metrics"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"log"
 	"time"
@@ -21,11 +21,11 @@ type ElasticDocumentClient interface {
 }
 
 type TransactionConsumer struct {
-	kafkaClient   KafkaClient
-	elasticClient ElasticDocumentClient
-	metrics       *metrics2.Metrics
-	currentTick   uint32
-	currentEpoch  uint32
+	kafkaClient     KafkaClient
+	elasticClient   ElasticDocumentClient
+	consumerMetrics *metrics.Metrics
+	currentTick     uint32
+	currentEpoch    uint32
 }
 
 type TickTransactions struct {
@@ -48,11 +48,11 @@ type Transaction struct {
 	MoneyFlew bool   `json:"moneyFlew"`
 }
 
-func NewTransactionConsumer(client KafkaClient, elasticClient ElasticDocumentClient, metrics *metrics2.Metrics) *TransactionConsumer {
+func NewTransactionConsumer(client KafkaClient, elasticClient ElasticDocumentClient, m *metrics.Metrics) *TransactionConsumer {
 	return &TransactionConsumer{
-		kafkaClient:   client,
-		metrics:       metrics,
-		elasticClient: elasticClient,
+		kafkaClient:     client,
+		consumerMetrics: m,
+		elasticClient:   elasticClient,
 	}
 }
 
@@ -110,15 +110,15 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 			c.currentTick = tickTransactions.TickNumber
 			c.currentEpoch = tickTransactions.Epoch
 		}
-		c.metrics.IncProcessedTicks()
-		c.metrics.IncProcessedMessages()
+		c.consumerMetrics.IncProcessedTicks()
+		c.consumerMetrics.IncProcessedMessages()
 	}
 
 	err := c.elasticClient.BulkIndex(ctx, documents)
 	if err != nil {
 		return -1, errors.Wrapf(err, "Error bulk indexing [%d] documents.", len(documents))
 	}
-	c.metrics.SetProcessedTick(c.currentEpoch, c.currentTick)
+	c.consumerMetrics.SetProcessedTick(c.currentEpoch, c.currentTick)
 
 	err = c.kafkaClient.CommitUncommittedOffsets(ctx)
 	if err != nil {

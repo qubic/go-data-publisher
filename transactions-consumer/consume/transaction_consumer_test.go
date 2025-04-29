@@ -3,8 +3,8 @@ package consume
 import (
 	"context"
 	"errors"
-	"github.com/qubic/go-transactions-consumer/extern"
-	"github.com/qubic/go-transactions-consumer/metrics"
+	"github.com/qubic/transactions-consumer/extern"
+	"github.com/qubic/transactions-consumer/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"log"
@@ -42,11 +42,11 @@ func TestTransactionConsumer_ConsumeBatch(t *testing.T) {
 		value: []byte(`{"epoch":123,"tickNumber":456,"transactions":[{"hash":"transaction-hash","source":"source-identity","destination":"destination-identity","amount":1,"tickNumber":2,"inputType":3,"inputSize":4,"inputData":"input-data","signature":"signature","timestamp":5,"moneyFlew":true}]}`),
 	}
 	transactionConsumer := &TransactionConsumer{
-		kafkaClient:   kafkaClient,
-		elasticClient: elastic,
-		metrics:       m,
-		currentTick:   0,
-		currentEpoch:  0,
+		kafkaClient:     kafkaClient,
+		elasticClient:   elastic,
+		consumerMetrics: m,
+		currentTick:     0,
+		currentEpoch:    0,
 	}
 
 	count, err := transactionConsumer.consumeBatch()
@@ -64,11 +64,11 @@ func TestTransactionConsumer_GivenFetchError_ThenError(t *testing.T) {
 		value:        []byte("foo"),
 	}
 	transactionConsumer := &TransactionConsumer{
-		kafkaClient:   kafkaClient,
-		elasticClient: &FakeElasticClient{},
-		metrics:       m,
-		currentTick:   0,
-		currentEpoch:  0,
+		kafkaClient:     kafkaClient,
+		elasticClient:   &FakeElasticClient{},
+		consumerMetrics: m,
+		currentTick:     0,
+		currentEpoch:    0,
 	}
 
 	_, err := transactionConsumer.consumeBatch()
@@ -80,11 +80,11 @@ func TestTransactionConsumer_GivenInvalidJson_ThenError(t *testing.T) {
 		value: []byte(`{"hash":"transaction-hash"}`),
 	}
 	transactionConsumer := &TransactionConsumer{
-		kafkaClient:   kafkaClient,
-		elasticClient: &FakeElasticClient{},
-		metrics:       m,
-		currentTick:   0,
-		currentEpoch:  0,
+		kafkaClient:     kafkaClient,
+		elasticClient:   &FakeElasticClient{},
+		consumerMetrics: m,
+		currentTick:     0,
+		currentEpoch:    0,
 	}
 
 	_, err := transactionConsumer.consumeBatch()
@@ -94,7 +94,6 @@ func TestTransactionConsumer_GivenInvalidJson_ThenError(t *testing.T) {
 func createFetches(err error, value []byte) kgo.Fetches {
 	return kgo.Fetches{
 		{
-
 			Topics: []kgo.FetchTopic{
 				{
 					Partitions: []kgo.FetchPartition{
@@ -111,5 +110,4 @@ func createFetches(err error, value []byte) kgo.Fetches {
 			},
 		},
 	}
-
 }

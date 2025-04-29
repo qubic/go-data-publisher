@@ -1,4 +1,4 @@
-module github.com/qubic/go-transactions-consumer
+module github.com/qubic/transactions-consumer
 
 go 1.24.0
 
