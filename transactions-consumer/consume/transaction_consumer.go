@@ -68,7 +68,7 @@ func (c *TransactionConsumer) Consume() error {
 			log.Printf("Error consuming batch: %v", err) // exits
 			return errors.Wrap(err, "Error consuming batch")
 		}
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
