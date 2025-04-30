@@ -17,8 +17,11 @@ http_ca.crt
 .env
 *local*
 
-# transaction-consumer specific
+# status service
+status-service/store
+
+# transaction consumer
 transactions-consumer/store
 
-# transaction-processor specific
+# transaction processor
 tx-processor-store/

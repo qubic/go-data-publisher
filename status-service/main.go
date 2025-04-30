@@ -4,11 +4,17 @@ import (
 	"fmt"
 	"github.com/ardanlabs/conf"
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/twmb/franz-go/pkg/kgo"
-	"github.com/twmb/franz-go/plugin/kprom"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/qubic/status-service/archiver"
+	"github.com/qubic/status-service/db"
+	"github.com/qubic/status-service/health"
+	"github.com/qubic/status-service/metrics"
+	"github.com/qubic/status-service/sync"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 const envPrefix = "QUBIC_STATUS_SERVICE"
@@ -23,12 +29,22 @@ func run() error {
 	log.SetOutput(os.Stdout) // default is stderr
 
 	var cfg struct {
-		Broker struct {
-			BootstrapServers string `conf:"default:localhost:9092"`
-			MetricsPort      int    `conf:"default:9999"`
-			MetricsNamespace string `conf:"default:qubic-kafka"`
-			ConsumeTopic     string `conf:"default:qubic-test-processed"`
-			ConsumerGroup    string `conf:"default:qubic-test"`
+		Client struct {
+			ArchiverUrl string `conf:"default:localhost:8010"`
+		}
+		Elastic struct {
+			Addresses   []string `conf:"default:https://localhost:9200"`
+			Username    string   `conf:"default:qubic-query"`
+			Password    string   `conf:"optional"`
+			IndexName   string   `conf:"default:qubic-transactions-alias"`
+			Certificate string   `conf:"default:http_ca.crt"`
+		}
+		Sync struct {
+			InternalStoreFolder string `conf:"default:store"`
+			LastProcessedTick   uint32 `conf:"optional"`
+			ServerPort          int    `conf:"default:9999"`
+			MetricsNamespace    string `conf:"default:qubic-status-service"`
+			Enabled             bool   `conf:"default:true"`
 		}
 	}
 
@@ -59,20 +75,61 @@ func run() error {
 	}
 	log.Printf("main: Config :\n%v\n", out)
 
-	m := kprom.NewMetrics(cfg.Broker.MetricsNamespace,
-		kprom.Registerer(prometheus.DefaultRegisterer),
-		kprom.Gatherer(prometheus.DefaultGatherer))
-	kcl, err := kgo.NewClient(
-		kgo.WithHooks(m),
-		kgo.SeedBrokers(cfg.Broker.BootstrapServers),
-		kgo.ConsumeTopics(cfg.Broker.ConsumeTopic), // TODO move this into consumer
-		kgo.ConsumerGroup(cfg.Broker.ConsumerGroup),
-		kgo.DisableAutoCommit(),
-	)
+	store, err := db.NewPebbleStore(cfg.Sync.InternalStoreFolder)
 	if err != nil {
-		log.Fatal(err)
+		return errors.Wrap(err, "creating db")
 	}
-	defer kcl.Close()
 
-	return nil
+	_, err = store.GetLastProcessedTick()
+	if cfg.Sync.LastProcessedTick > 0 || errors.Is(err, db.ErrNotFound) {
+		err = store.SetLastProcessedTick(cfg.Sync.LastProcessedTick)
+		if err != nil {
+			return errors.Wrap(err, "setting last processed tick")
+		}
+	}
+
+	//cert, err := os.ReadFile(cfg.Elastic.Certificate)
+	//if err != nil {
+	//	log.Printf("[WARN] main: could not read elastic certificate: %v", err)
+	//}
+	//esClient, err := elasticsearch.NewClient(elasticsearch.Config{
+	//	Addresses:     cfg.Elastic.Addresses,
+	//	Username:      cfg.Elastic.Username,
+	//	Password:      cfg.Elastic.Password,
+	//	CACert:        cert,
+	//	RetryOnStatus: []int{502, 503, 504, 429},
+	//})
+
+	cl, err := archiver.NewClient(cfg.Client.ArchiverUrl)
+	if err != nil {
+		return errors.Wrap(err, "creating archiver client")
+	}
+
+	m := metrics.NewMetrics(cfg.Sync.MetricsNamespace)
+	processor := sync.NewTickProcessor(cl, store, m)
+	processor.Synchronize()
+
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
+
+	// status and metrics endpoint
+	serverError := make(chan error, 1)
+	go func() {
+		log.Printf("main: Starting server on port [%d].", cfg.Sync.ServerPort)
+		http.HandleFunc("/health", health.Health)
+		http.Handle("/metrics", promhttp.Handler())
+		serverError <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.Sync.ServerPort), nil)
+	}()
+
+	log.Println("main: Service started.")
+
+	for {
+		select {
+		case <-shutdown:
+			log.Println("main: Received shutdown signal, shutting down...")
+			return nil
+		case err := <-serverError:
+			return fmt.Errorf("[ERROR] starting server: %v", err)
+		}
+	}
 }
