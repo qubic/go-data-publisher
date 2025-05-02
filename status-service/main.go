@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"github.com/ardanlabs/conf"
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/status-service/archiver"
 	"github.com/qubic/status-service/db"
+	"github.com/qubic/status-service/elastic"
 	"github.com/qubic/status-service/health"
 	"github.com/qubic/status-service/metrics"
 	"github.com/qubic/status-service/sync"
@@ -42,7 +44,7 @@ func run() error {
 		Sync struct {
 			InternalStoreFolder string `conf:"default:store"`
 			LastProcessedTick   uint32 `conf:"optional"`
-			ServerPort          int    `conf:"default:9999"`
+			ServerPort          int    `conf:"default:8000"`
 			MetricsNamespace    string `conf:"default:qubic-status-service"`
 			Enabled             bool   `conf:"default:true"`
 		}
@@ -88,17 +90,18 @@ func run() error {
 		}
 	}
 
-	//cert, err := os.ReadFile(cfg.Elastic.Certificate)
-	//if err != nil {
-	//	log.Printf("[WARN] main: could not read elastic certificate: %v", err)
-	//}
-	//esClient, err := elasticsearch.NewClient(elasticsearch.Config{
-	//	Addresses:     cfg.Elastic.Addresses,
-	//	Username:      cfg.Elastic.Username,
-	//	Password:      cfg.Elastic.Password,
-	//	CACert:        cert,
-	//	RetryOnStatus: []int{502, 503, 504, 429},
-	//})
+	cert, err := os.ReadFile(cfg.Elastic.Certificate)
+	if err != nil {
+		log.Printf("[WARN] main: could not read elastic certificate: %v", err)
+	}
+	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
+		Addresses:     cfg.Elastic.Addresses,
+		Username:      cfg.Elastic.Username,
+		Password:      cfg.Elastic.Password,
+		CACert:        cert,
+		RetryOnStatus: []int{502, 503, 504, 429},
+	})
+	elasticClient := elastic.NewClient(esClient, cfg.Elastic.IndexName)
 
 	cl, err := archiver.NewClient(cfg.Client.ArchiverUrl)
 	if err != nil {
@@ -106,8 +109,8 @@ func run() error {
 	}
 
 	m := metrics.NewMetrics(cfg.Sync.MetricsNamespace)
-	processor := sync.NewTickProcessor(cl, store, m)
-	processor.Synchronize()
+	processor := sync.NewTickProcessor(cl, elasticClient, store, m)
+	go processor.Synchronize()
 
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
@@ -115,8 +118,9 @@ func run() error {
 	// status and metrics endpoint
 	serverError := make(chan error, 1)
 	go func() {
+		statusHandler := health.NewHandler(m)
 		log.Printf("main: Starting server on port [%d].", cfg.Sync.ServerPort)
-		http.HandleFunc("/health", health.Health)
+		http.Handle("/status", statusHandler)
 		http.Handle("/metrics", promhttp.Handler())
 		serverError <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.Sync.ServerPort), nil)
 	}()

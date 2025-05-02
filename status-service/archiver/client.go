@@ -3,9 +3,11 @@ package archiver
 import (
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/qubic/go-archiver/protobuff"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"log"
 )
 
 type Client struct {
@@ -38,7 +40,7 @@ func NewClient(host string) (*Client, error) {
 func (c *Client) GetStatus(ctx context.Context) (*Status, error) {
 	s, err := c.api.GetStatus(ctx, nil)
 	if err != nil {
-		return nil, fmt.Errorf("calling archiver: %v", err)
+		return nil, errors.Wrap(err, "calling GetStatus api")
 	}
 
 	var intervals []*TickInterval
@@ -58,4 +60,28 @@ func (c *Client) GetStatus(ctx context.Context) (*Status, error) {
 	}
 	return &status, nil
 
+}
+
+func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) ([]string, error) {
+	request := protobuff.GetTickDataRequest{
+		TickNumber: tickNumber,
+	}
+	response, err := c.api.GetTickData(ctx, &request)
+	if err != nil {
+		return nil, errors.Wrap(err, "calling GetTickData api")
+	}
+	if response == nil {
+		return nil, errors.New("nil tick data response")
+	}
+	var hashes []string
+	if response.GetTickData() == nil {
+		log.Printf("[INFO] Tick [%d] is empty.", tickNumber)
+		hashes = []string{}
+	} else if response.GetTickData().GetTransactionIds() == nil { // non-empty tick without transactions
+		log.Printf("[INFO] Tick [%d] has no transactions.", tickNumber)
+		hashes = []string{}
+	} else {
+		hashes = response.GetTickData().GetTransactionIds()
+	}
+	return hashes, nil
 }

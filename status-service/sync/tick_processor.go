@@ -11,6 +11,11 @@ import (
 
 type ArchiveClient interface {
 	GetStatus(ctx context.Context) (*archiver.Status, error)
+	GetTickData(ctx context.Context, tickNumber uint32) ([]string, error)
+}
+
+type SearchClient interface {
+	GetTransactionHashes(ctx context.Context, tickNumber uint32) ([]string, error)
 }
 
 type DataStore interface {
@@ -20,13 +25,15 @@ type DataStore interface {
 
 type TickProcessor struct {
 	archiveClient     ArchiveClient
+	searchClient      SearchClient
 	dataStore         DataStore
 	processingMetrics *metrics.Metrics
 }
 
-func NewTickProcessor(archiveClient ArchiveClient, dataStore DataStore, m *metrics.Metrics) *TickProcessor {
+func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, dataStore DataStore, m *metrics.Metrics) *TickProcessor {
 	processor := TickProcessor{
 		archiveClient:     archiveClient,
+		searchClient:      elasticClient,
 		dataStore:         dataStore,
 		processingMetrics: m,
 	}
@@ -37,9 +44,14 @@ func (p *TickProcessor) Synchronize() {
 	ticker := time.Tick(1 * time.Second)
 	for range ticker {
 		err := p.sync()
-		if err != nil {
+		if err == nil {
+			p.processingMetrics.SetError(false)
+			log.Printf("[INFO] all ticks matched.")
+		} else {
+			p.processingMetrics.SetError(true)
 			log.Printf("[WARN] sync run failed: %v", err)
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -61,6 +73,7 @@ func (p *TickProcessor) sync() error {
 	if err != nil {
 		return errors.Wrap(err, "calculating tick range")
 	}
+	end = min(status.LatestTick, end) // don't exceed lastest tick
 
 	if start > end || start == 0 || end == 0 || epoch == 0 {
 		log.Printf("No ticks to process.")
@@ -91,10 +104,25 @@ func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, toExc
 }
 
 func (p *TickProcessor) processTick(ctx context.Context, tick uint32) error {
-
 	// query archiver for transactions
+	archiverTransactions, err := p.archiveClient.GetTickData(ctx, tick)
+	if err != nil {
+		return errors.Wrap(err, "get archiver transactions")
+	}
 
 	// query elastic for transactions
+	elasticTransactions, err := p.searchClient.GetTransactionHashes(ctx, tick)
+	if err != nil {
+		return errors.Wrap(err, "get elastic transactions")
+	}
+
+	difference := Difference(ToSet(archiverTransactions), ToSet(elasticTransactions))
+	if len(difference) > 0 { // transactions do not match
+		log.Printf("[WARN] Delta of transaction hashes for tick [%d]: %v", tick, difference)
+		log.Printf("Transactions in archiver: %v", archiverTransactions)
+		log.Printf("Transactions in elastic: %v", elasticTransactions)
+		return errors.Errorf("transactions mismatch for tick [%d]. Delta: %v", tick, difference)
+	}
 
 	return nil
 }

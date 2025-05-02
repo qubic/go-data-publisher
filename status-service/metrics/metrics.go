@@ -11,6 +11,8 @@ type Metrics struct {
 	sourceEpochGauge                 prometheus.Gauge
 	processedTransactionsTickGauge   prometheus.Gauge
 	processingTransactionsEpochGauge prometheus.Gauge
+	hasErrorGauge                    prometheus.Gauge
+	lastProcessedTick                uint32
 }
 
 func NewMetrics(namespace string) *Metrics {
@@ -33,11 +35,16 @@ func NewMetrics(namespace string) *Metrics {
 			Name: fmt.Sprintf("%s_source_epoch", namespace),
 			Help: "The latest known source epoch",
 		}),
+		hasErrorGauge: promauto.NewGauge(prometheus.GaugeOpts{
+			Name: fmt.Sprintf("%s_has_error", namespace),
+			Help: "Number of subsequent processing errors",
+		}),
 	}
 	return &m
 }
 
 func (metrics *Metrics) SetProcessedTransactionsTick(epoch uint32, tick uint32) {
+	metrics.lastProcessedTick = tick
 	metrics.processingTransactionsEpochGauge.Set(float64(epoch))
 	metrics.processedTransactionsTickGauge.Set(float64(tick))
 }
@@ -45,4 +52,16 @@ func (metrics *Metrics) SetProcessedTransactionsTick(epoch uint32, tick uint32) 
 func (metrics *Metrics) SetSourceTick(epoch uint32, tick uint32) {
 	metrics.sourceEpochGauge.Set(float64(epoch))
 	metrics.sourceTickGauge.Set(float64(tick))
+}
+
+func (metrics *Metrics) SetError(error bool) {
+	if error {
+		metrics.hasErrorGauge.Inc() // count subsequent errors
+	} else {
+		metrics.hasErrorGauge.Set(float64(0)) // reset
+	}
+}
+
+func (metrics *Metrics) GetLastProcessedTick() uint32 {
+	return metrics.lastProcessedTick
 }
