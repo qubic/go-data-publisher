@@ -10,7 +10,7 @@ import (
 	"github.com/qubic/status-service/db"
 	"github.com/qubic/status-service/elastic"
 	"github.com/qubic/status-service/metrics"
-	"github.com/qubic/status-service/statu
+	"github.com/qubic/status-service/status"
 	"github.com/qubic/status-service/sync"
 	"log"
 	"net/http"
