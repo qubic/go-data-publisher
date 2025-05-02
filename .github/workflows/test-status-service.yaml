@@ -6,7 +6,7 @@ on:
     paths:
       - 'status-service/**'
 
-name: Test transactions consumer
+name: Test status service
 jobs:
   test-nocache:
     strategy:
