@@ -10,7 +10,7 @@ services:
       QUBIC_STATUS_SERVICE_ELASTIC_ADDRESSES: "https://localhost:9200" # set elasticsearch url here
       QUBIC_STATUS_SERVICE_ELASTIC_USERNAME: "enter-username-here" # enter elasticsearch username
       QUBIC_STATUS_SERVICE_ELASTIC_PASSWORD: "enter-password-here" # enter elasticsearch password
-      QUBIC_STATUS_SERVICE_SYNC_LAST_PROCESSED_TICK: 0 # overrides stored last processed tick if > 0
+      QUBIC_STATUS_SERVICE_SYNC_START_TICK: 0 # overrides stored last processed tick if > 0
     volumes:
       - ./store/qubic-status-service:/app/store
       - ./certs/elastic/http_ca.crt:/app/http_ca.crt:ro
