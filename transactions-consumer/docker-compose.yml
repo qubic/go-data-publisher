@@ -1,6 +1,6 @@
 services:
   qubic-transactions-consumer:
-    image: ghcr.io/qubic/go-transactions-consumer:latest # set correct version
+    image: ghcr.io/qubic/transactions-consumer:latest # set correct version
     container_name: qubic-transactions-consumer
     ports:
       - "127.0.0.1:9996:9999"
