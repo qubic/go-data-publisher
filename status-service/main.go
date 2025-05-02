@@ -111,7 +111,11 @@ func run() error {
 
 	m := metrics.NewMetrics(cfg.Sync.MetricsNamespace)
 	processor := sync.NewTickProcessor(cl, elasticClient, store, m)
-	go processor.Synchronize()
+	if cfg.Sync.Enabled {
+		go processor.Synchronize()
+	} else {
+		log.Println("[WARN] main: sync disabled")
+	}
 
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
