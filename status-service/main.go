@@ -9,8 +9,8 @@ import (
 	"github.com/qubic/status-service/archiver"
 	"github.com/qubic/status-service/db"
 	"github.com/qubic/status-service/elastic"
-	"github.com/qubic/status-service/health"
 	"github.com/qubic/status-service/metrics"
+	"github.com/qubic/status-service/statu
 	"github.com/qubic/status-service/sync"
 	"log"
 	"net/http"
@@ -31,8 +31,8 @@ func run() error {
 	log.SetOutput(os.Stdout) // default is stderr
 
 	var cfg struct {
-		Client struct {
-			ArchiverUrl string `conf:"default:localhost:8010"`
+		Archiver struct {
+			Host string `conf:"default:localhost:8010"`
 		}
 		Elastic struct {
 			Addresses   []string `conf:"default:https://localhost:9200"`
@@ -43,8 +43,9 @@ func run() error {
 		}
 		Sync struct {
 			InternalStoreFolder string `conf:"default:store"`
-			LastProcessedTick   uint32 `conf:"optional"`
+			StartTick           uint32 `conf:"optional"`
 			ServerPort          int    `conf:"default:8000"`
+			MetricsPort         int    `conf:"default:9999"`
 			MetricsNamespace    string `conf:"default:qubic-status-service"`
 			Enabled             bool   `conf:"default:true"`
 		}
@@ -83,8 +84,8 @@ func run() error {
 	}
 
 	_, err = store.GetLastProcessedTick()
-	if cfg.Sync.LastProcessedTick > 0 || errors.Is(err, db.ErrNotFound) {
-		err = store.SetLastProcessedTick(cfg.Sync.LastProcessedTick)
+	if cfg.Sync.StartTick > 0 || errors.Is(err, db.ErrNotFound) {
+		err = store.SetLastProcessedTick(cfg.Sync.StartTick)
 		if err != nil {
 			return errors.Wrap(err, "setting last processed tick")
 		}
@@ -103,7 +104,7 @@ func run() error {
 	})
 	elasticClient := elastic.NewClient(esClient, cfg.Elastic.IndexName)
 
-	cl, err := archiver.NewClient(cfg.Client.ArchiverUrl)
+	cl, err := archiver.NewClient(cfg.Archiver.Host)
 	if err != nil {
 		return errors.Wrap(err, "creating archiver client")
 	}
@@ -118,11 +119,16 @@ func run() error {
 	// status and metrics endpoint
 	serverError := make(chan error, 1)
 	go func() {
-		statusHandler := health.NewHandler(m)
 		log.Printf("main: Starting server on port [%d].", cfg.Sync.ServerPort)
-		http.Handle("/status", statusHandler)
-		http.Handle("/metrics", promhttp.Handler())
+		http.Handle("/status", status.NewHandler(m))
 		serverError <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.Sync.ServerPort), nil)
+	}()
+
+	metricsServerError := make(chan error, 1)
+	go func() {
+		log.Printf("main: Starting metrics server on port [%d].", cfg.Sync.MetricsPort)
+		http.Handle("/metrics", promhttp.Handler())
+		metricsServerError <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.Sync.MetricsPort), nil)
 	}()
 
 	log.Println("main: Service started.")
@@ -132,8 +138,10 @@ func run() error {
 		case <-shutdown:
 			log.Println("main: Received shutdown signal, shutting down...")
 			return nil
+		case err := <-metricsServerError:
+			return errors.Wrapf(err, "[ERROR] starting metrics endpoint.")
 		case err := <-serverError:
-			return fmt.Errorf("[ERROR] starting server: %v", err)
+			return errors.Wrapf(err, "[ERROR] starting server endpoint(s).")
 		}
 	}
 }

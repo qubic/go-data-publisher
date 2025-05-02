@@ -1,4 +1,4 @@
-package health
+package status
 
 import (
 	"encoding/json"
@@ -7,26 +7,24 @@ import (
 )
 
 type Handler struct {
-	sp StatusProvider
+	sp ProcessedTickProvider
 }
 
-type StatusProvider interface {
+type ProcessedTickProvider interface {
 	GetLastProcessedTick() uint32
 }
 
-type StatusResponse struct {
-	Status              string `json:"status"`
+type Response struct {
 	LatestProcessedTick uint32 `json:"latestProcessedTick"`
 }
 
-func NewHandler(sp StatusProvider) *Handler {
+func NewHandler(sp ProcessedTickProvider) *Handler {
 	return &Handler{sp: sp}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(StatusResponse{
-		Status:              "UP",
+	err := json.NewEncoder(w).Encode(Response{
 		LatestProcessedTick: h.sp.GetLastProcessedTick(),
 	})
 	if err != nil {
