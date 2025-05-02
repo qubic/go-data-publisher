@@ -23,7 +23,7 @@ import (
 	"time"
 )
 
-const prefix = "QUBIC_GO_DATA_PUBLISHER"
+const prefix = "QUBIC_TRANSACTIONS_PUBLISHER"
 
 func main() {
 	if err := run(); err != nil {
