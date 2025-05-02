@@ -1,9 +1,9 @@
-name: Deploy status service release
+name: Deploy custom status service tag
 
 on:
   push:
-    tags:
-      - 'status-service/v*.*.*'
+    branches:
+      - 'feature/status-service'
 
 jobs:
   docker-publish:
@@ -27,19 +27,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract module and version from tag
-        id: extract
-        run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          MODULE_NAME=$(echo "$TAG" | cut -d/ -f1)
-          VERSION=$(echo "$TAG" | cut -d/ -f2)
-          echo "module=$MODULE_NAME" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: ./status-service
           file: ./status-service/Dockerfile
           push: true
-          tags: ghcr.io/qubic/status-service:${{ steps.extract.outputs.version }}
+          tags: ghcr.io/qubic/status-service:snapshot
