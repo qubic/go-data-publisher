@@ -17,7 +17,7 @@ services:
     networks:
       - qubic
     healthcheck:
-      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8000/status" ]
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8000/health" ]
       interval: 15s
       timeout: 3s
       retries: 3

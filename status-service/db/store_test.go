@@ -64,3 +64,38 @@ func TestStore_UpdateLastProcessedTick(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, newTick, retrievedTick)
 }
+
+func TestPebbleStore_GetSkippedTicks(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "processor_store_test")
+	assert.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	store, err := NewPebbleStore(tempDir)
+	assert.NoError(t, err)
+	defer store.Close()
+
+	ticks, err := store.GetSkippedTicks()
+	assert.NoError(t, err)
+	assert.NotNil(t, ticks)
+	assert.Empty(t, ticks)
+}
+
+func TestStore_AddSkippedTick(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "processor_store_test")
+	assert.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	store, err := NewPebbleStore(tempDir)
+	assert.NoError(t, err)
+	defer store.Close()
+
+	assert.NoError(t, store.AddSkippedTick(12345))
+	assert.NoError(t, store.AddSkippedTick(123456))
+
+	skippedTicks, err := store.GetSkippedTicks()
+	assert.NoError(t, err)
+	assert.Len(t, skippedTicks, 2)
+	assert.Contains(t, skippedTicks, uint32(12345))
+	assert.Contains(t, skippedTicks, uint32(123456))
+	assert.NotContains(t, skippedTicks, uint32(666))
+}

@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/qubic/status-service/archiver"
 	"github.com/qubic/status-service/metrics"
+	"github.com/qubic/status-service/util"
 	"log"
 	"time"
 )
@@ -21,22 +22,25 @@ type SearchClient interface {
 type DataStore interface {
 	SetLastProcessedTick(tick uint32) error
 	GetLastProcessedTick() (tick uint32, err error)
+	AddSkippedTick(tick uint32) error
 }
 
 type TickProcessor struct {
-	archiveClient     ArchiveClient
-	searchClient      SearchClient
-	dataStore         DataStore
-	processingMetrics *metrics.Metrics
-	errorsCount       int64
+	archiveClient      ArchiveClient
+	searchClient       SearchClient
+	dataStore          DataStore
+	processingMetrics  *metrics.Metrics
+	skipErroneousTicks bool
+	errorsCount        int64
 }
 
-func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, dataStore DataStore, m *metrics.Metrics) *TickProcessor {
+func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, dataStore DataStore, m *metrics.Metrics, skip bool) *TickProcessor {
 	processor := TickProcessor{
-		archiveClient:     archiveClient,
-		searchClient:      elasticClient,
-		dataStore:         dataStore,
-		processingMetrics: m,
+		archiveClient:      archiveClient,
+		searchClient:       elasticClient,
+		dataStore:          dataStore,
+		processingMetrics:  m,
+		skipErroneousTicks: skip,
 	}
 	return &processor
 }
@@ -91,9 +95,20 @@ func (p *TickProcessor) sync() error {
 
 func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, toExcl uint32) error {
 	for tick := from; tick < toExcl; tick++ {
-		err := p.processTick(ctx, tick)
+		match, err := p.processTick(ctx, tick)
 		if err != nil {
 			return errors.Wrapf(err, "processing tick [%d]", tick)
+		}
+		if !match {
+			if p.skipErroneousTicks {
+				log.Printf("[WARN] skipping tick %d.", tick)
+				err = p.dataStore.AddSkippedTick(tick)
+				if err != nil {
+					return errors.Wrap(err, "trying to store skipped tick")
+				}
+			} else {
+				return errors.Errorf("Transaction mismatch in tick %d (epoch %d)", tick, epoch)
+			}
 		}
 		err = p.dataStore.SetLastProcessedTick(tick)
 		if err != nil {
@@ -104,28 +119,29 @@ func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, toExc
 	return nil
 }
 
-func (p *TickProcessor) processTick(ctx context.Context, tick uint32) error {
+// processTick returns 'false' if the tick comparison between archiver and elastic does not match
+func (p *TickProcessor) processTick(ctx context.Context, tick uint32) (bool, error) {
 	// query archiver for transactions
 	archiverTransactions, err := p.archiveClient.GetTickData(ctx, tick)
 	if err != nil {
-		return errors.Wrap(err, "get archiver transactions")
+		return false, errors.Wrap(err, "get archiver transactions")
 	}
 
 	// query elastic for transactions
 	elasticTransactions, err := p.searchClient.GetTransactionHashes(ctx, tick)
 	if err != nil {
-		return errors.Wrap(err, "get elastic transactions")
+		return false, errors.Wrap(err, "get elastic transactions")
 	}
 
-	difference := Difference(ToSet(archiverTransactions), ToSet(elasticTransactions))
+	difference := util.Difference(util.ToSet(archiverTransactions), util.ToSet(elasticTransactions))
 	if len(difference) > 0 { // transactions do not match
-		log.Printf("[WARN] Delta of transaction hashes for tick [%d]: %v", tick, difference)
-		log.Printf("Transactions in archiver: %v", archiverTransactions)
-		log.Printf("Transactions in elastic: %v", elasticTransactions)
-		return errors.Errorf("transactions mismatch for tick [%d]. Delta: %v", tick, difference)
+		log.Printf("[WARN] Transaction mismatch for tick [%d]. Delta: %v", tick, difference)
+		log.Printf("%d transactions in archiver: %v", len(archiverTransactions), archiverTransactions)
+		log.Printf("%d transactions in elastic: %v", len(elasticTransactions), elasticTransactions)
+		return false, nil // return mismatch
 	}
 
-	return nil
+	return true, nil
 }
 
 func calculateNextTickRange(lastProcessedTick uint32, intervals []*archiver.TickInterval) (uint32, uint32, uint32, error) {
@@ -146,9 +162,9 @@ func calculateNextTickRange(lastProcessedTick uint32, intervals []*archiver.Tick
 }
 
 func (p *TickProcessor) sleepWithBackoff() {
-	if p.errorsCount < 100 {
+	if p.errorsCount < 100 { // error count * 100ms
 		time.Sleep(time.Duration(p.errorsCount) * 100 * time.Millisecond)
-	} else {
+	} else { // 10 sec max
 		time.Sleep(10 * time.Second)
 	}
 }

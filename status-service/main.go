@@ -6,11 +6,11 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/qubic/status-service/api"
 	"github.com/qubic/status-service/archiver"
 	"github.com/qubic/status-service/db"
 	"github.com/qubic/status-service/elastic"
 	"github.com/qubic/status-service/metrics"
-	"github.com/qubic/status-service/status"
 	"github.com/qubic/status-service/sync"
 	"log"
 	"net/http"
@@ -47,6 +47,7 @@ func run() error {
 			ServerPort          int    `conf:"default:8000"`
 			MetricsPort         int    `conf:"default:9999"`
 			MetricsNamespace    string `conf:"default:qubic-status-service"`
+			SkipTicks           bool   `conf:"default:false"`
 			Enabled             bool   `conf:"default:true"`
 		}
 	}
@@ -110,7 +111,7 @@ func run() error {
 	}
 
 	m := metrics.NewMetrics(cfg.Sync.MetricsNamespace)
-	processor := sync.NewTickProcessor(cl, elasticClient, store, m)
+	processor := sync.NewTickProcessor(cl, elasticClient, store, m, cfg.Sync.SkipTicks)
 	if cfg.Sync.Enabled {
 		go processor.Synchronize()
 	} else {
@@ -123,9 +124,13 @@ func run() error {
 	// status and metrics endpoint
 	serverError := make(chan error, 1)
 	go func() {
+		mux := http.NewServeMux()
+		server := api.NewHandler(store)
+		mux.HandleFunc("/v1/status", server.GetStatus)
+		mux.HandleFunc("/v1/skippedTicks", server.GetSkippedTicks)
+		mux.HandleFunc("/health", server.GetHealth)
 		log.Printf("main: Starting server on port [%d].", cfg.Sync.ServerPort)
-		http.Handle("/status", status.NewHandler(m))
-		serverError <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.Sync.ServerPort), nil)
+		serverError <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.Sync.ServerPort), mux)
 	}()
 
 	metricsServerError := make(chan error, 1)

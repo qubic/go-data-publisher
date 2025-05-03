@@ -1,4 +1,4 @@
-package sync
+package util
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -45,4 +45,16 @@ func TestSet_difference_givenEmptySet(t *testing.T) {
 
 	result3 := Difference(set1, set1)
 	assert.Empty(t, result3)
+}
+
+func TestSet_addToSet(t *testing.T) {
+
+	set := NewSet()
+	AddToSet(set, "one")
+	AddToSet(set, "two")
+
+	assert.True(t, set["one"])
+	assert.True(t, set["two"])
+	assert.False(t, set["foo"])
+
 }
