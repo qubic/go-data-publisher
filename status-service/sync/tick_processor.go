@@ -53,7 +53,6 @@ func (p *TickProcessor) Synchronize() {
 			log.Printf("[WARN] sync run failed: %v", err)
 			p.sleepWithBackoff() // backoff if sync run fails subsequently
 		}
-		time.Sleep(100 * time.Millisecond)
 	}
 }
 
