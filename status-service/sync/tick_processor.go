@@ -28,6 +28,7 @@ type TickProcessor struct {
 	searchClient      SearchClient
 	dataStore         DataStore
 	processingMetrics *metrics.Metrics
+	errorsCount       int64
 }
 
 func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, dataStore DataStore, m *metrics.Metrics) *TickProcessor {
@@ -45,11 +46,12 @@ func (p *TickProcessor) Synchronize() {
 	for range ticker {
 		err := p.sync()
 		if err == nil {
-			p.processingMetrics.SetError(false)
+			p.resetErrorCount()
 			log.Printf("[INFO] all ticks matched.")
 		} else {
-			p.processingMetrics.SetError(true)
+			p.incrementErrorCount()
 			log.Printf("[WARN] sync run failed: %v", err)
+			p.sleepWithBackoff() // backoff if sync run fails subsequently
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -142,4 +144,22 @@ func calculateNextTickRange(lastProcessedTick uint32, intervals []*archiver.Tick
 
 	// no delta found do not sync
 	return 0, 0, 0, nil
+}
+
+func (p *TickProcessor) sleepWithBackoff() {
+	if p.errorsCount < 100 {
+		time.Sleep(time.Duration(p.errorsCount) * 100 * time.Millisecond)
+	} else {
+		time.Sleep(10 * time.Second)
+	}
+}
+
+func (p *TickProcessor) incrementErrorCount() {
+	p.errorsCount++
+	p.processingMetrics.SetError(true)
+}
+
+func (p *TickProcessor) resetErrorCount() {
+	p.errorsCount = 0
+	p.processingMetrics.SetError(false)
 }
