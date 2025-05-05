@@ -1,4 +1,4 @@
-name: Release transactions-producer
+name: Create transactions producer image
 
 on:
   push:
