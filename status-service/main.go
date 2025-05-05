@@ -84,12 +84,16 @@ func run() error {
 		return errors.Wrap(err, "creating db")
 	}
 
-	_, err = store.GetLastProcessedTick()
+	lastProcessedTick, err := store.GetLastProcessedTick()
 	if cfg.Sync.StartTick > 0 || errors.Is(err, db.ErrNotFound) {
-		err = store.SetLastProcessedTick(cfg.Sync.StartTick)
-		if err != nil {
+		setErr := store.SetLastProcessedTick(cfg.Sync.StartTick)
+		if setErr != nil {
 			return errors.Wrap(err, "setting last processed tick")
 		}
+	} else if err != nil {
+		return errors.Wrap(err, "getting last processed tick")
+	} else {
+		log.Printf("Resuming from last processed tick: [%d].", lastProcessedTick)
 	}
 
 	cert, err := os.ReadFile(cfg.Elastic.Certificate)

@@ -37,7 +37,7 @@ func (ps *PebbleStore) SetLastProcessedTick(tick uint32) error {
 	var value []byte
 	value = binary.BigEndian.AppendUint32(value, tick)
 
-	err := ps.db.Set(key, value, pebble.NoSync) // No sync is very fast. Data loss can happen.
+	err := ps.db.Set(key, value, pebble.Sync)
 	if err != nil {
 		return errors.Wrapf(err, "setting key [%s] to [%d]", lastProcessedTickKey, tick)
 	}
