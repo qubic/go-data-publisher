@@ -49,7 +49,6 @@ The following properties (with defaults) can be set:
 --broker-metrics-namespace=qubic-kafka
 --broker-consume-topic=qubic-transactions
 --broker-consumer-group=qubic-elastic
---broker-return-channel-topic=
 ```
 
 `
@@ -106,9 +105,3 @@ Topic name consuming event kafka messages from.
 --broker-consumer-group=
 `
 Group name used for consuming messages.
-
-`
---broker-return-channel-topic=
-`
-
-Optional. Topic name for returning processed tick numbers. Defaults to consume-topic with `-processed` postfix.
