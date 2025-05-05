@@ -9,6 +9,9 @@ vendor/
 # log file
 *.log
 
+# temporary files
+*~
+
 # ca certificate
 certs
 http_ca.crt

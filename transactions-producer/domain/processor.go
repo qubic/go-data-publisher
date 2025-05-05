@@ -16,7 +16,7 @@ type Fetcher interface {
 }
 
 type Publisher interface {
-	PublishTransactions(ctx context.Context, txs []entities.Tx) error
+	PublishTickTransactions(tickTransactions []entities.TickTransactions) error
 }
 
 type statusStore interface {
@@ -26,32 +26,32 @@ type statusStore interface {
 }
 
 type Processor struct {
-	fetcher        Fetcher
-	fetchTimeout   time.Duration
-	publisher      Publisher
-	publishTimeout time.Duration
-	statusStore    statusStore
-	batchSize      int
-	logger         *zap.SugaredLogger
+	fetcher      Fetcher
+	fetchTimeout time.Duration
+	publisher    Publisher
+	statusStore  statusStore
+	batchSize    int
+	logger       *zap.SugaredLogger
+	syncMetrics  *Metrics
 }
 
 func NewProcessor(
 	fetcher Fetcher,
 	fetchTimeout time.Duration,
 	publisher Publisher,
-	publishTimeout time.Duration,
 	statusStore statusStore,
 	batchSize int,
 	logger *zap.SugaredLogger,
+	metrics *Metrics,
 ) *Processor {
 	return &Processor{
-		fetcher:        fetcher,
-		fetchTimeout:   fetchTimeout,
-		publisher:      publisher,
-		publishTimeout: publishTimeout,
-		statusStore:    statusStore,
-		batchSize:      batchSize,
-		logger:         logger,
+		fetcher:      fetcher,
+		fetchTimeout: fetchTimeout,
+		publisher:    publisher,
+		statusStore:  statusStore,
+		batchSize:    batchSize,
+		logger:       logger,
+		syncMetrics:  metrics,
 	}
 }
 
@@ -158,6 +158,9 @@ func (p *Processor) getStartingTicksForEpochs(epochsIntervals []entities.Process
 func (p *Processor) processEpoch(startTick uint32, epochTickIntervals entities.ProcessedTickIntervalsPerEpoch) error {
 	p.logger.Infow("Starting epoch processor", "epoch", epochTickIntervals.Epoch, "startTick", startTick)
 
+	lastTickFromIntervals := epochTickIntervals.Intervals[len(epochTickIntervals.Intervals)-1].LastProcessedTick
+	p.syncMetrics.SetSourceTick(epochTickIntervals.Epoch, lastTickFromIntervals) // this will fluctuate on initial sync because multiple epochs are synced in parallel
+
 	for {
 		lastProcessedTick, err := p.processBatch(startTick, epochTickIntervals)
 		if err != nil {
@@ -166,7 +169,6 @@ func (p *Processor) processEpoch(startTick uint32, epochTickIntervals entities.P
 		}
 
 		// if lastProcessedTick is equal to the last tick from intervals, we are done
-		lastTickFromIntervals := epochTickIntervals.Intervals[len(epochTickIntervals.Intervals)-1].LastProcessedTick
 		if lastProcessedTick == lastTickFromIntervals {
 			break
 		}
@@ -180,18 +182,20 @@ func (p *Processor) processEpoch(startTick uint32, epochTickIntervals entities.P
 func (p *Processor) processBatch(startTick uint32, epochTickIntervals entities.ProcessedTickIntervalsPerEpoch) (uint32, error) {
 	epoch := epochTickIntervals.Epoch
 
-	batchTxToInsert, tick, err := p.gatherTxBatch(epoch, startTick, epochTickIntervals)
+	tickTransactionsBatch, tick, err := p.gatherTickTransactionsBatch(epoch, startTick, epochTickIntervals)
 	if err != nil {
-		return 0, fmt.Errorf("gathering tx batch: %v", err)
+		return 0, fmt.Errorf("gathering tick tx batch: %v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), p.publishTimeout)
-	defer cancel()
 
-	p.logger.Infow("Publishing transactions", "nr_transactions", len(batchTxToInsert), "epoch", epoch, "tick", tick)
-	err = p.publisher.PublishTransactions(ctx, batchTxToInsert)
+	batchSize := len(tickTransactionsBatch)
+	p.logger.Infow("Publishing tick transactions", "nr_ticks", batchSize, "epoch", epoch, "tick", tick)
+	err = p.publisher.PublishTickTransactions(tickTransactionsBatch)
 	if err != nil {
 		return 0, fmt.Errorf("inserting batch: %v", err)
 	}
+	p.syncMetrics.IncProcessedTicks(batchSize)
+	p.syncMetrics.IncProcessedMessages(batchSize)
+	p.syncMetrics.SetProcessedTick(epochTickIntervals.Epoch, tick)
 
 	p.logger.Infow("Storing last processed tick", "epoch", epoch, "tick", tick)
 	err = p.statusStore.SetLastProcessedTick(epoch, tick)
@@ -202,42 +206,46 @@ func (p *Processor) processBatch(startTick uint32, epochTickIntervals entities.P
 	return tick, nil
 }
 
-func (p *Processor) gatherTxBatch(epoch, startTick uint32, epochTickIntervals entities.ProcessedTickIntervalsPerEpoch) ([]entities.Tx, uint32, error) {
-	batchTxToInsert := make([]entities.Tx, 0, p.batchSize+1024)
+func (p *Processor) gatherTickTransactionsBatch(epoch, startTick uint32, epochTickIntervals entities.ProcessedTickIntervalsPerEpoch) ([]entities.TickTransactions, uint32, error) {
+
+	var tickTransactionsBatch []entities.TickTransactions
+
 	var tick uint32
 
-	for _, interval := range epochTickIntervals.Intervals {
+	for intervalIndex, interval := range epochTickIntervals.Intervals {
 		for tick = interval.InitialProcessedTick; tick <= interval.LastProcessedTick; tick++ {
 			if tick < startTick {
 				continue
 			}
 
-			txs, err := func() ([]entities.Tx, error) {
+			transactions, err := func() ([]entities.Tx, error) {
 				ctx, cancel := context.WithTimeout(context.Background(), p.fetchTimeout)
 				defer cancel()
 
 				return p.fetcher.GetTickTransactions(ctx, tick)
 			}()
-			if errors.Is(err, entities.ErrEmptyTick) {
-				if tick == interval.LastProcessedTick {
-					return batchTxToInsert, tick, nil
-				}
-
-				continue
-			}
 
 			if err != nil {
-				p.logger.Errorw("error processing tick; retrying...", "epoch", epoch, "tick", tick, "error", fmt.Errorf("getting transactions: %v", err))
-				tick--
-				continue
+				if !errors.Is(err, entities.ErrEmptyTick) {
+					p.logger.Errorw("error processing tick; retrying...", "epoch", epoch, "tick", tick, "error", fmt.Errorf("getting transactions: %v", err))
+					tick--
+					continue
+				}
+				transactions = []entities.Tx{}
 			}
 
-			batchTxToInsert = append(batchTxToInsert, txs...)
-			if len(batchTxToInsert) >= p.batchSize || tick == interval.LastProcessedTick {
-				return batchTxToInsert, tick, nil
+			tickTransactions := entities.TickTransactions{
+				TickNumber:   tick,
+				Epoch:        epoch,
+				Transactions: transactions,
+			}
+			tickTransactionsBatch = append(tickTransactionsBatch, tickTransactions)
+
+			if len(tickTransactionsBatch) >= p.batchSize || (intervalIndex == len(epochTickIntervals.Intervals)-1) && tick == interval.LastProcessedTick {
+				return tickTransactionsBatch, tick, nil
 			}
 		}
 	}
 
-	return batchTxToInsert, tick, nil
+	return tickTransactionsBatch, tick, nil
 }

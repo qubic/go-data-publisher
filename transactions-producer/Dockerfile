@@ -10,8 +10,6 @@ RUN go build -o "./bin/transactions-producer" "./app/transactions-producer"
 FROM alpine
 COPY --from=builder /src/bin/transactions-producer /app/transactions-producer
 
-EXPOSE 8000
-
 WORKDIR /app
 
 ENTRYPOINT ["./transactions-producer"]

@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"github.com/ardanlabs/conf"
 	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/transactions-producer/domain"
 	"github.com/qubic/transactions-producer/external/archiver"
-	"github.com/qubic/transactions-producer/external/elastic"
+	"github.com/qubic/transactions-producer/external/kafka"
 	"github.com/qubic/transactions-producer/infrastructure/store/pebbledb"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/plugin/kprom"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"log"
@@ -19,7 +23,7 @@ import (
 	"time"
 )
 
-const prefix = "QUBIC_GO_DATA_PUBLISHER"
+const prefix = "QUBIC_TRANSACTIONS_PUBLISHER"
 
 func main() {
 	if err := run(); err != nil {
@@ -34,7 +38,7 @@ func run() error {
 
 	logger, err := config.Build()
 	if err != nil {
-		fmt.Errorf("creating logger: %v", err)
+		return fmt.Errorf("creating logger: %v", err)
 	}
 	defer logger.Sync()
 	sLogger := logger.Sugar()
@@ -42,19 +46,18 @@ func run() error {
 	var cfg struct {
 		InternalStoreFolder                 string        `conf:"default:store"`
 		ArchiverGrpcHost                    string        `conf:"default:127.0.0.1:6001"`
-		ServerListenAddr                    string        `conf:"default:0.0.0.0:8000"`
 		ArchiverReadTimeout                 time.Duration `conf:"default:20s"`
-		ElasticSearchAddress                string        `conf:"default:http://127.0.0.1:9200"`
-		ElasticSearchWriteTimeout           time.Duration `conf:"default:5m"`
-		ElasticPushRetries                  int           `conf:"default:20"`
-		ElasticUsername                     string        `conf:"default:elastic"`
-		ElasticPassword                     string        `conf:"default:password"`
-		ElasticIndex                        string        `conf:"default:qubic-transactions-v1"`
 		BatchSize                           int           `conf:"default:100"`
 		NrWorkers                           int           `conf:"default:20"`
 		OverrideLastProcessedTick           bool          `conf:"default:false"`
 		OverrideLastProcessedTickEpochValue uint32        `conf:"default:155"`
 		OverrideLastProcessedTickValue      uint32        `conf:"default:22669394"`
+		Kafka                               struct {
+			BootstrapServers []string `conf:"default:localhost:9092"`
+			TxTopic          string   `conf:"default:qubic-transactions"`
+		}
+		MetricsNamespace string `conf:"default:qubic-kafka"`
+		MetricsPort      int    `conf:"default:9999"`
 	}
 
 	if err := conf.Parse(os.Args[1:], prefix, &cfg); err != nil {
@@ -94,17 +97,29 @@ func run() error {
 		}
 	}
 
-	esClient, err := elastic.NewClient(cfg.ElasticSearchAddress, cfg.ElasticIndex, cfg.ElasticSearchWriteTimeout, elastic.WithPushRetries(cfg.ElasticPushRetries), elastic.WithBasicAuth(cfg.ElasticUsername, cfg.ElasticPassword))
+	kafkaMetrics := kprom.NewMetrics(cfg.MetricsNamespace,
+		kprom.Registerer(prometheus.DefaultRegisterer),
+		kprom.Gatherer(prometheus.DefaultGatherer))
+	kcl, err := kgo.NewClient(
+		kgo.WithHooks(kafkaMetrics),
+		// The default should eventually be removed after implementing publishing for multiple types of data.
+		kgo.DefaultProduceTopic(cfg.Kafka.TxTopic),
+		kgo.SeedBrokers(cfg.Kafka.BootstrapServers...),
+		kgo.ProducerBatchCompression(kgo.ZstdCompression()),
+	)
 	if err != nil {
-		return fmt.Errorf("creating elasticsearch tx inserter: %v", err)
+		return errors.Wrap(err, "creating kafka client")
 	}
+
+	kafkaClient := kafka.NewClient(kcl)
 
 	archiverClient, err := archiver.NewClient(cfg.ArchiverGrpcHost)
 	if err != nil {
 		return fmt.Errorf("creating archiver client: %v", err)
 	}
 
-	proc := domain.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, esClient, cfg.ElasticSearchWriteTimeout, procStore, cfg.BatchSize, sLogger)
+	metrics := domain.NewMetrics(cfg.MetricsNamespace)
+	proc := domain.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, kafkaClient, procStore, cfg.BatchSize, sLogger, metrics)
 	if err != nil {
 		return fmt.Errorf("creating processor: %v", err)
 	}
@@ -117,31 +132,31 @@ func run() error {
 		procErrors <- proc.Start(cfg.NrWorkers)
 	}()
 
-	http.HandleFunc("/v1/status", func(w http.ResponseWriter, r *http.Request) {
-		epochsLastProcessedTick, err := procStore.GetLastProcessedTickForAllEpochs()
-		if err != nil {
-			http.Error(w, fmt.Sprintf("getting last processed tick for all epochs: %v", err), http.StatusInternalServerError)
-			return
-		}
-		response := map[string]map[uint32]uint32{
-			"lastProcessedTicks": epochsLastProcessedTick,
-		}
-		data, err := json.Marshal(response)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("marshalling response: %v", err), http.StatusInternalServerError)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, err = w.Write(data)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("writing response: %v", err), http.StatusInternalServerError)
-			return
-		}
-	})
-
 	serverErr := make(chan error, 1)
-
 	go func() {
-		serverErr <- http.ListenAndServe(cfg.ServerListenAddr, nil)
+		log.Printf("main: Starting status and metrics endpoint on port [%d]", cfg.MetricsPort)
+		http.HandleFunc("/v1/status", func(w http.ResponseWriter, r *http.Request) {
+			epochsLastProcessedTick, err := procStore.GetLastProcessedTickForAllEpochs()
+			if err != nil {
+				http.Error(w, fmt.Sprintf("getting last processed tick for all epochs: %v", err), http.StatusInternalServerError)
+				return
+			}
+			response := map[string]map[uint32]uint32{
+				"lastProcessedTicks": epochsLastProcessedTick,
+			}
+			data, err := json.Marshal(response)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("marshalling response: %v", err), http.StatusInternalServerError)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, err = w.Write(data)
+			if err != nil {
+				http.Error(w, fmt.Sprintf("writing response: %v", err), http.StatusInternalServerError)
+				return
+			}
+		})
+		http.Handle("/metrics", promhttp.Handler())
+		serverErr <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.MetricsPort), nil)
 	}()
 
 	for {
