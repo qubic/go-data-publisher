@@ -1,4 +1,4 @@
-name: Deploy custom status service tag
+name: Create custom status service snapshot image
 
 on:
   push:

@@ -1,4 +1,4 @@
-name: Deploy status service release
+name: Create status service image
 
 on:
   push:
