@@ -91,6 +91,7 @@ func run() error {
 		kgo.SeedBrokers(cfg.Broker.BootstrapServers),
 		kgo.ConsumeTopics(cfg.Broker.ConsumeTopic),
 		kgo.ConsumerGroup(cfg.Broker.ConsumerGroup),
+		kgo.BlockRebalanceOnPoll(),
 		kgo.DisableAutoCommit(),
 	)
 	if err != nil {

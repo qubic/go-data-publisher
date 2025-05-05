@@ -27,6 +27,8 @@ func (fkc *FakeKafkaClient) CommitUncommittedOffsets(_ context.Context) error {
 	return nil
 }
 
+func (fkc *FakeKafkaClient) AllowRebalance() {}
+
 type FakeElasticClient struct {
 	LatestBatch []extern.EsDocument
 }
@@ -72,7 +74,7 @@ func TestTransactionConsumer_GivenFetchError_ThenError(t *testing.T) {
 	}
 
 	_, err := transactionConsumer.consumeBatch()
-	assert.ErrorContains(t, err, "Error fetching records")
+	assert.ErrorContains(t, err, "fetching records")
 }
 
 func TestTransactionConsumer_GivenInvalidJson_ThenError(t *testing.T) {

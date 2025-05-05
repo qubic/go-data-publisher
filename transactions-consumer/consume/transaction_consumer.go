@@ -14,6 +14,7 @@ import (
 type KafkaClient interface {
 	PollRecords(ctx context.Context, maxPollRecords int) kgo.Fetches
 	CommitUncommittedOffsets(ctx context.Context) error
+	AllowRebalance()
 }
 
 type ElasticDocumentClient interface {
@@ -64,14 +65,15 @@ func (c *TransactionConsumer) Consume() error {
 		} else {
 			// if there is an error consuming we abort. We need to fix the error before trying again.
 			log.Printf("Error consuming batch: %v", err) // exits
-			return errors.Wrap(err, "Error consuming batch")
+			return errors.Wrap(err, "consuming batch")
 		}
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
 func (c *TransactionConsumer) consumeBatch() (int, error) {
 	ctx := context.Background()
+	defer c.kafkaClient.AllowRebalance()            // because of the configured kgo.BlockRebalanceOnPoll() option
 	fetches := c.kafkaClient.PollRecords(ctx, 1000) // batch process max x messages in one run
 	if errs := fetches.Errors(); len(errs) > 0 {
 		// Only non-retryable errors are returned.
@@ -79,7 +81,7 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 		for _, err := range errs {
 			log.Printf("Error: %v", err)
 		}
-		return -1, errors.New("Error fetching records")
+		return -1, errors.New("fetching records")
 	}
 
 	var documents []extern.EsDocument
@@ -90,13 +92,13 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 		var tickTransactions TickTransactions
 		err := unmarshalTickTransactions(record, &tickTransactions)
 		if err != nil {
-			return -1, errors.Wrapf(err, "Error unmarshalling record value %s", string(record.Value))
+			return -1, errors.Wrapf(err, "unmarshalling record value %s", string(record.Value))
 		}
 
 		for _, transaction := range tickTransactions.Transactions {
 			val, err := json.Marshal(transaction)
 			if err != nil {
-				return -1, errors.Wrapf(err, "Error unmarshalling transaction %+v", transaction)
+				return -1, errors.Wrapf(err, "unmarshalling transaction %+v", transaction)
 			}
 			documents = append(documents, extern.EsDocument{
 				Id:      transaction.Hash,
@@ -116,13 +118,13 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 
 	err := c.elasticClient.BulkIndex(ctx, documents)
 	if err != nil {
-		return -1, errors.Wrapf(err, "Error bulk indexing [%d] documents.", len(documents))
+		return -1, errors.Wrapf(err, "bulk indexing [%d] documents.", len(documents))
 	}
 	c.consumerMetrics.SetProcessedTick(c.currentEpoch, c.currentTick)
 
 	err = c.kafkaClient.CommitUncommittedOffsets(ctx)
 	if err != nil {
-		return -1, errors.Wrap(err, "Error committing offsets")
+		return -1, errors.Wrap(err, "committing offsets")
 	}
 	return len(documents), nil
 }
