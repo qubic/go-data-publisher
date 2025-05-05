@@ -25,7 +25,7 @@ func NewClient(kafkaClient KafkaClient) *Client {
 	}
 }
 
-func (kc *Client) PublishTickTransactions(ctx context.Context, tickTransactions []entities.TickTransactions) error {
+func (kc *Client) PublishTickTransactions(tickTransactions []entities.TickTransactions) error {
 
 	wg := sync.WaitGroup{}
 	errorChannel := make(chan error, len(tickTransactions))
@@ -40,7 +40,7 @@ func (kc *Client) PublishTickTransactions(ctx context.Context, tickTransactions 
 		}
 
 		wg.Add(1)
-		kc.kcl.Produce(ctx, record, func(_ *kgo.Record, err error) {
+		kc.kcl.Produce(nil, record, func(_ *kgo.Record, err error) {
 			defer wg.Done()
 			if err != nil {
 				log.Printf("Error while producing transaction record: %v", err)

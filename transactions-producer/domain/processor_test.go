@@ -65,7 +65,7 @@ type MockPublisher struct {
 	shouldError               bool
 }
 
-func (mp *MockPublisher) PublishTickTransactions(_ context.Context, tickTransactions []entities.TickTransactions) error {
+func (mp *MockPublisher) PublishTickTransactions(tickTransactions []entities.TickTransactions) error {
 
 	if mp.shouldError {
 		return ErrMock
@@ -233,7 +233,7 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 
-	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, time.Second, store, 100, logger.Sugar(), metrics)
+	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 100, logger.Sugar(), metrics)
 
 	err = txProcessor.runCycle(2)
 	require.NoError(t, err)
@@ -269,7 +269,7 @@ func TestTxProcessor_GetStartingTicksForEpochs(t *testing.T) {
 	err = store.SetLastProcessedTick(103, 26000001)
 	require.NoError(t, err)
 
-	txProcessor := NewProcessor(nil, 0, nil, 0, store, 0, nil, metrics)
+	txProcessor := NewProcessor(nil, 0, nil, store, 0, nil, metrics)
 
 	testData := []struct {
 		name           string
@@ -391,7 +391,7 @@ func TestTxProcessor_ProcessBatch(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 
-	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, time.Second, store, 100, logger.Sugar(), metrics)
+	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 100, logger.Sugar(), metrics)
 
 	testData := []struct {
 		name                 string
@@ -511,7 +511,7 @@ func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 
-	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, time.Second, store, 100, logger.Sugar(), metrics)
+	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 100, logger.Sugar(), metrics)
 
 	testData := []struct {
 		name                     string

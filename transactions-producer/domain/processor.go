@@ -16,7 +16,7 @@ type Fetcher interface {
 }
 
 type Publisher interface {
-	PublishTickTransactions(ctx context.Context, tickTransactions []entities.TickTransactions) error
+	PublishTickTransactions(tickTransactions []entities.TickTransactions) error
 }
 
 type statusStore interface {
@@ -26,35 +26,32 @@ type statusStore interface {
 }
 
 type Processor struct {
-	fetcher        Fetcher
-	fetchTimeout   time.Duration
-	publisher      Publisher
-	publishTimeout time.Duration
-	statusStore    statusStore
-	batchSize      int
-	logger         *zap.SugaredLogger
-	syncMetrics    *Metrics
+	fetcher      Fetcher
+	fetchTimeout time.Duration
+	publisher    Publisher
+	statusStore  statusStore
+	batchSize    int
+	logger       *zap.SugaredLogger
+	syncMetrics  *Metrics
 }
 
 func NewProcessor(
 	fetcher Fetcher,
 	fetchTimeout time.Duration,
 	publisher Publisher,
-	publishTimeout time.Duration,
 	statusStore statusStore,
 	batchSize int,
 	logger *zap.SugaredLogger,
 	metrics *Metrics,
 ) *Processor {
 	return &Processor{
-		fetcher:        fetcher,
-		fetchTimeout:   fetchTimeout,
-		publisher:      publisher,
-		publishTimeout: publishTimeout,
-		statusStore:    statusStore,
-		batchSize:      batchSize,
-		logger:         logger,
-		syncMetrics:    metrics,
+		fetcher:      fetcher,
+		fetchTimeout: fetchTimeout,
+		publisher:    publisher,
+		statusStore:  statusStore,
+		batchSize:    batchSize,
+		logger:       logger,
+		syncMetrics:  metrics,
 	}
 }
 
@@ -189,12 +186,10 @@ func (p *Processor) processBatch(startTick uint32, epochTickIntervals entities.P
 	if err != nil {
 		return 0, fmt.Errorf("gathering tick tx batch: %v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), p.publishTimeout)
-	defer cancel()
 
 	batchSize := len(tickTransactionsBatch)
 	p.logger.Infow("Publishing tick transactions", "nr_ticks", batchSize, "epoch", epoch, "tick", tick)
-	err = p.publisher.PublishTickTransactions(ctx, tickTransactionsBatch)
+	err = p.publisher.PublishTickTransactions(tickTransactionsBatch)
 	if err != nil {
 		return 0, fmt.Errorf("inserting batch: %v", err)
 	}

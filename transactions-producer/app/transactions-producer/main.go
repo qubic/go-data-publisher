@@ -47,7 +47,6 @@ func run() error {
 		InternalStoreFolder                 string        `conf:"default:store"`
 		ArchiverGrpcHost                    string        `conf:"default:127.0.0.1:6001"`
 		ArchiverReadTimeout                 time.Duration `conf:"default:20s"`
-		PublishWriteTimeout                 time.Duration `conf:"default:5m"`
 		BatchSize                           int           `conf:"default:100"`
 		NrWorkers                           int           `conf:"default:20"`
 		OverrideLastProcessedTick           bool          `conf:"default:false"`
@@ -120,7 +119,7 @@ func run() error {
 	}
 
 	metrics := domain.NewMetrics(cfg.MetricsNamespace)
-	proc := domain.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, kafkaClient, cfg.PublishWriteTimeout, procStore, cfg.BatchSize, sLogger, metrics)
+	proc := domain.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, kafkaClient, procStore, cfg.BatchSize, sLogger, metrics)
 	if err != nil {
 		return fmt.Errorf("creating processor: %v", err)
 	}
