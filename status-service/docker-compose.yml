@@ -1,0 +1,25 @@
+services:
+  qubic-status-service:
+    image: ghcr.io/qubic/status-service:latest # set correct version
+    container_name: qubic-status-service
+    ports:
+      - "127.0.0.1:8003:8000"
+      - "127.0.0.1:9995:9999"
+    environment:
+      QUBIC_STATUS_SERVICE_ARCHIVER_HOST: "localhost:8010" # grpc archiver url
+      QUBIC_STATUS_SERVICE_ELASTIC_ADDRESSES: "https://localhost:9200" # set elasticsearch url here
+      QUBIC_STATUS_SERVICE_ELASTIC_USERNAME: "enter-username-here" # enter elasticsearch username
+      QUBIC_STATUS_SERVICE_ELASTIC_PASSWORD: "enter-password-here" # enter elasticsearch password
+      QUBIC_STATUS_SERVICE_SYNC_START_TICK: 0 # overrides stored last processed tick if > 0
+    volumes:
+      - ./store/qubic-status-service:/app/store
+      - ./certs/elastic/http_ca.crt:/app/http_ca.crt:ro
+    networks:
+      - qubic
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8000/health" ]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+networks:
+  qubic:
