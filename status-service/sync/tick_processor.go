@@ -31,7 +31,7 @@ type TickProcessor struct {
 	dataStore          DataStore
 	processingMetrics  *metrics.Metrics
 	skipErroneousTicks bool
-	errorsCount        int64
+	errorsCount        uint
 }
 
 func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, dataStore DataStore, m *metrics.Metrics, skip bool) *TickProcessor {
@@ -53,8 +53,7 @@ func (p *TickProcessor) Synchronize() {
 			p.resetErrorCount()
 		} else {
 			p.incrementErrorCount()
-			log.Printf("[WARN] sync run failed: %v", err)
-			p.sleepWithBackoff() // backoff if sync run fails subsequently
+			log.Printf("Check failed: %v", err)
 		}
 	}
 }
@@ -68,7 +67,7 @@ func (p *TickProcessor) sync() error {
 	p.processingMetrics.SetSourceTick(status.LatestEpoch, status.LatestTick)
 
 	tick, err := p.dataStore.GetLastProcessedTick()
-	log.Printf("Last processed tick: %v", tick)
+	log.Printf("Last processed tick: [%d].", tick)
 	if err != nil {
 		return errors.Wrap(err, "get last processed tick")
 	}
@@ -100,13 +99,13 @@ func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, toExc
 		}
 		if !match {
 			if p.skipErroneousTicks {
-				log.Printf("[WARN] skipping tick %d.", tick)
+				log.Printf("[WARN] skipping tick [%d].", tick)
 				err = p.dataStore.AddSkippedTick(tick)
 				if err != nil {
 					return errors.Wrap(err, "trying to store skipped tick")
 				}
 			} else {
-				return errors.Errorf("Transaction mismatch in tick %d (epoch %d)", tick, epoch)
+				return errors.Errorf("Transaction mismatch in tick [%d]", tick)
 			}
 		}
 		err = p.dataStore.SetLastProcessedTick(tick)
@@ -134,12 +133,12 @@ func (p *TickProcessor) processTick(ctx context.Context, tick uint32) (bool, err
 
 	difference := util.Difference(util.ToSet(archiverTransactions), util.ToSet(elasticTransactions))
 	if len(difference) > 0 { // transactions do not match
-		if p.skipErroneousTicks || p.errorsCount == 0 { // verbose log only first time
+		if p.skipErroneousTicks { // verbose log only if we skip ticks
 			log.Printf("Transaction mismatch for tick [%d].", tick)
 			log.Printf("Archiver: %v", archiverTransactions)
 			log.Printf("Elastic: %v", elasticTransactions)
 		} else {
-			log.Printf("Transaction mismatch for tick [%d]. Count: [%d] archiver, [%d] elastic.", tick, len(archiverTransactions), len(elasticTransactions))
+			log.Printf("Transaction mismatch for tick [%d]. Count: archiver [%d], elastic [%d].", tick, len(archiverTransactions), len(elasticTransactions))
 		}
 		return false, nil // return mismatch
 	}
@@ -164,20 +163,12 @@ func calculateNextTickRange(lastProcessedTick uint32, intervals []*archiver.Tick
 	return 0, 0, 0, nil
 }
 
-func (p *TickProcessor) sleepWithBackoff() {
-	if p.errorsCount < 10 { // error count * 100ms
-		time.Sleep(time.Duration(p.errorsCount+1) * time.Second)
-	} else { // 10 sec max
-		time.Sleep(10 * time.Second)
-	}
-}
-
 func (p *TickProcessor) incrementErrorCount() {
 	p.errorsCount++
-	p.processingMetrics.SetError(true)
+	p.processingMetrics.SetError(p.errorsCount)
 }
 
 func (p *TickProcessor) resetErrorCount() {
 	p.errorsCount = 0
-	p.processingMetrics.SetError(false)
+	p.processingMetrics.SetError(p.errorsCount)
 }
