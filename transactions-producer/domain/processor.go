@@ -114,7 +114,7 @@ func (p *Processor) waitAllWorkersToFinish(startedWorkers *atomic.Int32) {
 			break
 		}
 
-		time.Sleep(5 * time.Second)
+		time.Sleep(time.Second)
 		continue
 	}
 }
@@ -125,7 +125,7 @@ func (p *Processor) waitWorkerToFreeUp(nrWorkers int, startedWorkers *atomic.Int
 			break
 		}
 
-		time.Sleep(5 * time.Second)
+		time.Sleep(time.Second)
 		continue
 	}
 }
