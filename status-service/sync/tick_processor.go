@@ -67,7 +67,6 @@ func (p *TickProcessor) sync() error {
 	p.processingMetrics.SetSourceTick(status.LatestEpoch, status.LatestTick)
 
 	tick, err := p.dataStore.GetLastProcessedTick()
-	log.Printf("Last processed tick: [%d].", tick)
 	if err != nil {
 		return errors.Wrap(err, "get last processed tick")
 	}
