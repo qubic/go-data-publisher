@@ -78,10 +78,9 @@ func (p *TickProcessor) sync() error {
 	}
 	end = min(status.LatestTick, end) // don't exceed lastest tick
 
-	if start > end || start == 0 || end == 0 || epoch == 0 {
-		log.Printf("No ticks to process.")
-	} else { // if start == end then process one tick
+	if start <= end && start > 0 && end > 0 && epoch > 0 {
 		log.Printf("Processing ticks from [%d] to [%d] for epoch [%d].", start, end, epoch)
+		// if start == end then process one tick
 		err = p.processTickRange(ctx, epoch, start, end+1)
 		if err != nil {
 			return errors.Wrap(err, "processing tick range")
