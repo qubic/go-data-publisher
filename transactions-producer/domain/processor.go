@@ -79,10 +79,7 @@ func (p *Processor) runCycle(nrWorkers int) error {
 
 	var startedWorkers atomic.Int32
 
-	if len(epochs) > 0 && len(epochs[0].Intervals) > 0 { // make sure that there is data to fetch
-		// first epoch and last interval is current tick
-		p.syncMetrics.SetSourceTick(epochs[0].Epoch, epochs[0].Intervals[len(epochs[0].Intervals)-1].LastProcessedTick)
-	}
+	p.setLatestSourceTickToMetrics(epochs)
 
 	for _, epochIntervals := range epochs {
 		startingTick, ok := startingTicksForEpochs[epochIntervals.Epoch]
@@ -111,6 +108,17 @@ func (p *Processor) runCycle(nrWorkers int) error {
 	p.waitAllWorkersToFinish(&startedWorkers)
 
 	return nil
+}
+
+func (p *Processor) setLatestSourceTickToMetrics(epochs []entities.ProcessedTickIntervalsPerEpoch) {
+	// last epoch and last interval contains latest source tick
+	if len(epochs) > 0 { // check if there are epochs
+		latestEpochIndex := len(epochs) - 1
+		if len(epochs[latestEpochIndex].Intervals) > 0 { // check if there are intervals
+			latestIntervalIndex := len(epochs[latestEpochIndex].Intervals) - 1
+			p.syncMetrics.SetSourceTick(epochs[latestEpochIndex].Epoch, epochs[latestEpochIndex].Intervals[latestIntervalIndex].LastProcessedTick)
+		}
+	}
 }
 
 func (p *Processor) waitAllWorkersToFinish(startedWorkers *atomic.Int32) {
