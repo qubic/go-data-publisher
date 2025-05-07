@@ -56,8 +56,8 @@ func (metrics *ProcessingMetrics) IncProcessedTicks() {
 	metrics.processedTicksCount.Inc()
 }
 
-func (metrics *ProcessingMetrics) AddProcessedMessages(count int) {
-	metrics.processedMessageCount.Add(float64(count))
+func (metrics *ProcessingMetrics) IncProcessedMessages() {
+	metrics.processedMessageCount.Inc()
 }
 
 func (metrics *ProcessingMetrics) SetSourceTick(epoch uint32, tick uint32) {

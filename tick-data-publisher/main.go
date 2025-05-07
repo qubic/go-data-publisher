@@ -9,6 +9,7 @@ import (
 	"github.com/qubic/tick-data-publisher/api"
 	"github.com/qubic/tick-data-publisher/archiver"
 	"github.com/qubic/tick-data-publisher/db"
+	"github.com/qubic/tick-data-publisher/kafka"
 	"github.com/qubic/tick-data-publisher/metrics"
 	"github.com/qubic/tick-data-publisher/sync"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -41,12 +42,12 @@ func run() error {
 		}
 		Sync struct {
 			InternalStoreFolder string `conf:"default:store"`
-			StartTick           uint32 `conf:"optional"`
 			ServerPort          int    `conf:"default:8000"`
 			MetricsPort         int    `conf:"default:9999"`
 			MetricsNamespace    string `conf:"default:qubic-kafka"`
-			SkipTicks           bool   `conf:"default:false"`
-			Enabled             bool   `conf:"default:true"`
+			NumWorkers          int    `conf:"default:16"`   // maximum number of workers for parallel processing
+			StartTick           uint32 `conf:"optional"`     // overrides last processed tick
+			Enabled             bool   `conf:"default:true"` // only for testing
 		}
 	}
 
@@ -114,9 +115,10 @@ func run() error {
 		return errors.Wrap(err, "creating archiver client")
 	}
 
-	mtx := metrics.NewProcessingMetrics(cfg.Sync.MetricsNamespace)
+	producer := kafka.NewTickDataProducer(kcl)
+	procMetrics := metrics.NewProcessingMetrics(cfg.Sync.MetricsNamespace)
 	if cfg.Sync.Enabled {
-		processor := sync.NewTickDataProcessor(store, cl, mtx)
+		processor := sync.NewTickDataProcessor(store, cl, producer, cfg.Sync.NumWorkers, procMetrics)
 		go processor.StartProcessing()
 	} else {
 		log.Println("[WARN] main: Message consuming disabled")

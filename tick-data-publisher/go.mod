@@ -13,6 +13,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/twmb/franz-go v1.18.1
 	github.com/twmb/franz-go/plugin/kprom v1.2.1
+	golang.org/x/sync v0.12.0
 	google.golang.org/grpc v1.72.0
 )
 

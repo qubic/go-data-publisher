@@ -2,6 +2,8 @@ package archiver
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/qubic/go-archiver/protobuff"
@@ -24,6 +26,18 @@ type TickInterval struct {
 	Epoch uint32
 	From  uint32
 	To    uint32
+}
+
+type TickData struct {
+	ComputorIndex     uint32   `json:"computorIndex"`
+	Epoch             uint32   `json:"epoch"`
+	TickNumber        uint32   `json:"tickNumber"`
+	Timestamp         uint64   `json:"timestamp"`
+	VarStruct         string   `json:"varStruct,omitempty"` // []byte -> base64
+	TimeLock          string   `json:"timeLock,omitempty"`  // []byte -> base64
+	TransactionHashes []string `json:"transactionHashes,omitempty"`
+	ContractFees      []int64  `json:"contractFees,omitempty"`
+	Signature         string   `json:"signature"` // hex -> base64
 }
 
 func NewClient(host string) (*Client, error) {
@@ -62,7 +76,7 @@ func (c *Client) GetStatus(ctx context.Context) (*Status, error) {
 
 }
 
-func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) ([]string, error) {
+func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*TickData, error) {
 	request := protobuff.GetTickDataRequest{
 		TickNumber: tickNumber,
 	}
@@ -73,15 +87,31 @@ func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) ([]string, 
 	if response == nil {
 		return nil, errors.New("nil tick data response")
 	}
-	var hashes []string
 	if response.GetTickData() == nil {
 		log.Printf("[INFO] Tick [%d] is empty.", tickNumber)
-		hashes = []string{}
-	} else if response.GetTickData().GetTransactionIds() == nil { // non-empty tick without transactions
-		log.Printf("[INFO] Tick [%d] has no transactions.", tickNumber)
-		hashes = []string{}
-	} else {
-		hashes = response.GetTickData().GetTransactionIds()
+		return nil, nil
 	}
-	return hashes, nil
+	tickData, err := convertTickData(response.GetTickData())
+	if err != nil {
+		return nil, errors.Wrap(err, "converting tick data")
+	}
+	return tickData, nil
+}
+
+func convertTickData(td *protobuff.TickData) (*TickData, error) {
+	sigBytes, err := hex.DecodeString(td.SignatureHex)
+	if err != nil {
+		return nil, errors.Wrapf(err, "decoding signature hex [%s]", td.SignatureHex)
+	}
+	return &TickData{
+		ComputorIndex:     td.ComputorIndex,
+		Epoch:             td.Epoch,
+		TickNumber:        td.TickNumber,
+		Timestamp:         td.Timestamp,
+		VarStruct:         base64.StdEncoding.EncodeToString(td.VarStruct),
+		TimeLock:          base64.StdEncoding.EncodeToString(td.TimeLock),
+		TransactionHashes: td.TransactionIds,
+		ContractFees:      td.ContractFees,
+		Signature:         base64.StdEncoding.EncodeToString(sigBytes),
+	}, nil
 }
