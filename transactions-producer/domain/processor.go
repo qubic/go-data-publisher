@@ -79,6 +79,11 @@ func (p *Processor) runCycle(nrWorkers int) error {
 
 	var startedWorkers atomic.Int32
 
+	if len(epochs) > 0 && len(epochs[0].Intervals) > 0 { // make sure that there is data to fetch
+		// first epoch and last interval is current tick
+		p.syncMetrics.SetSourceTick(epochs[0].Epoch, epochs[0].Intervals[len(epochs[0].Intervals)-1].LastProcessedTick)
+	}
+
 	for _, epochIntervals := range epochs {
 		startingTick, ok := startingTicksForEpochs[epochIntervals.Epoch]
 		if !ok {
@@ -159,7 +164,6 @@ func (p *Processor) processEpoch(startTick uint32, epochTickIntervals entities.P
 	p.logger.Infow("Starting epoch processor", "epoch", epochTickIntervals.Epoch, "startTick", startTick)
 
 	lastTickFromIntervals := epochTickIntervals.Intervals[len(epochTickIntervals.Intervals)-1].LastProcessedTick
-	p.syncMetrics.SetSourceTick(epochTickIntervals.Epoch, lastTickFromIntervals) // this will fluctuate on initial sync because multiple epochs are synced in parallel
 
 	for {
 		lastProcessedTick, err := p.processBatch(startTick, epochTickIntervals)
