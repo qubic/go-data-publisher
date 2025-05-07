@@ -3,7 +3,7 @@ name: Release transactions-producer
 on:
   push:
     branches:
-      - feature/kafka-publisher
+      - feature/reduce-processing-delay
 
 jobs:
   docker-publish:
@@ -33,4 +33,4 @@ jobs:
           context: ./transactions-producer
           file: ./transactions-producer/Dockerfile
           push: true
-          tags: ghcr.io/qubic/transactions-producer:kafka-publisher
+          tags: ghcr.io/qubic/transactions-producer:snapshot
