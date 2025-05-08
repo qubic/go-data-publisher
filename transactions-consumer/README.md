@@ -4,7 +4,7 @@ Service for consuming qubic transaction messages from a message broker.
 
 ## Build
 
-`go build` in the root directory will create the `go-transactions-consumer` executable.
+`go build` in the module root directory will create the executable.
 
 ## Run tests
 
@@ -13,21 +13,6 @@ Service for consuming qubic transaction messages from a message broker.
 ## Prerequisites
 
 The application needs kafka to be installed. The topics need to be created before starting the application.
-The consumer requires two topics: one for consuming the transaction messages and one for returning the
-processing status. Default names (you should only use the defaults if you consume with only one consumer group):
-
-```
-qubic-transactions
-qubic-transactions-processed
-```
-
-```shell
-./bin/kafka-topics.sh --list --bootstrap-server localhost:9092
-```
-
-```shell
-./bin/kafka-topics.sh --create --topic qubic-transactions-processed  --bootstrap-server localhost:9092
-```
 
 ## Configuration
 
@@ -54,7 +39,7 @@ The following properties (with defaults) can be set:
 `
 --elastic-addresses=
 `
-Elasticsearch url(s). Typically, https and port 9200.
+Elasticsearch url(s).
 
 `
 --elastic-username=
@@ -84,12 +69,12 @@ Number of maximum retries for indexing elasticsearch documents.
 `
 --broker-bootstrap-servers=
 `
-Kafka bootstrap server urls. Typically, http and port 9092.
+Kafka bootstrap server urls.
 
 `
 --broker-metrics-port=
 `
-Port for exposing prometheus metrics. Defaults to 9999. Access default with `curl localhost:9999/metrics` for example.
+Port for exposing prometheus metrics. Access default with `curl localhost:9999/metrics` for example.
 
 `
 --broker-metrics-namespace=
