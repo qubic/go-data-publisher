@@ -18,7 +18,7 @@ The application needs kafka to be installed. The topics need to be created befor
 
 ## Configuration options
 
-You can use command line properties or environment variables. Environment variables need to be prefixed with `QUBIC_TRANSACTIONS_CONSUMER_`.
+You can use command line properties or environment variables. Environment variables need to be prefixed with `QUBIC_TICK_DATA_PUBLISHER_`.
 
 The following properties (with defaults) can be set:
 
