@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/qubic/go-archiver/protobuff"
+	"github.com/qubic/tick-data-publisher/domain"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
@@ -14,30 +15,6 @@ import (
 
 type Client struct {
 	api protobuff.ArchiveServiceClient
-}
-
-type Status struct {
-	LatestEpoch   uint32
-	LatestTick    uint32
-	TickIntervals []*TickInterval
-}
-
-type TickInterval struct {
-	Epoch uint32
-	From  uint32
-	To    uint32
-}
-
-type TickData struct {
-	ComputorIndex     uint32   `json:"computorIndex"`
-	Epoch             uint32   `json:"epoch"`
-	TickNumber        uint32   `json:"tickNumber"`
-	Timestamp         uint64   `json:"timestamp"`
-	VarStruct         string   `json:"varStruct,omitempty"` // []byte -> base64
-	TimeLock          string   `json:"timeLock,omitempty"`  // []byte -> base64
-	TransactionHashes []string `json:"transactionHashes,omitempty"`
-	ContractFees      []int64  `json:"contractFees,omitempty"`
-	Signature         string   `json:"signature,omitempty"` // hex -> base64
 }
 
 func NewClient(host string) (*Client, error) {
@@ -51,23 +28,23 @@ func NewClient(host string) (*Client, error) {
 	return &cl, nil
 }
 
-func (c *Client) GetStatus(ctx context.Context) (*Status, error) {
+func (c *Client) GetStatus(ctx context.Context) (*domain.Status, error) {
 	s, err := c.api.GetStatus(ctx, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "calling GetStatus api")
 	}
 
-	var intervals []*TickInterval
+	var intervals []*domain.TickInterval
 	for _, epochIntervals := range s.GetProcessedTickIntervalsPerEpoch() {
 		for _, interval := range epochIntervals.Intervals {
-			intervals = append(intervals, &TickInterval{
+			intervals = append(intervals, &domain.TickInterval{
 				Epoch: epochIntervals.Epoch,
 				From:  interval.InitialProcessedTick,
 				To:    interval.LastProcessedTick,
 			})
 		}
 	}
-	status := Status{
+	status := domain.Status{
 		LatestTick:    s.GetLastProcessedTick().GetTickNumber(),
 		LatestEpoch:   s.GetLastProcessedTick().GetEpoch(),
 		TickIntervals: intervals,
@@ -76,7 +53,7 @@ func (c *Client) GetStatus(ctx context.Context) (*Status, error) {
 
 }
 
-func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*TickData, error) {
+func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*domain.TickData, error) {
 	request := protobuff.GetTickDataRequest{
 		TickNumber: tickNumber,
 	}
@@ -98,12 +75,12 @@ func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*TickData,
 	return tickData, nil
 }
 
-func convertTickData(td *protobuff.TickData) (*TickData, error) {
+func convertTickData(td *protobuff.TickData) (*domain.TickData, error) {
 	sigBytes, err := hex.DecodeString(td.SignatureHex)
 	if err != nil {
 		return nil, errors.Wrapf(err, "decoding signature hex [%s]", td.SignatureHex)
 	}
-	return &TickData{
+	return &domain.TickData{
 		ComputorIndex:     td.ComputorIndex,
 		Epoch:             td.Epoch,
 		TickNumber:        td.TickNumber,

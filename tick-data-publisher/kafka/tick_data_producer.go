@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"github.com/pkg/errors"
-	"github.com/qubic/tick-data-publisher/archiver"
+	"github.com/qubic/tick-data-publisher/domain"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -19,7 +19,7 @@ func NewTickDataProducer(client *kgo.Client) *TickDataProducer {
 	}
 }
 
-func (p *TickDataProducer) SendMessage(ctx context.Context, tickData *archiver.TickData) error {
+func (p *TickDataProducer) SendMessage(ctx context.Context, tickData *domain.TickData) error {
 	record, err := createRecord(tickData)
 	if err != nil {
 		return err
@@ -31,7 +31,7 @@ func (p *TickDataProducer) SendMessage(ctx context.Context, tickData *archiver.T
 	return nil
 }
 
-func createRecord(tickData *archiver.TickData) (*kgo.Record, error) {
+func createRecord(tickData *domain.TickData) (*kgo.Record, error) {
 	payload, err := json.Marshal(tickData)
 	if err != nil {
 		return nil, errors.Wrapf(err, "marshalling to json")

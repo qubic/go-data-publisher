@@ -2,7 +2,7 @@ package sync
 
 import (
 	"context"
-	"github.com/qubic/tick-data-publisher/archiver"
+	"github.com/qubic/tick-data-publisher/domain"
 	"github.com/qubic/tick-data-publisher/metrics"
 	"github.com/stretchr/testify/assert"
 	"sync"
@@ -22,37 +22,37 @@ func (f *FakeDataStore) GetLastProcessedTick() (tick uint32, err error) {
 	return uint32(f.tickNumber), nil
 }
 
-func defaultCreateTickData(_ uint32) (*archiver.TickData, error) {
-	return &archiver.TickData{}, nil
+func defaultCreateTickData(_ uint32) (*domain.TickData, error) {
+	return &domain.TickData{}, nil
 }
 
 type FakeArchiveClient struct {
-	createTickData func(tickNumber uint32) (*archiver.TickData, error)
+	createTickData func(tickNumber uint32) (*domain.TickData, error)
 }
 
-func (f *FakeArchiveClient) GetStatus(_ context.Context) (*archiver.Status, error) {
-	interval1 := &archiver.TickInterval{
+func (f *FakeArchiveClient) GetStatus(_ context.Context) (*domain.Status, error) {
+	interval1 := &domain.TickInterval{
 		Epoch: 100,
 		From:  1,
 		To:    1000,
 	}
 
-	interval2 := &archiver.TickInterval{
+	interval2 := &domain.TickInterval{
 		Epoch: 123,
 		From:  10001,
 		To:    123456,
 	}
 
-	status := &archiver.Status{
+	status := &domain.Status{
 		LatestEpoch:   123,
 		LatestTick:    12345,
-		TickIntervals: []*archiver.TickInterval{interval1, interval2},
+		TickIntervals: []*domain.TickInterval{interval1, interval2},
 	}
 
 	return status, nil
 }
 
-func (f *FakeArchiveClient) GetTickData(_ context.Context, tickNumber uint32) (*archiver.TickData, error) {
+func (f *FakeArchiveClient) GetTickData(_ context.Context, tickNumber uint32) (*domain.TickData, error) {
 	return f.createTickData(tickNumber)
 }
 
@@ -61,7 +61,7 @@ type FakeProducer struct {
 	count int
 }
 
-func (f *FakeProducer) SendMessage(_ context.Context, _ *archiver.TickData) error {
+func (f *FakeProducer) SendMessage(_ context.Context, _ *domain.TickData) error {
 	f.mutex.Lock() // we need to lock because of parallelism
 	defer f.mutex.Unlock()
 	f.count++
@@ -90,7 +90,7 @@ func TestTickDataProcessor_process(t *testing.T) {
 func TestTickDataProcessor_process_doNotSendEmptyTicks(t *testing.T) {
 	dataStore := &FakeDataStore{}
 	archiveClient := &FakeArchiveClient{
-		createTickData: func(tickNumber uint32) (*archiver.TickData, error) { return nil, nil },
+		createTickData: func(tickNumber uint32) (*domain.TickData, error) { return nil, nil },
 	}
 	producer := &FakeProducer{}
 	processor := NewTickDataProcessor(dataStore, archiveClient, producer, 5, m)

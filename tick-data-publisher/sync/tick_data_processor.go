@@ -3,7 +3,7 @@ package sync
 import (
 	"context"
 	"github.com/pkg/errors"
-	"github.com/qubic/tick-data-publisher/archiver"
+	"github.com/qubic/tick-data-publisher/domain"
 	"github.com/qubic/tick-data-publisher/metrics"
 	"golang.org/x/sync/errgroup"
 	"log"
@@ -11,8 +11,8 @@ import (
 )
 
 type ArchiveClient interface {
-	GetStatus(ctx context.Context) (*archiver.Status, error)
-	GetTickData(ctx context.Context, tickNumber uint32) (*archiver.TickData, error)
+	GetStatus(ctx context.Context) (*domain.Status, error)
+	GetTickData(ctx context.Context, tickNumber uint32) (*domain.TickData, error)
 }
 
 type DataStore interface {
@@ -21,7 +21,7 @@ type DataStore interface {
 }
 
 type Producer interface {
-	SendMessage(ctx context.Context, tickData *archiver.TickData) error
+	SendMessage(ctx context.Context, tickData *domain.TickData) error
 }
 
 type TickDataProcessor struct {
@@ -125,7 +125,7 @@ func (p *TickDataProcessor) processTick(ctx context.Context, tick uint32) error 
 	if err != nil {
 		return errors.Wrap(err, "get tick data")
 	}
-	if tickData != nil || (tickData == &archiver.TickData{}) { // empty tick
+	if tickData != nil || (tickData == &domain.TickData{}) { // empty tick
 		err = p.producer.SendMessage(ctx, tickData)
 		if err != nil {
 			return errors.Wrap(err, "sending message")
@@ -136,7 +136,7 @@ func (p *TickDataProcessor) processTick(ctx context.Context, tick uint32) error 
 	return nil
 }
 
-func calculateNextTickRange(lastProcessedTick uint32, intervals []*archiver.TickInterval) (uint32, uint32, uint32, error) {
+func calculateNextTickRange(lastProcessedTick uint32, intervals []*domain.TickInterval) (uint32, uint32, uint32, error) {
 	if len(intervals) == 0 {
 		return 0, 0, 0, errors.New("invalid argument: missing tick intervals")
 	}
