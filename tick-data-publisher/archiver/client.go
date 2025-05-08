@@ -37,7 +37,7 @@ type TickData struct {
 	TimeLock          string   `json:"timeLock,omitempty"`  // []byte -> base64
 	TransactionHashes []string `json:"transactionHashes,omitempty"`
 	ContractFees      []int64  `json:"contractFees,omitempty"`
-	Signature         string   `json:"signature"` // hex -> base64
+	Signature         string   `json:"signature,omitempty"` // hex -> base64
 }
 
 func NewClient(host string) (*Client, error) {
