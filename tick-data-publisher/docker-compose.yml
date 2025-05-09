@@ -1,0 +1,22 @@
+services:
+  qubic-tick-data-publisher:
+    image: ghcr.io/qubic/tick-data-publisher:latest # set correct version
+    container_name: qubic-tick-data-publisher
+    ports:
+      - "127.0.0.1:8004:8000"
+      - "127.0.0.1:9994:9999"
+    environment:
+      QUBIC_TICK_DATA_PUBLISHER_ARCHIVER_GRPC_HOST: "localhost:8010" # set archiver grpc url
+      QUBIC_TICK_DATA_PUBLISHER_BROKER_BOOTSTRAP_SERVERS: "localhost:9092" # set kafka url
+      QUBIC_TICK_DATA_PUBLISHER_BROKER_PRODUCE_TOPIC: "qubic-tick-data-topic" # set topic name
+    volumes:
+      - ./store/qubic-tick-data-publisher:/app/store
+    networks:
+      - qubic
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8000/health" ]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+networks:
+  qubic:

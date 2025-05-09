@@ -1,0 +1,24 @@
+on:
+  push:
+    paths:
+      - 'tick-data-publisher/**'
+  pull_request:
+    paths:
+      - 'tick-data-publisher/**'
+
+name: Test tick data publisher
+jobs:
+  test-nocache:
+    strategy:
+      matrix:
+        go-version: [1.24.x]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: false
+      - run: go test -p 1 -tags ci ./...
+        working-directory: tick-data-publisher

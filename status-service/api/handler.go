@@ -31,27 +31,6 @@ func NewHandler(sp StatusProvider) *Handler {
 	return &Handler{sp: sp}
 }
 
-func (h *Handler) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
-
-	lastProcessedTick, err := h.sp.GetLastProcessedTick()
-	if err != nil {
-		log.Printf("Error getting last processed tick: %v", err)
-		http.Error(w, "Error getting last processed tick", 500)
-		return
-	}
-
-	err = json.NewEncoder(w).Encode(StatusResponse{
-		ProcessedTransactionTick: lastProcessedTick,
-	})
-	if err != nil {
-		log.Printf("Error encoding response: %v", err)
-		http.Error(w, "Error encoding response", 500)
-		return
-	}
-
-	w.Header().Add("Content-Type", "application/json")
-}
-
 func (h *Handler) GetSkippedTicks(w http.ResponseWriter, _ *http.Request) {
 	ticks, err := h.sp.GetSkippedTicks()
 	if err != nil {
