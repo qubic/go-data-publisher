@@ -1,0 +1,21 @@
+services:
+  qubic-tick-data-consumer:
+    image: ghcr.io/qubic/tick-data-consumer:latest # set correct version
+    container_name: qubic-tick-data-consumer
+    ports:
+      - "127.0.0.1:9993:9999"
+    environment:
+      QUBIC_TICK_DATA_CONSUMER_BROKER_BOOTSTRAP_SERVERS: "localhost:9092" # set kafka url here
+      QUBIC_TICK_DATA_CONSUMER_BROKER_CONSUME_TOPIC: "qubic-tick-data-test" # set topic name
+      QUBIC_TICK_DATA_CONSUMER_BROKER_CONSUMER_GROUP: "qubic-elastic-test" # set consumer group name
+      QUBIC_TICK_DATA_CONSUMER_ELASTIC_ADDRESSES: "https://localhost:9200" # set elasticsearch url here
+      QUBIC_TICK_DATA_CONSUMER_ELASTIC_PASSWORD: "enter-password-here"
+    networks:
+      - qubic
+    healthcheck:
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8000/health" ]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+networks:
+  qubic:
