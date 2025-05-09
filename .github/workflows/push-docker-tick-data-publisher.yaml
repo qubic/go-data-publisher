@@ -1,4 +1,4 @@
-name: Create status service image
+name: Create tick data publisher image
 
 on:
   push:
