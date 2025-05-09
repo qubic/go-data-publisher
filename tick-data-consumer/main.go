@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/ardanlabs/conf"
 	"github.com/elastic/go-elasticsearch/v8"
@@ -104,16 +105,25 @@ func run() error {
 		log.Printf("[WARN] main: could not read elastic certificate: %v", err)
 	}
 
-	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses:     cfg.Elastic.Addresses,
-		Username:      cfg.Elastic.Username,
-		Password:      cfg.Elastic.Password,
-		CACert:        cert,
-		RetryOnStatus: []int{502, 503, 504, 429},
-		MaxRetries:    cfg.Elastic.MaxRetries,
-		RetryBackoff:  calculateBackoff(),
-	})
-	elasticClient := elastic.NewClient(esClient, cfg.Elastic.IndexName)
+	var elasticClient consume.ElasticClient
+	if cfg.Elastic.Stub {
+		log.Printf("[WARN] main: stubbing elastic client")
+		elasticClient = &ElasticStubClient{}
+	} else {
+		esClient, err := elasticsearch.NewClient(elasticsearch.Config{
+			Addresses:     cfg.Elastic.Addresses,
+			Username:      cfg.Elastic.Username,
+			Password:      cfg.Elastic.Password,
+			CACert:        cert,
+			RetryOnStatus: []int{502, 503, 504, 429},
+			MaxRetries:    cfg.Elastic.MaxRetries,
+			RetryBackoff:  calculateBackoff(),
+		})
+		if err != nil {
+			return errors.Wrap(err, "creating elastic client")
+		}
+		elasticClient = elastic.NewClient(esClient, cfg.Elastic.IndexName)
+	}
 	consumeMetrics := metrics.NewMetrics(cfg.Sync.MetricsNamespace)
 	consumer := kafka.NewClient(kcl, consumeMetrics)
 	processor := consume.NewTickProcessor(consumer, elasticClient, consumeMetrics)
@@ -172,4 +182,11 @@ func calculateBackoff() func(i int) time.Duration {
 
 func randomMillis() time.Duration {
 	return time.Duration(rand.Intn(1000)) * time.Millisecond
+}
+
+type ElasticStubClient struct{}
+
+func (e ElasticStubClient) BulkIndex(_ context.Context, data []*elastic.EsDocument) error {
+	log.Printf("[WARN] main: elastic client stubbed! Skipping [%d] documents.", len(data))
+	return nil
 }
