@@ -79,6 +79,8 @@ func (p *Processor) runCycle(nrWorkers int) error {
 
 	var startedWorkers atomic.Int32
 
+	p.setLatestSourceTickToMetrics(epochs)
+
 	for _, epochIntervals := range epochs {
 		startingTick, ok := startingTicksForEpochs[epochIntervals.Epoch]
 		if !ok {
@@ -108,13 +110,24 @@ func (p *Processor) runCycle(nrWorkers int) error {
 	return nil
 }
 
+func (p *Processor) setLatestSourceTickToMetrics(epochs []entities.ProcessedTickIntervalsPerEpoch) {
+	// last epoch and last interval contains latest source tick
+	if len(epochs) > 0 { // check if there are epochs
+		latestEpochIndex := len(epochs) - 1
+		if len(epochs[latestEpochIndex].Intervals) > 0 { // check if there are intervals
+			latestIntervalIndex := len(epochs[latestEpochIndex].Intervals) - 1
+			p.syncMetrics.SetSourceTick(epochs[latestEpochIndex].Epoch, epochs[latestEpochIndex].Intervals[latestIntervalIndex].LastProcessedTick)
+		}
+	}
+}
+
 func (p *Processor) waitAllWorkersToFinish(startedWorkers *atomic.Int32) {
 	for {
 		if startedWorkers.Load() == int32(0) {
 			break
 		}
 
-		time.Sleep(5 * time.Second)
+		time.Sleep(time.Second)
 		continue
 	}
 }
@@ -125,7 +138,7 @@ func (p *Processor) waitWorkerToFreeUp(nrWorkers int, startedWorkers *atomic.Int
 			break
 		}
 
-		time.Sleep(5 * time.Second)
+		time.Sleep(time.Second)
 		continue
 	}
 }
@@ -159,7 +172,6 @@ func (p *Processor) processEpoch(startTick uint32, epochTickIntervals entities.P
 	p.logger.Infow("Starting epoch processor", "epoch", epochTickIntervals.Epoch, "startTick", startTick)
 
 	lastTickFromIntervals := epochTickIntervals.Intervals[len(epochTickIntervals.Intervals)-1].LastProcessedTick
-	p.syncMetrics.SetSourceTick(epochTickIntervals.Epoch, lastTickFromIntervals) // this will fluctuate on initial sync because multiple epochs are synced in parallel
 
 	for {
 		lastProcessedTick, err := p.processBatch(startTick, epochTickIntervals)
