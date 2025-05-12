@@ -2,7 +2,9 @@ package sync
 
 import (
 	"context"
+	"github.com/qubic/go-archiver/protobuff"
 	"github.com/qubic/status-service/archiver"
+	"github.com/qubic/status-service/elastic"
 	"github.com/qubic/status-service/metrics"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -10,9 +12,17 @@ import (
 
 type FakeElasticClient struct {
 	faultyTickNumber uint32
+	emptyTickNumber  uint32
+}
+
+func (f *FakeElasticClient) GetTickData(_ context.Context, tickNumber uint32) (*elastic.TickData, error) {
+	panic("implement me")
 }
 
 func (f *FakeElasticClient) GetTransactionHashes(_ context.Context, tickNumber uint32) ([]string, error) {
+	if tickNumber == f.emptyTickNumber {
+		return []string{}, nil
+	}
 	hashes := []string{
 		"hash-1",
 		"hash-2",
@@ -28,6 +38,26 @@ func (f *FakeElasticClient) GetTransactionHashes(_ context.Context, tickNumber u
 
 type FakeArchiveClient struct {
 	faultyTickNumber uint32
+	emptyTickNumber  uint32
+}
+
+func (f *FakeArchiveClient) GetTickData(_ context.Context, tickNumber uint32) (*protobuff.TickData, error) {
+	if tickNumber == f.emptyTickNumber {
+		return nil, nil
+	}
+	hashes := []string{
+		"hash-1",
+		"hash-2",
+		"hash-3",
+		"hash-4",
+		"hash-5",
+	}
+	if tickNumber == f.faultyTickNumber {
+		hashes = append(hashes, "hash-only-in-archiver")
+	}
+	return &protobuff.TickData{
+		TransactionIds: hashes,
+	}, nil
 }
 
 func (f *FakeArchiveClient) GetStatus(_ context.Context) (*archiver.Status, error) {
@@ -51,20 +81,6 @@ func (f *FakeArchiveClient) GetStatus(_ context.Context) (*archiver.Status, erro
 	}
 
 	return status, nil
-}
-
-func (f *FakeArchiveClient) GetTickData(_ context.Context, tickNumber uint32) ([]string, error) {
-	hashes := []string{
-		"hash-1",
-		"hash-2",
-		"hash-3",
-		"hash-4",
-		"hash-5",
-	}
-	if tickNumber == f.faultyTickNumber {
-		hashes = append(hashes, "hash-only-in-archiver")
-	}
-	return hashes, nil
 }
 
 type FakeDataStore struct {
@@ -92,19 +108,28 @@ func TestProcessor_Sync(t *testing.T) {
 	archiveClient := &FakeArchiveClient{}
 	elasticClient := &FakeElasticClient{}
 	dataStore := &FakeDataStore{}
-	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, false)
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{})
 
 	err := processor.sync()
 	assert.NoError(t, err)
 	assert.Equal(t, 1000, int(dataStore.tick))
+}
 
-	err = processor.sync()
-	assert.NoError(t, err)
-	assert.Equal(t, 12345, int(dataStore.tick))
+func TestProcessor_Sync_GivenEmptyDoNotCrash(t *testing.T) {
+	archiveClient := &FakeArchiveClient{
+		emptyTickNumber: 666,
+	}
+	elasticClient := &FakeElasticClient{
+		emptyTickNumber: 666,
+	}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTransactions: true,
+	})
 
-	err = processor.sync()
+	err := processor.sync()
 	assert.NoError(t, err)
-	assert.Equal(t, 12345, int(dataStore.tick))
+	assert.Equal(t, 1000, int(dataStore.tick))
 }
 
 func TestProcessor_Sync_GivenSkipErroneousTicks_ThenStoreAndContinue(t *testing.T) {
@@ -115,7 +140,10 @@ func TestProcessor_Sync_GivenSkipErroneousTicks_ThenStoreAndContinue(t *testing.
 		faultyTickNumber: 666, // has extra hash
 	}
 	dataStore := &FakeDataStore{}
-	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, true)
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTransactions: true,
+		SkipTicks:        true,
+	})
 
 	err := processor.sync()
 	assert.NoError(t, err)
@@ -134,7 +162,9 @@ func TestProcessor_Sync_GivenMissingHashInElastic_ThenError(t *testing.T) {
 	}
 	elasticClient := &FakeElasticClient{}
 	dataStore := &FakeDataStore{}
-	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, false)
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTransactions: true,
+	})
 
 	err := processor.sync()
 	assert.Error(t, err)
@@ -147,7 +177,9 @@ func TestProcessor_Sync_GivenMissingHashInArchiver_ThenError(t *testing.T) {
 		faultyTickNumber: 666, // has extra hash
 	}
 	dataStore := &FakeDataStore{}
-	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, false)
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTransactions: true,
+	})
 
 	err := processor.sync()
 	assert.Error(t, err)

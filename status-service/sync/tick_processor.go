@@ -3,7 +3,9 @@ package sync
 import (
 	"context"
 	"github.com/pkg/errors"
+	"github.com/qubic/go-archiver/protobuff"
 	"github.com/qubic/status-service/archiver"
+	"github.com/qubic/status-service/elastic"
 	"github.com/qubic/status-service/metrics"
 	"github.com/qubic/status-service/util"
 	"log"
@@ -12,11 +14,12 @@ import (
 
 type ArchiveClient interface {
 	GetStatus(ctx context.Context) (*archiver.Status, error)
-	GetTickData(ctx context.Context, tickNumber uint32) ([]string, error)
+	GetTickData(ctx context.Context, tickNumber uint32) (*protobuff.TickData, error)
 }
 
 type SearchClient interface {
 	GetTransactionHashes(ctx context.Context, tickNumber uint32) ([]string, error)
+	GetTickData(_ context.Context, tickNumber uint32) (*elastic.TickData, error)
 }
 
 type DataStore interface {
@@ -30,17 +33,27 @@ type TickProcessor struct {
 	searchClient       SearchClient
 	dataStore          DataStore
 	processingMetrics  *metrics.Metrics
+	syncTransactions   bool
+	syncTickData       bool
 	skipErroneousTicks bool
 	errorsCount        uint
 }
 
-func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, dataStore DataStore, m *metrics.Metrics, skip bool) *TickProcessor {
+type Config struct {
+	SyncTransactions bool
+	SyncTickData     bool
+	SkipTicks        bool
+}
+
+func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, dataStore DataStore, m *metrics.Metrics, config Config) *TickProcessor {
 	processor := TickProcessor{
 		archiveClient:      archiveClient,
 		searchClient:       elasticClient,
 		dataStore:          dataStore,
 		processingMetrics:  m,
-		skipErroneousTicks: skip,
+		syncTransactions:   config.SyncTransactions,
+		syncTickData:       config.SyncTickData,
+		skipErroneousTicks: config.SkipTicks,
 	}
 	return &processor
 }
@@ -103,7 +116,7 @@ func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, toExc
 					return errors.Wrap(err, "trying to store skipped tick")
 				}
 			} else {
-				return errors.Errorf("Transaction mismatch in tick [%d]", tick)
+				return errors.Errorf("verifying tick [%d]", tick)
 			}
 		}
 		err = p.dataStore.SetLastProcessedTick(tick)
@@ -118,25 +131,64 @@ func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, toExc
 // processTick returns 'false' if the tick comparison between archiver and elastic does not match
 func (p *TickProcessor) processTick(ctx context.Context, tick uint32) (bool, error) {
 	// query archiver for transactions
-	archiverTransactions, err := p.archiveClient.GetTickData(ctx, tick)
+	tickData, err := p.archiveClient.GetTickData(ctx, tick)
 	if err != nil {
 		return false, errors.Wrap(err, "get archiver transactions")
 	}
 
+	match := true
+	if p.syncTickData {
+		match, err = p.verifyTickData(ctx, tick, tickData)
+		if err != nil {
+			return false, errors.Wrap(err, "verifying tick data")
+		}
+	}
+
+	if match && p.syncTransactions {
+		match, err := p.verifyTickTransactions(ctx, tick, tickData)
+		if err != nil {
+			return false, errors.Wrap(err, "verifying transactions")
+		}
+		if !match {
+			return false, nil
+		}
+	}
+	return match, nil
+}
+
+func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, tickData *protobuff.TickData) (bool, error) {
+	etd, err := p.searchClient.GetTickData(ctx, tick)
+	if err != nil {
+		return false, errors.Wrap(err, "get elastic tick data")
+	}
+
+	match := (tickData != nil && etd != nil && etd.Epoch == tickData.Epoch && etd.TickNumber == tickData.TickNumber) ||
+		(tickData == nil && etd == nil)
+
+	if !match {
+		log.Printf("Tick data mismatch for tick [%d]. Elastic: %v, archiver: %v", tick, etd, tickData)
+	}
+
+	return match, nil
+}
+
+func (p *TickProcessor) verifyTickTransactions(ctx context.Context, tick uint32, tickData *protobuff.TickData) (bool, error) {
 	// query elastic for transactions
 	elasticTransactions, err := p.searchClient.GetTransactionHashes(ctx, tick)
 	if err != nil {
 		return false, errors.Wrap(err, "get elastic transactions")
 	}
 
+	archiverTransactions := tickData.GetTransactionIds() // tick data and transaction ids can be nil
 	difference := util.Difference(util.ToSet(archiverTransactions), util.ToSet(elasticTransactions))
 	if len(difference) > 0 { // transactions do not match
 		if p.skipErroneousTicks { // verbose log only if we skip ticks
 			log.Printf("Transaction mismatch for tick [%d].", tick)
-			log.Printf("Archiver: %v", archiverTransactions)
+			log.Printf("Archiver: %v", tickData)
 			log.Printf("Elastic: %v", elasticTransactions)
 		} else {
-			log.Printf("Transaction mismatch for tick [%d]. Count: archiver [%d], elastic [%d].", tick, len(archiverTransactions), len(elasticTransactions))
+			log.Printf("Transaction mismatch for tick [%d]. Count: archiver [%d], elastic [%d].",
+				tick, len(archiverTransactions), len(elasticTransactions))
 		}
 		return false, nil // return mismatch
 	}

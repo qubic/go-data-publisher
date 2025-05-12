@@ -59,10 +59,9 @@ func (c *Client) GetStatus(ctx context.Context) (*Status, error) {
 		TickIntervals: intervals,
 	}
 	return &status, nil
-
 }
 
-func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) ([]string, error) {
+func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*protobuff.TickData, error) {
 	request := protobuff.GetTickDataRequest{
 		TickNumber: tickNumber,
 	}
@@ -73,15 +72,10 @@ func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) ([]string, 
 	if response == nil {
 		return nil, errors.New("nil tick data response")
 	}
-	var hashes []string
 	if response.GetTickData() == nil {
-		log.Printf("[INFO] Tick [%d] is empty.", tickNumber)
-		hashes = []string{}
-	} else if response.GetTickData().GetTransactionIds() == nil { // non-empty tick without transactions
-		log.Printf("[INFO] Tick [%d] has no transactions.", tickNumber)
-		hashes = []string{}
-	} else {
-		hashes = response.GetTickData().GetTransactionIds()
+		log.Printf("[INFO] Archiver tick [%d] is empty.", tickNumber)
+	} else if response.GetTickData().GetTransactionIds() == nil { // it's ok to call this on nil
+		log.Printf("[INFO] Archiver tick [%d] has no transactions.", tickNumber)
 	}
-	return hashes, nil
+	return response.GetTickData(), nil // can return nil, for example in case of empty tick
 }

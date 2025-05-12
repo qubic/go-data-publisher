@@ -92,7 +92,7 @@ func (ps *PebbleStore) GetSkippedTicks() ([]uint32, error) {
 		if value && ok {
 			tickNumber, err := strconv.ParseUint(tick, 10, 32)
 			if err != nil {
-				log.Printf("error converting [%s] to number", tick)
+				return nil, errors.Wrapf(err, "error converting [%s] to number", tick)
 			}
 			tickList = append(tickList, uint32(tickNumber))
 		}
