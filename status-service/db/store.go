@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"path/filepath"
+	"sort"
 	"strconv"
 )
 
@@ -81,22 +82,23 @@ func (ps *PebbleStore) AddSkippedTick(tick uint32) error {
 }
 
 func (ps *PebbleStore) GetSkippedTicks() ([]uint32, error) {
-	//goland:noinspection ALL
-	tickList := []uint32{} // empty array is default return value
 	skippedTicks, err := ps.loadSkippedTicksSet()
 	if err != nil {
 		return nil, errors.Wrap(err, "getting skipped ticks")
 	}
-	for tick := range skippedTicks {
-		value, ok := skippedTicks[tick]
-		if value && ok {
-			tickNumber, err := strconv.ParseUint(tick, 10, 32)
+	tickList := make([]uint32, 0, len(skippedTicks)) // empty array is default return value
+	// Iterate over all keys
+	for key, val := range skippedTicks {
+		if val {
+			tickNumber, err := strconv.ParseUint(key, 10, 32)
 			if err != nil {
-				return nil, errors.Wrapf(err, "error converting [%s] to number", tick)
+				return nil, errors.Wrapf(err, "error converting [%s] to number", key)
 			}
 			tickList = append(tickList, uint32(tickNumber))
 		}
 	}
+	// sort tick numbers
+	sort.Slice(tickList, func(i, j int) bool { return tickList[i] < tickList[j] })
 	return tickList, nil
 }
 
