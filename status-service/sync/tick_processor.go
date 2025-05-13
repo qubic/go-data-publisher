@@ -220,5 +220,5 @@ func (p *TickProcessor) incrementErrorCount() {
 
 func (p *TickProcessor) resetErrorCount() {
 	p.errorsCount = 0
-	p.processingMetrics.SetError(p.errorsCount)
+	p.processingMetrics.SetError(0)
 }
