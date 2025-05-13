@@ -32,6 +32,7 @@ func NewClient(esClient *elasticsearch.Client, transactionsIndex, tickDataIndex 
 type TickData struct {
 	Epoch      uint32 `json:"epoch"`
 	TickNumber uint32 `json:"tickNumber"`
+	Signature  string `json:"signature"`
 }
 
 type elasticHits struct {
@@ -60,7 +61,7 @@ func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*TickData,
 		c.tickDataIndex,
 		strconv.Itoa(int(tickNumber)),
 		c.esClient.Get.WithContext(ctx),
-		c.esClient.Get.WithSource("epoch", "tickNumber"))
+		c.esClient.Get.WithSource("epoch", "tickNumber", "signature"))
 	if err != nil {
 		return nil, errors.Wrap(err, "calling elastic")
 	}

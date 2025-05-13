@@ -2,11 +2,14 @@ package sync
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/hex"
 	"github.com/qubic/go-archiver/protobuff"
 	"github.com/qubic/status-service/archiver"
 	"github.com/qubic/status-service/elastic"
 	"github.com/qubic/status-service/metrics"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -16,7 +19,20 @@ type FakeElasticClient struct {
 }
 
 func (f *FakeElasticClient) GetTickData(_ context.Context, tickNumber uint32) (*elastic.TickData, error) {
-	panic("implement me")
+	if tickNumber == f.emptyTickNumber {
+		return nil, nil
+	}
+
+	signature := base64.StdEncoding.EncodeToString([]byte("signature"))
+	if tickNumber == f.faultyTickNumber {
+		signature = base64.StdEncoding.EncodeToString([]byte("faulty"))
+	}
+
+	return &elastic.TickData{
+		TickNumber: tickNumber,
+		Signature:  signature,
+	}, nil
+
 }
 
 func (f *FakeElasticClient) GetTransactionHashes(_ context.Context, tickNumber uint32) ([]string, error) {
@@ -52,11 +68,15 @@ func (f *FakeArchiveClient) GetTickData(_ context.Context, tickNumber uint32) (*
 		"hash-4",
 		"hash-5",
 	}
+	signature := hex.EncodeToString([]byte("signature"))
 	if tickNumber == f.faultyTickNumber {
 		hashes = append(hashes, "hash-only-in-archiver")
+		signature = hex.EncodeToString([]byte("faulty"))
 	}
 	return &protobuff.TickData{
+		TickNumber:     tickNumber,
 		TransactionIds: hashes,
+		SignatureHex:   signature,
 	}, nil
 }
 
@@ -104,18 +124,21 @@ func (f *FakeDataStore) GetLastProcessedTick() (tick uint32, err error) {
 
 var m = metrics.NewMetrics("test")
 
-func TestProcessor_Sync(t *testing.T) {
+func TestProcessor_SyncAll(t *testing.T) {
 	archiveClient := &FakeArchiveClient{}
 	elasticClient := &FakeElasticClient{}
 	dataStore := &FakeDataStore{}
-	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{})
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTransactions: true,
+		SyncTickData:     true,
+	})
 
 	err := processor.sync()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 1000, int(dataStore.tick))
 }
 
-func TestProcessor_Sync_GivenEmptyDoNotCrash(t *testing.T) {
+func TestProcessor_SyncAll_GivenEmptyDoNotCrash(t *testing.T) {
 	archiveClient := &FakeArchiveClient{
 		emptyTickNumber: 666,
 	}
@@ -125,6 +148,7 @@ func TestProcessor_Sync_GivenEmptyDoNotCrash(t *testing.T) {
 	dataStore := &FakeDataStore{}
 	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
 		SyncTransactions: true,
+		SyncTickData:     true,
 	})
 
 	err := processor.sync()
@@ -132,7 +156,127 @@ func TestProcessor_Sync_GivenEmptyDoNotCrash(t *testing.T) {
 	assert.Equal(t, 1000, int(dataStore.tick))
 }
 
-func TestProcessor_Sync_GivenSkipErroneousTicks_ThenStoreAndContinue(t *testing.T) {
+func TestProcessor_SyncTransactions_GivenMissingHashInElastic_ThenError(t *testing.T) {
+	archiveClient := &FakeArchiveClient{
+		faultyTickNumber: 1000, // has extra hash
+	}
+	elasticClient := &FakeElasticClient{}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTransactions: true,
+	})
+
+	err := processor.sync()
+	assert.Error(t, err)
+	assert.Equal(t, 999, int(dataStore.tick))
+}
+
+func TestProcessor_SyncTransactions_GivenMissingHashInArchiver_ThenError(t *testing.T) {
+	archiveClient := &FakeArchiveClient{}
+	elasticClient := &FakeElasticClient{
+		faultyTickNumber: 666, // has extra hash
+	}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTransactions: true,
+	})
+
+	err := processor.sync()
+	assert.Error(t, err)
+	assert.Equal(t, 665, int(dataStore.tick))
+}
+
+func TestProcessor_SyncTransactions_GivenEmptyInElastic_ThenError(t *testing.T) {
+	archiveClient := &FakeArchiveClient{}
+	elasticClient := &FakeElasticClient{
+		emptyTickNumber: 666,
+	}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTransactions: true,
+	})
+
+	err := processor.sync()
+	assert.Error(t, err)
+	assert.Equal(t, 665, int(dataStore.tick))
+}
+
+func TestProcessor_SyncTransactions_GivenEmptyInArchiver_ThenError(t *testing.T) {
+	archiveClient := &FakeArchiveClient{
+		emptyTickNumber: 666,
+	}
+	elasticClient := &FakeElasticClient{}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTransactions: true,
+	})
+
+	err := processor.sync()
+	assert.Error(t, err)
+	assert.Equal(t, 665, int(dataStore.tick))
+}
+
+func TestProcessor_SyncTickData_GivenEmptyInElastic_ThenError(t *testing.T) {
+	archiveClient := &FakeArchiveClient{}
+	elasticClient := &FakeElasticClient{
+		emptyTickNumber: 666,
+	}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTickData: true,
+	})
+
+	err := processor.sync()
+	assert.Error(t, err)
+	assert.Equal(t, 665, int(dataStore.tick))
+}
+
+func TestProcessor_SyncTickData_GivenEmptyInArchiver_ThenError(t *testing.T) {
+	archiveClient := &FakeArchiveClient{
+		emptyTickNumber: 666,
+	}
+	elasticClient := &FakeElasticClient{}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTickData: true,
+	})
+
+	err := processor.sync()
+	assert.Error(t, err)
+	assert.Equal(t, 665, int(dataStore.tick))
+}
+
+func TestProcessor_SyncTickData_GivenOtherDataInElastic_ThenError(t *testing.T) {
+	archiveClient := &FakeArchiveClient{}
+	elasticClient := &FakeElasticClient{
+		faultyTickNumber: 1000, // has extra hash
+	}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTickData: true,
+	})
+
+	err := processor.sync()
+	assert.Error(t, err)
+	assert.Equal(t, 999, int(dataStore.tick))
+}
+
+func TestProcessor_SyncTickData_GivenOtherDataInArchiver_ThenError(t *testing.T) {
+	archiveClient := &FakeArchiveClient{
+		faultyTickNumber: 1000, // has extra hash
+	}
+	elasticClient := &FakeElasticClient{}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTickData: true,
+	})
+
+	err := processor.sync()
+	assert.Error(t, err)
+	assert.Equal(t, 999, int(dataStore.tick))
+}
+
+func TestProcessor_SyncAll_GivenSkipErroneousTicks_ThenStoreAndContinue(t *testing.T) {
 	archiveClient := &FakeArchiveClient{
 		faultyTickNumber: 10101, // has extra hash
 	}
@@ -141,6 +285,7 @@ func TestProcessor_Sync_GivenSkipErroneousTicks_ThenStoreAndContinue(t *testing.
 	}
 	dataStore := &FakeDataStore{}
 	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTickData:     true,
 		SyncTransactions: true,
 		SkipTicks:        true,
 	})
@@ -156,32 +301,52 @@ func TestProcessor_Sync_GivenSkipErroneousTicks_ThenStoreAndContinue(t *testing.
 	assert.Equal(t, 10101, int(dataStore.skippedTick))
 }
 
-func TestProcessor_Sync_GivenMissingHashInElastic_ThenError(t *testing.T) {
+func TestProcessor_SyncTransactions_GivenSkipErroneousTicks_ThenStoreAndContinue(t *testing.T) {
 	archiveClient := &FakeArchiveClient{
-		faultyTickNumber: 1000, // has extra hash
+		faultyTickNumber: 10101, // has extra hash
 	}
-	elasticClient := &FakeElasticClient{}
-	dataStore := &FakeDataStore{}
-	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
-		SyncTransactions: true,
-	})
-
-	err := processor.sync()
-	assert.Error(t, err)
-	assert.Equal(t, 999, int(dataStore.tick))
-}
-
-func TestProcessor_Sync_GivenMissingHashInArchiver_ThenError(t *testing.T) {
-	archiveClient := &FakeArchiveClient{}
 	elasticClient := &FakeElasticClient{
 		faultyTickNumber: 666, // has extra hash
 	}
 	dataStore := &FakeDataStore{}
 	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTickData:     false,
 		SyncTransactions: true,
+		SkipTicks:        true,
 	})
 
 	err := processor.sync()
-	assert.Error(t, err)
-	assert.Equal(t, 665, int(dataStore.tick))
+	assert.NoError(t, err)
+	assert.Equal(t, 1000, int(dataStore.tick))
+	assert.Equal(t, 666, int(dataStore.skippedTick))
+
+	err = processor.sync()
+	assert.NoError(t, err)
+	assert.Equal(t, 12345, int(dataStore.tick))
+	assert.Equal(t, 10101, int(dataStore.skippedTick))
+}
+
+func TestProcessor_SyncTickData_GivenSkipErroneousTicks_ThenStoreAndContinue(t *testing.T) {
+	archiveClient := &FakeArchiveClient{
+		faultyTickNumber: 10101, // has extra hash
+	}
+	elasticClient := &FakeElasticClient{
+		faultyTickNumber: 666, // has extra hash
+	}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTickData:     true,
+		SyncTransactions: false,
+		SkipTicks:        true,
+	})
+
+	err := processor.sync()
+	assert.NoError(t, err)
+	assert.Equal(t, 1000, int(dataStore.tick))
+	assert.Equal(t, 666, int(dataStore.skippedTick))
+
+	err = processor.sync()
+	assert.NoError(t, err)
+	assert.Equal(t, 12345, int(dataStore.tick))
+	assert.Equal(t, 10101, int(dataStore.skippedTick))
 }

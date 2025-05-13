@@ -2,6 +2,8 @@ package sync
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/hex"
 	"github.com/pkg/errors"
 	"github.com/qubic/go-archiver/protobuff"
 	"github.com/qubic/status-service/archiver"
@@ -162,11 +164,19 @@ func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, tickDat
 		return false, errors.Wrap(err, "get elastic tick data")
 	}
 
-	match := (tickData != nil && etd != nil && etd.Epoch == tickData.Epoch && etd.TickNumber == tickData.TickNumber) ||
-		(tickData == nil && etd == nil)
+	match := tickData == nil && etd == nil
+	if tickData != nil && etd != nil {
+		bytes, err := hex.DecodeString(tickData.GetSignatureHex())
+		if err != nil {
+			return false, errors.Wrap(err, "decoding signature hex")
+		}
+		match = etd.Epoch == tickData.Epoch &&
+			etd.TickNumber == tickData.TickNumber &&
+			etd.Signature == base64.StdEncoding.EncodeToString(bytes)
+	}
 
 	if !match {
-		log.Printf("Tick data mismatch for tick [%d]. Elastic: %v, archiver: %v", tick, etd, tickData)
+		log.Printf("Tick data mismatch for tick [%d]. Elastic: %+v. Archiver: [%v]", tick, etd, tickData)
 	}
 
 	return match, nil

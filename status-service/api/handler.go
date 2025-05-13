@@ -16,7 +16,7 @@ type StatusProvider interface {
 }
 
 type StatusResponse struct {
-	ProcessedTransactionTick uint32 `json:"processedTransactionTick"`
+	LastProcessedTick uint32 `json:"lastProcessedTick"`
 }
 
 type HealthResponse struct {
@@ -24,7 +24,7 @@ type HealthResponse struct {
 }
 
 type SkippedTicksResponse struct {
-	SkippedTransactionTicks []uint32 `json:"skippedTransactionTicks"`
+	SkippedTicks []uint32 `json:"skippedTicks"`
 }
 
 func NewHandler(sp StatusProvider) *Handler {
@@ -41,7 +41,7 @@ func (h *Handler) GetSkippedTicks(w http.ResponseWriter, _ *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(SkippedTicksResponse{
-		SkippedTransactionTicks: ticks,
+		SkippedTicks: ticks,
 	})
 	if err != nil {
 		log.Printf("Error encoding response: %v", err)
@@ -72,7 +72,7 @@ func (h *Handler) GetStatus(w http.ResponseWriter, _ *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(StatusResponse{
-		ProcessedTransactionTick: lastProcessedTick,
+		LastProcessedTick: lastProcessedTick,
 	})
 	if err != nil {
 		log.Printf("Error encoding response: %v", err)
