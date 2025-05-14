@@ -10,6 +10,7 @@ import (
 	"github.com/qubic/status-service/elastic"
 	"github.com/qubic/status-service/metrics"
 	"github.com/qubic/status-service/util"
+	"golang.org/x/sync/errgroup"
 	"log"
 	"time"
 )
@@ -38,6 +39,7 @@ type TickProcessor struct {
 	syncTransactions   bool
 	syncTickData       bool
 	skipErroneousTicks bool
+	maxWorkers         int
 	errorsCount        uint
 }
 
@@ -45,6 +47,7 @@ type Config struct {
 	SyncTransactions bool
 	SyncTickData     bool
 	SkipTicks        bool
+	NumMaxWorkers    int
 }
 
 func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, dataStore DataStore, m *metrics.Metrics, config Config) *TickProcessor {
@@ -56,6 +59,7 @@ func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, d
 		syncTransactions:   config.SyncTransactions,
 		syncTickData:       config.SyncTickData,
 		skipErroneousTicks: config.SkipTicks,
+		maxWorkers:         max(1, config.NumMaxWorkers), // one worker minimum
 	}
 	return &processor
 }
@@ -95,7 +99,7 @@ func (p *TickProcessor) sync() error {
 	if start <= end && start > 0 && end > 0 && epoch > 0 {
 		log.Printf("Processing ticks from [%d] to [%d] for epoch [%d].", start, end, epoch)
 		// if start == end then process one tick
-		err = p.processTickRange(ctx, epoch, start, end+1)
+		err = p.processTickRange(ctx, epoch, start, end)
 		if err != nil {
 			return errors.Wrap(err, "processing tick range")
 		}
@@ -104,58 +108,90 @@ func (p *TickProcessor) sync() error {
 	return nil
 }
 
-func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, toExcl uint32) error {
-	for tick := from; tick < toExcl; tick++ {
-		match, err := p.processTick(ctx, tick)
-		if err != nil {
-			return errors.Wrapf(err, "processing tick [%d]", tick)
-		}
-		if !match {
-			if p.skipErroneousTicks {
-				log.Printf("[WARN] skipping tick [%d].", tick)
-				err = p.dataStore.AddSkippedTick(tick)
-				if err != nil {
-					return errors.Wrap(err, "trying to store skipped tick")
-				}
-			} else {
-				return errors.Errorf("verifying tick [%d]", tick)
+var TickDataMismatchError = errors.New("tick data mismatch") // used to identify errors because of data mismatch (for tick skipping)
+
+func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, to uint32) error {
+
+	// work more in parallel if tick range is larger
+	numWorkers := min((int(to-from)/10)+1, p.maxWorkers)
+	nextTicks := make([]uint32, 0, numWorkers)
+	for tick := from; tick <= to; tick++ {
+		// process several ticks in parallel
+		nextTicks = append(nextTicks, tick)
+
+		// if we have an error then process only one tick
+		if p.errorsCount > 0 || len(nextTicks) == numWorkers || tick == to {
+
+			err := p.processTicks(ctx, nextTicks)
+			if err != nil {
+				return errors.Wrapf(err, "processing ticks %v", nextTicks)
 			}
+			nextTicks = nil // reset
+
+			// update stats
+			err = p.dataStore.SetLastProcessedTick(tick)
+			if err != nil {
+				return errors.Wrapf(err, "storing last processed tick [%d]", tick)
+			}
+			p.processingMetrics.SetProcessedTransactionsTick(epoch, tick)
+
 		}
-		err = p.dataStore.SetLastProcessedTick(tick)
-		if err != nil {
-			return errors.Wrapf(err, "storing last processed tick [%d]", tick)
-		}
-		p.processingMetrics.SetProcessedTransactionsTick(epoch, tick)
 	}
 	return nil
 }
 
-// processTick returns 'false' if the tick comparison between archiver and elastic does not match
-func (p *TickProcessor) processTick(ctx context.Context, tick uint32) (bool, error) {
+func (p *TickProcessor) processTicks(ctx context.Context, ticks []uint32) error {
+	var errorGroup errgroup.Group
+	for _, tick := range ticks {
+		errorGroup.Go(func() error {
+			// log.Printf("Processing tick [%d]", tick)
+			return p.processTick(ctx, tick)
+		})
+	}
+	return errorGroup.Wait()
+}
+
+// processTick errors in case of mismatch only, if skipping ticks is disabled
+func (p *TickProcessor) processTick(ctx context.Context, tick uint32) error {
 	// query archiver for transactions
 	tickData, err := p.archiveClient.GetTickData(ctx, tick)
 	if err != nil {
-		return false, errors.Wrap(err, "get archiver transactions")
+		return errors.Wrap(err, "get archiver transactions")
 	}
 
-	match := true
 	if p.syncTickData {
-		match, err = p.verifyTickData(ctx, tick, tickData)
+		match, err := p.verifyTickData(ctx, tick, tickData)
 		if err != nil {
-			return false, errors.Wrap(err, "verifying tick data")
-		}
-	}
-
-	if match && p.syncTransactions {
-		match, err := p.verifyTickTransactions(ctx, tick, tickData)
-		if err != nil {
-			return false, errors.Wrap(err, "verifying transactions")
+			return errors.Wrap(err, "verifying tick data")
 		}
 		if !match {
-			return false, nil
+			return p.handleTickMismatch(tick)
 		}
 	}
-	return match, nil
+
+	if p.syncTransactions {
+		match, err := p.verifyTickTransactions(ctx, tick, tickData)
+		if err != nil {
+			return errors.Wrap(err, "verifying transactions")
+		}
+		if !match {
+			return p.handleTickMismatch(tick)
+		}
+	}
+	return nil
+}
+
+func (p *TickProcessor) handleTickMismatch(tick uint32) error {
+	if p.skipErroneousTicks {
+		log.Printf("[WARN] skipping tick [%d].", tick)
+		err := p.dataStore.AddSkippedTick(tick)
+		if err != nil {
+			return errors.Wrap(err, "trying to store skipped tick")
+		}
+		return nil
+	} else {
+		return TickDataMismatchError
+	}
 }
 
 func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, tickData *protobuff.TickData) (bool, error) {

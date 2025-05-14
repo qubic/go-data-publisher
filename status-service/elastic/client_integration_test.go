@@ -83,7 +83,7 @@ func setup() {
 			Password          string   `conf:"optional"`
 			TransactionsIndex string   `conf:"default:qubic-transactions-alias"`
 			TickDataIndex     string   `conf:"default:qubic-tick-data-alias"`
-			Certificate       string   `conf:"default:../http_ca.crt"`
+			Certificate       string   `conf:"default:../certs/elastic-dev/http_ca.crt"`
 		}
 	}
 	err = conf.Parse(os.Args[1:], envPrefix, &cfg)

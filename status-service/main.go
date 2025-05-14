@@ -47,6 +47,7 @@ func run() error {
 			MetricsPort         int    `conf:"default:9999"`
 			MetricsNamespace    string `conf:"default:qubic-status-service"`
 			InternalStoreFolder string `conf:"default:store"`
+			NumMaxWorkers       int    `conf:"optional"`
 			SkipTicks           bool   `conf:"default:false"`
 			StartTick           uint32 `conf:"optional"`
 			Transactions        bool   `conf:"default:true"`
@@ -121,6 +122,7 @@ func run() error {
 		SyncTransactions: cfg.Sync.Transactions,
 		SyncTickData:     cfg.Sync.TickData,
 		SkipTicks:        cfg.Sync.SkipTicks,
+		NumMaxWorkers:    cfg.Sync.NumMaxWorkers,
 	})
 	if cfg.Sync.Transactions || cfg.Sync.TickData {
 		go processor.Synchronize()

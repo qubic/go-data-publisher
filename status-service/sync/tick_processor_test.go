@@ -136,6 +136,10 @@ func TestProcessor_SyncAll(t *testing.T) {
 	err := processor.sync()
 	require.NoError(t, err)
 	assert.Equal(t, 1000, int(dataStore.tick))
+
+	err = processor.sync()
+	require.NoError(t, err)
+	assert.Equal(t, 12345, int(dataStore.tick))
 }
 
 func TestProcessor_SyncAll_GivenEmptyDoNotCrash(t *testing.T) {
@@ -349,4 +353,68 @@ func TestProcessor_SyncTickData_GivenSkipErroneousTicks_ThenStoreAndContinue(t *
 	assert.NoError(t, err)
 	assert.Equal(t, 12345, int(dataStore.tick))
 	assert.Equal(t, 10101, int(dataStore.skippedTick))
+}
+
+func TestProcessor_SyncAll_GivenMultipleWorkers(t *testing.T) {
+	archiveClient := &FakeArchiveClient{}
+	elasticClient := &FakeElasticClient{}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTransactions: true,
+		SyncTickData:     true,
+		NumMaxWorkers:    10,
+	})
+
+	err := processor.sync()
+	require.NoError(t, err)
+	assert.Equal(t, 1000, int(dataStore.tick))
+
+	err = processor.sync()
+	require.NoError(t, err)
+	assert.Equal(t, 12345, int(dataStore.tick))
+}
+
+func TestProcessor_SyncTickData_GivenErrorWithMultipleWorkersSkipErroneousTicks_ThenStoreAndContinue(t *testing.T) {
+	archiveClient := &FakeArchiveClient{
+		faultyTickNumber: 10101, // has extra hash
+	}
+	elasticClient := &FakeElasticClient{
+		faultyTickNumber: 666, // has extra hash
+	}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTransactions: true,
+		SkipTicks:        true,
+		NumMaxWorkers:    5,
+	})
+
+	err := processor.sync()
+	assert.NoError(t, err)
+	assert.Equal(t, 1000, int(dataStore.tick))
+	assert.Equal(t, 666, int(dataStore.skippedTick))
+
+	err = processor.sync()
+	assert.NoError(t, err)
+	assert.Equal(t, 12345, int(dataStore.tick))
+	assert.Equal(t, 10101, int(dataStore.skippedTick))
+}
+
+func TestProcessor_SyncAll_GivenErrorWithMultipleWorkers_ThenLastProcessedTickIsPreviousBatch(t *testing.T) {
+	archiveClient := &FakeArchiveClient{}
+	elasticClient := &FakeElasticClient{
+		faultyTickNumber: 666,
+	}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTickData:  true,
+		NumMaxWorkers: 10,
+	})
+
+	err := processor.sync()
+	assert.Error(t, err)
+	assert.Equal(t, 660, int(dataStore.tick)) // last batch is from 661-670
+
+	err = processor.sync()
+	assert.Error(t, err)
+	assert.Equal(t, 660, int(dataStore.tick)) // last batch is from 661-670
 }
