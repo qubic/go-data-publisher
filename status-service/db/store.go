@@ -8,7 +8,6 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/pkg/errors"
 	"github.com/qubic/status-service/util"
-	"io"
 	"log"
 	"path/filepath"
 	"sort"
@@ -57,12 +56,7 @@ func (ps *PebbleStore) GetLastProcessedTick() (tick uint32, err error) {
 	if err != nil {
 		return 0, errors.Wrapf(err, "getting value for key [%s]", lastProcessedTickKey)
 	}
-	defer func(closer io.Closer) {
-		err := closer.Close()
-		if err != nil {
-			log.Printf("[ERROR] closing db: %v", err)
-		}
-	}(closer)
+	defer closer.Close()
 
 	tick = binary.BigEndian.Uint32(value)
 	return tick, nil
@@ -131,12 +125,7 @@ func (ps *PebbleStore) loadSkippedTicksSet() (map[string]bool, error) {
 	if err != nil {
 		return nil, errors.Wrapf(err, "getting value for key [%s]", lastProcessedTickKey)
 	}
-	defer func(closer io.Closer) {
-		err := closer.Close()
-		if err != nil {
-			log.Printf("[ERROR] closing db: %v", err)
-		}
-	}(closer)
+	defer closer.Close()
 
 	// decode
 	buffer := bytes.NewBuffer(value)

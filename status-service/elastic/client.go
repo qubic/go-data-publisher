@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/pkg/errors"
-	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -65,12 +64,7 @@ func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*TickData,
 	if err != nil {
 		return nil, errors.Wrap(err, "calling elastic")
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Printf("[ERROR] closing body: %v", err)
-		}
-	}(res.Body)
+	defer res.Body.Close()
 
 	// return if there is no tick data (alternative would be to ignore status code and check found property)
 	if res.StatusCode == http.StatusNotFound {
@@ -112,12 +106,7 @@ func (c *Client) GetTransactionHashes(ctx context.Context, tickNumber uint32) ([
 	if err != nil {
 		return nil, errors.Wrap(err, "calling elastic")
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Printf("[ERROR] closing body: %v", err)
-		}
-	}(res.Body)
+	defer res.Body.Close()
 
 	if res.IsError() {
 		var e map[string]interface{}
