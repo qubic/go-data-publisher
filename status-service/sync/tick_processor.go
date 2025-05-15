@@ -66,7 +66,7 @@ func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, d
 }
 
 func (p *TickProcessor) Synchronize() {
-	ticker := time.Tick(1 * time.Second)
+	ticker := time.Tick(1 * time.Second) // delays if execution takes longer
 	for range ticker {
 		err := p.sync()
 		if err == nil {
@@ -85,6 +85,9 @@ func (p *TickProcessor) sync() error {
 		return errors.Wrap(err, "get archive status")
 	}
 	p.processingMetrics.SetSourceTick(status.LatestEpoch, status.LatestTick)
+
+	// wait a bit to allow latest tick to sync
+	time.Sleep(750 * time.Millisecond)
 
 	tick, err := p.dataStore.GetLastProcessedTick()
 	if err != nil {
