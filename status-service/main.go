@@ -6,11 +6,11 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/qubic/status-service/api"
 	"github.com/qubic/status-service/archiver"
 	"github.com/qubic/status-service/db"
 	"github.com/qubic/status-service/elastic"
 	"github.com/qubic/status-service/metrics"
+	"github.com/qubic/status-service/rpc"
 	"github.com/qubic/status-service/sync"
 	"log"
 	"net/http"
@@ -34,6 +34,11 @@ func run() error {
 		Archiver struct {
 			Host string `conf:"default:localhost:8010"`
 		}
+		Server struct {
+			HttpHost        string `conf:"default:0.0.0.0:8000"`
+			GrpcHost        string `conf:"default:0.0.0.0:8001"`
+			MetricsHttpHost string `conf:"default:0.0.0.0:9999"`
+		}
 		Elastic struct {
 			Addresses        []string `conf:"default:https://localhost:9200"`
 			Username         string   `conf:"default:qubic-query"`
@@ -43,8 +48,6 @@ func run() error {
 			CertificatePath  string   `conf:"default:http_ca.crt"`
 		}
 		Sync struct {
-			ServerPort          int    `conf:"default:8000"`
-			MetricsPort         int    `conf:"default:9999"`
 			MetricsNamespace    string `conf:"default:qubic-status-service"`
 			InternalStoreFolder string `conf:"default:store"`
 			NumMaxWorkers       int    `conf:"optional"`
@@ -135,21 +138,17 @@ func run() error {
 
 	// status and metrics endpoint
 	serverError := make(chan error, 1)
-	go func() {
-		mux := http.NewServeMux()
-		server := api.NewHandler(store)
-		mux.HandleFunc("/v1/status", server.GetStatus)
-		mux.HandleFunc("/v1/skippedTicks", server.GetSkippedTicks)
-		mux.HandleFunc("/health", server.GetHealth)
-		log.Printf("main: Starting server on port [%d].", cfg.Sync.ServerPort)
-		serverError <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.Sync.ServerPort), mux)
-	}()
+	server := rpc.NewStatusServiceServer(cfg.Server.GrpcHost, cfg.Server.HttpHost, store)
+	err = server.Start(serverError)
+	if err != nil {
+		return fmt.Errorf("starting server: %w", err)
+	}
 
 	metricsServerError := make(chan error, 1)
 	go func() {
-		log.Printf("main: Starting metrics server on port [%d].", cfg.Sync.MetricsPort)
+		log.Printf("main: Starting metrics server on addr [%d].", cfg.Server.MetricsHttpHost)
 		http.Handle("/metrics", promhttp.Handler())
-		metricsServerError <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.Sync.MetricsPort), nil)
+		metricsServerError <- http.ListenAndServe(cfg.Server.MetricsHttpHost, nil)
 	}()
 
 	log.Println("main: Service started.")
