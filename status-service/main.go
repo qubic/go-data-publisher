@@ -146,7 +146,7 @@ func run() error {
 
 	metricsServerError := make(chan error, 1)
 	go func() {
-		log.Printf("main: Starting metrics server on addr [%d].", cfg.Server.MetricsHttpHost)
+		log.Printf("main: Starting metrics server on addr [%s].", cfg.Server.MetricsHttpHost)
 		http.Handle("/metrics", promhttp.Handler())
 		metricsServerError <- http.ListenAndServe(cfg.Server.MetricsHttpHost, nil)
 	}()
