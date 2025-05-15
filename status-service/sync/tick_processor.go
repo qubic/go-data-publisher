@@ -66,7 +66,7 @@ func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, d
 }
 
 func (p *TickProcessor) Synchronize() {
-	ticker := time.Tick(1 * time.Second) // delays if execution takes longer
+	ticker := time.Tick(1 * time.Second)
 	for range ticker {
 		err := p.sync()
 		if err == nil {
@@ -87,7 +87,7 @@ func (p *TickProcessor) sync() error {
 	p.processingMetrics.SetSourceTick(status.LatestEpoch, status.LatestTick)
 
 	// wait a bit to allow latest tick to sync
-	time.Sleep(750 * time.Millisecond)
+	time.Sleep(800 * time.Millisecond)
 
 	tick, err := p.dataStore.GetLastProcessedTick()
 	if err != nil {
@@ -112,15 +112,13 @@ func (p *TickProcessor) sync() error {
 	return nil
 }
 
-var TickDataMismatchError = errors.New("tick data mismatch") // used to identify errors because of data mismatch (for tick skipping)
-
 func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, to uint32) error {
 
-	// work more in parallel if tick range is larger
+	// work more in parallel, if tick range is larger
 	numWorkers := min((int(to-from)/10)+1, p.maxWorkers)
 	nextTicks := make([]uint32, 0, numWorkers)
+
 	for tick := from; tick <= to; tick++ {
-		// process several ticks in parallel
 		nextTicks = append(nextTicks, tick)
 
 		// if we have an error then process only one tick
@@ -141,6 +139,7 @@ func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, to ui
 
 		}
 	}
+
 	return nil
 }
 
@@ -194,7 +193,7 @@ func (p *TickProcessor) handleTickMismatch(tick uint32) error {
 		}
 		return nil
 	} else {
-		return TickDataMismatchError
+		return errors.New("tick data mismatch") // error, if we do not skip faulty ticks
 	}
 }
 
