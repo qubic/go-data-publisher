@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package status.service.pb;
+
+option go_package = "github.com/qubic/status-service/protobuf/";
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+
+message GetStatusResponse {
+  uint32 last_processed_tick = 1;
+}
+
+message GetHealthCheckResponse {
+  string status = 1;
+}
+
+message GetSkippedTicksResponse {
+  repeated uint32 skipped_ticks = 1;
+}
+
+service StatusService {
+  rpc GetSkippedTicks(google.protobuf.Empty) returns (GetSkippedTicksResponse) {
+    option (google.api.http) = {
+      get: "/v1/skippedTicks"
+    };
+  };
+
+  rpc GetStatus(google.protobuf.Empty) returns (GetStatusResponse) {
+    option (google.api.http) = {
+      get: "/v1/status"
+    };
+  };
+
+  // A method that is mainly used by the load-balancer to decide if the instance should be added to the balancing rotation based on if it's up-to-date with the network or not.
+  rpc GetHealthCheck(google.protobuf.Empty) returns (GetHealthCheckResponse){
+    option (google.api.http) = {
+      get: "/health"
+    };
+  };
+}
