@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"fmt"
 	"github.com/pkg/errors"
 	"github.com/qubic/go-archiver/protobuff"
 	"github.com/qubic/status-service/archiver"
@@ -194,25 +195,32 @@ func (p *TickProcessor) handleTickMismatch(tick uint32) error {
 	}
 }
 
-func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, tickData *protobuff.TickData) (bool, error) {
-	etd, err := p.searchClient.GetTickData(ctx, tick)
+func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, archiveTd *protobuff.TickData) (bool, error) {
+	elasticTd, err := p.searchClient.GetTickData(ctx, tick)
 	if err != nil {
 		return false, errors.Wrap(err, "get elastic tick data")
 	}
 
-	match := tickData == nil && etd == nil
-	if tickData != nil && etd != nil {
-		bytes, err := hex.DecodeString(tickData.GetSignatureHex())
-		if err != nil {
+	match := archiveTd == nil && elasticTd == nil
+	if archiveTd != nil && elasticTd != nil {
+		bytes, dErr := hex.DecodeString(archiveTd.GetSignatureHex())
+		if dErr != nil {
 			return false, errors.Wrap(err, "decoding signature hex")
 		}
-		match = etd.Epoch == tickData.Epoch &&
-			etd.TickNumber == tickData.TickNumber &&
-			etd.Signature == base64.StdEncoding.EncodeToString(bytes)
+		match = elasticTd.Epoch == archiveTd.Epoch &&
+			elasticTd.TickNumber == archiveTd.TickNumber &&
+			elasticTd.Signature == base64.StdEncoding.EncodeToString(bytes)
 	}
 
 	if !match {
-		log.Printf("Tick data mismatch for tick [%d]. Elastic: %+v. Archiver: [%v]", tick, etd, tickData)
+		if elasticTd == nil { // typical case
+			log.Printf("Tick data mismatch for tick [%d]. Missing in Elastic.", tick)
+		} else if archiveTd == nil { // typical case
+			log.Printf("Tick data mismatch for tick [%d]. Missing in Archiver.", tick)
+		} else { // complicated data mismatch
+			log.Printf("Tick data mismatch for tick [%d]. Elastic: [%v]. Archiver: [%v]",
+				tick, elasticDebugString(elasticTd), archiveDebugString(archiveTd))
+		}
 	}
 
 	return match, nil
@@ -257,6 +265,14 @@ func calculateNextTickRange(lastProcessedTick uint32, intervals []*archiver.Tick
 
 	// no delta found do not sync
 	return 0, 0, 0, nil
+}
+
+func elasticDebugString(td *elastic.TickData) string {
+	return fmt.Sprintf("tick %d, epoch %d, signature %s", td.TickNumber, td.Epoch, td.Signature)
+}
+
+func archiveDebugString(td *protobuff.TickData) string {
+	return fmt.Sprintf("tick %d, epoch %d, signature hex %s", td.TickNumber, td.Epoch, td.SignatureHex)
 }
 
 func (p *TickProcessor) incrementErrorCount() {
