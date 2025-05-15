@@ -55,7 +55,7 @@ func (metrics *Metrics) SetSourceTick(epoch uint32, tick uint32) {
 }
 
 func (metrics *Metrics) SetError(count uint) {
-	metrics.hasErrorGauge.Set(float64(count)) // reset
+	metrics.hasErrorGauge.Set(float64(count))
 }
 
 func (metrics *Metrics) GetLastProcessedTick() uint32 {

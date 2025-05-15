@@ -11,6 +11,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"log"
 	"net/http"
 	"os"
@@ -45,6 +46,21 @@ func TestElasticClient_getTransactionHashes_givenTickWithoutTransactions(t *test
 	assert.Len(t, hashes, 0)
 }
 
+func TestElasticClient_getTickData(t *testing.T) {
+	tickData, err := elasticClient.GetTickData(nil, 24333026)
+	require.NoError(t, err)
+	require.NotNil(t, tickData)
+	log.Printf("Tick data: %+v", tickData)
+	assert.Equal(t, 24333026, int(tickData.TickNumber))
+	assert.Equal(t, 158, int(tickData.Epoch))
+}
+
+func TestElasticClient_getTickData_givenUnknownTickNumber_thenReturnNil(t *testing.T) {
+	tickData, err := elasticClient.GetTickData(nil, 1234567890)
+	assert.NoError(t, err)
+	assert.Nil(t, tickData)
+}
+
 func TestMain(m *testing.M) {
 	setup()
 	// Parse args and run
@@ -62,11 +78,12 @@ func setup() {
 	}
 	var cfg struct {
 		Elastic struct {
-			Addresses   []string `conf:"default:https://localhost:9200"`
-			Username    string   `conf:"default:qubic-query"`
-			Password    string   `conf:"optional"`
-			IndexName   string   `conf:"default:qubic-transactions-alias"`
-			Certificate string   `conf:"default:../http_ca.crt"`
+			Addresses         []string `conf:"default:https://localhost:9200"`
+			Username          string   `conf:"default:qubic-query"`
+			Password          string   `conf:"optional"`
+			TransactionsIndex string   `conf:"default:qubic-transactions-alias"`
+			TickDataIndex     string   `conf:"default:qubic-tick-data-alias"`
+			Certificate       string   `conf:"default:../certs/elastic-dev/http_ca.crt"`
 		}
 	}
 	err = conf.Parse(os.Args[1:], envPrefix, &cfg)
@@ -86,5 +103,5 @@ func setup() {
 	if err != nil {
 		log.Fatalf("error creating elastic client: %v", err)
 	}
-	elasticClient = NewClient(esClient, cfg.Elastic.IndexName)
+	elasticClient = NewClient(esClient, cfg.Elastic.TransactionsIndex, cfg.Elastic.TickDataIndex)
 }

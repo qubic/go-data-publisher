@@ -35,20 +35,23 @@ func run() error {
 			Host string `conf:"default:localhost:8010"`
 		}
 		Elastic struct {
-			Addresses   []string `conf:"default:https://localhost:9200"`
-			Username    string   `conf:"default:qubic-query"`
-			Password    string   `conf:"optional"`
-			IndexName   string   `conf:"default:qubic-transactions-alias"`
-			Certificate string   `conf:"default:http_ca.crt"`
+			Addresses        []string `conf:"default:https://localhost:9200"`
+			Username         string   `conf:"default:qubic-query"`
+			Password         string   `conf:"optional"`
+			TransactionIndex string   `conf:"default:qubic-transactions-alias"`
+			TickDataIndex    string   `conf:"default:qubic-tick-data-alias"`
+			CertificatePath  string   `conf:"default:http_ca.crt"`
 		}
 		Sync struct {
-			InternalStoreFolder string `conf:"default:store"`
-			StartTick           uint32 `conf:"optional"`
 			ServerPort          int    `conf:"default:8000"`
 			MetricsPort         int    `conf:"default:9999"`
 			MetricsNamespace    string `conf:"default:qubic-status-service"`
+			InternalStoreFolder string `conf:"default:store"`
+			NumMaxWorkers       int    `conf:"optional"`
 			SkipTicks           bool   `conf:"default:false"`
-			Enabled             bool   `conf:"default:true"`
+			StartTick           uint32 `conf:"optional"`
+			Transactions        bool   `conf:"default:true"`
+			TickData            bool   `conf:"default:true"`
 		}
 	}
 
@@ -96,7 +99,7 @@ func run() error {
 		log.Printf("Resuming from last processed tick: [%d].", lastProcessedTick)
 	}
 
-	cert, err := os.ReadFile(cfg.Elastic.Certificate)
+	cert, err := os.ReadFile(cfg.Elastic.CertificatePath)
 	if err != nil {
 		log.Printf("[WARN] main: could not read elastic certificate: %v", err)
 	}
@@ -107,7 +110,7 @@ func run() error {
 		CACert:        cert,
 		RetryOnStatus: []int{502, 503, 504, 429},
 	})
-	elasticClient := elastic.NewClient(esClient, cfg.Elastic.IndexName)
+	elasticClient := elastic.NewClient(esClient, cfg.Elastic.TransactionIndex, cfg.Elastic.TickDataIndex)
 
 	cl, err := archiver.NewClient(cfg.Archiver.Host)
 	if err != nil {
@@ -115,8 +118,13 @@ func run() error {
 	}
 
 	m := metrics.NewMetrics(cfg.Sync.MetricsNamespace)
-	processor := sync.NewTickProcessor(cl, elasticClient, store, m, cfg.Sync.SkipTicks)
-	if cfg.Sync.Enabled {
+	processor := sync.NewTickProcessor(cl, elasticClient, store, m, sync.Config{
+		SyncTransactions: cfg.Sync.Transactions,
+		SyncTickData:     cfg.Sync.TickData,
+		SkipTicks:        cfg.Sync.SkipTicks,
+		NumMaxWorkers:    cfg.Sync.NumMaxWorkers,
+	})
+	if cfg.Sync.Transactions || cfg.Sync.TickData {
 		go processor.Synchronize()
 	} else {
 		log.Println("[WARN] main: sync disabled")
