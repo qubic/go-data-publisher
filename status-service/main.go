@@ -40,7 +40,7 @@ func run() error {
 			Password         string   `conf:"optional"`
 			TransactionIndex string   `conf:"default:qubic-transactions-alias"`
 			TickDataIndex    string   `conf:"default:qubic-tick-data-alias"`
-			Certificate      string   `conf:"default:http_ca.crt"`
+			CertificatePath  string   `conf:"default:http_ca.crt"`
 		}
 		Sync struct {
 			ServerPort          int    `conf:"default:8000"`
@@ -99,7 +99,7 @@ func run() error {
 		log.Printf("Resuming from last processed tick: [%d].", lastProcessedTick)
 	}
 
-	cert, err := os.ReadFile(cfg.Elastic.Certificate)
+	cert, err := os.ReadFile(cfg.Elastic.CertificatePath)
 	if err != nil {
 		log.Printf("[WARN] main: could not read elastic certificate: %v", err)
 	}
