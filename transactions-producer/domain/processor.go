@@ -66,6 +66,40 @@ func (p *Processor) Start(nrWorkers int) error {
 	}
 }
 
+func (p *Processor) PublishSingleTicks(ticks []uint32) error {
+	intervals, e := p.fetcher.GetProcessedTickIntervalsPerEpoch(context.Background())
+	if e != nil {
+		return fmt.Errorf("getting tick intervals: %v", e)
+	}
+
+	for _, tick := range ticks {
+
+		epoch, err := getEpochForTick(tick, intervals)
+		if err != nil {
+			return fmt.Errorf("getting epoch for tick [%d]: %v", tick, err)
+		}
+
+		transactions, err := p.fetcher.GetTickTransactions(context.Background(), tick)
+		if err != nil {
+			return fmt.Errorf("fetching transactions: %v", err)
+		}
+
+		tickTransactions := []entities.TickTransactions{
+			{
+				Epoch:        epoch,
+				TickNumber:   tick,
+				Transactions: transactions,
+			},
+		}
+
+		err = p.publisher.PublishTickTransactions(tickTransactions)
+		if err != nil {
+			return fmt.Errorf("inserting batch: %v", err)
+		}
+	}
+	return nil
+}
+
 func (p *Processor) runCycle(nrWorkers int) error {
 	epochs, err := p.fetcher.GetProcessedTickIntervalsPerEpoch(context.Background())
 	if err != nil {
@@ -260,4 +294,15 @@ func (p *Processor) gatherTickTransactionsBatch(epoch, startTick uint32, epochTi
 	}
 
 	return tickTransactionsBatch, tick, nil
+}
+
+func getEpochForTick(tick uint32, intervals []entities.ProcessedTickIntervalsPerEpoch) (uint32, error) {
+	for _, epochIntervals := range intervals {
+		for _, interval := range epochIntervals.Intervals {
+			if interval.InitialProcessedTick <= tick && interval.LastProcessedTick >= tick {
+				return epochIntervals.Epoch, nil
+			}
+		}
+	}
+	return 0, fmt.Errorf("found no epoch")
 }

@@ -49,6 +49,7 @@ func run() error {
 		ArchiverReadTimeout                 time.Duration `conf:"default:20s"`
 		BatchSize                           int           `conf:"default:100"`
 		NrWorkers                           int           `conf:"default:20"`
+		PublishCustomTicks                  []uint32      `conf:"optional"`
 		OverrideLastProcessedTick           bool          `conf:"default:false"`
 		OverrideLastProcessedTickEpochValue uint32        `conf:"default:155"`
 		OverrideLastProcessedTickValue      uint32        `conf:"default:22669394"`
@@ -92,6 +93,8 @@ func run() error {
 	}
 
 	if cfg.OverrideLastProcessedTick {
+		log.Printf("main: overriding last processed tick with [%d] and epoch [%d].",
+			cfg.OverrideLastProcessedTickValue, cfg.OverrideLastProcessedTickEpochValue)
 		if err := procStore.SetLastProcessedTick(cfg.OverrideLastProcessedTickEpochValue, cfg.OverrideLastProcessedTickValue); err != nil {
 			return fmt.Errorf("setting last processed tick: %v", err)
 		}
@@ -128,9 +131,21 @@ func run() error {
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
 	procErrors := make(chan error, 1)
-	go func() {
-		procErrors <- proc.Start(cfg.NrWorkers)
-	}()
+	if len(cfg.PublishCustomTicks) > 0 {
+		log.Printf("main: publishing custom ticks: %v", cfg.PublishCustomTicks)
+		go func() {
+			err = proc.PublishSingleTicks(cfg.PublishCustomTicks)
+			if err != nil {
+				procErrors <- err
+			} else {
+				log.Printf("main: finished processing without error.")
+			}
+		}()
+	} else {
+		go func() {
+			procErrors <- proc.Start(cfg.NrWorkers)
+		}()
+	}
 
 	serverErr := make(chan error, 1)
 	go func() {

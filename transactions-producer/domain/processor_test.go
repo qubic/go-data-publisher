@@ -7,6 +7,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/qubic/transactions-producer/entities"
 	"github.com/qubic/transactions-producer/infrastructure/store/pebbledb"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"os"
@@ -250,6 +251,64 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 		t.Fatalf("Unexpected result: %v", diff)
 	}
 
+}
+
+func TestTxProcessor_PublishSingleTicks(t *testing.T) {
+	dbDir, err := os.MkdirTemp("", "pebble_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(dbDir)
+	store, err := pebbledb.NewProcessorStore(dbDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	fetcher := MockFetcher{
+		processedTickIntervalsPerEpoch: []entities.ProcessedTickIntervalsPerEpoch{
+			{
+				Epoch: 100,
+				Intervals: []entities.ProcessedTickInterval{
+					{
+						InitialProcessedTick: 10000001,
+						LastProcessedTick:    10000002,
+					},
+				},
+			},
+			{
+				Epoch: 103,
+				Intervals: []entities.ProcessedTickInterval{
+					{
+						InitialProcessedTick: 40000001,
+						LastProcessedTick:    40000002,
+					},
+					{
+						InitialProcessedTick: 5000000,
+						LastProcessedTick:    5000100,
+					},
+				},
+			},
+		},
+	}
+	publisher := MockPublisher{}
+
+	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 100, logger.Sugar(), metrics)
+	err = txProcessor.PublishSingleTicks([]uint32{10000001, 10000002, 5000020})
+	require.NoError(t, err)
+
+	got := publisher.publishedTickTransactions
+	assert.Len(t, got, 3)
+	assert.Equal(t, 10000001, int(got[0].TickNumber))
+	assert.Equal(t, 100, int(got[0].Epoch))
+	assert.Len(t, got[0].Transactions, 1)
+
+	assert.Equal(t, 10000002, int(got[1].TickNumber))
+	assert.Equal(t, 100, int(got[1].Epoch))
+	assert.Len(t, got[0].Transactions, 1)
+
+	assert.Equal(t, 5000020, int(got[2].TickNumber))
+	assert.Equal(t, 103, int(got[2].Epoch))
+	assert.Len(t, got[0].Transactions, 1)
 }
 
 func TestTxProcessor_GetStartingTicksForEpochs(t *testing.T) {
