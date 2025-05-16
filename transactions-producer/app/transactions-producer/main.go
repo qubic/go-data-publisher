@@ -179,7 +179,11 @@ func run() error {
 		case <-shutdown:
 			return errors.New("shutting down")
 		case err := <-procErrors:
-			return fmt.Errorf("processing error: %v", err)
+			if err != nil {
+				return fmt.Errorf("processing error: %v", err)
+			} else {
+				return fmt.Errorf("finished processing")
+			}
 		case err := <-serverErr:
 			return fmt.Errorf("server error: %v", err)
 		}

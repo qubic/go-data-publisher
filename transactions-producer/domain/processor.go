@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/qubic/transactions-producer/entities"
 	"go.uber.org/zap"
+	"log"
 	"sync/atomic"
 	"time"
 )
@@ -96,6 +97,8 @@ func (p *Processor) PublishSingleTicks(ticks []uint32) error {
 		if err != nil {
 			return fmt.Errorf("inserting batch: %v", err)
 		}
+
+		log.Printf("Published transactions for tick [%d].", tick)
 	}
 	return nil
 }
