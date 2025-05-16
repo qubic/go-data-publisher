@@ -5,6 +5,7 @@ import (
 	"github.com/qubic/tick-data-publisher/domain"
 	"github.com/qubic/tick-data-publisher/metrics"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"sync"
 	"testing"
 )
@@ -22,8 +23,10 @@ func (f *FakeDataStore) GetLastProcessedTick() (tick uint32, err error) {
 	return uint32(f.tickNumber), nil
 }
 
-func defaultCreateTickData(_ uint32) (*domain.TickData, error) {
-	return &domain.TickData{}, nil
+func defaultCreateTickData(tick uint32) (*domain.TickData, error) {
+	return &domain.TickData{
+		TickNumber: tick,
+	}, nil
 }
 
 type FakeArchiveClient struct {
@@ -58,17 +61,31 @@ func (f *FakeArchiveClient) GetTickData(_ context.Context, tickNumber uint32) (*
 
 type FakeProducer struct {
 	mutex sync.Mutex
-	count int
+	sent  []*domain.TickData
 }
 
-func (f *FakeProducer) SendMessage(_ context.Context, _ *domain.TickData) error {
+func (f *FakeProducer) SendMessage(_ context.Context, td *domain.TickData) error {
 	f.mutex.Lock() // we need to lock because of parallelism
 	defer f.mutex.Unlock()
-	f.count++
+	f.sent = append(f.sent, td)
 	return nil
 }
 
 var m = metrics.NewProcessingMetrics("test")
+
+func TestTickDataProcessor_PublishCustomTicks(t *testing.T) {
+	dataStore := &FakeDataStore{}
+	archiveClient := &FakeArchiveClient{defaultCreateTickData}
+	producer := &FakeProducer{}
+	processor := NewTickDataProcessor(dataStore, archiveClient, producer, 32, m)
+
+	err := processor.PublishCustomTicks([]uint32{1, 2, 3})
+	require.NoError(t, err)
+	assert.Len(t, producer.sent, 3)
+	assert.Equal(t, 1, int(producer.sent[0].TickNumber))
+	assert.Equal(t, 2, int(producer.sent[1].TickNumber))
+	assert.Equal(t, 3, int(producer.sent[2].TickNumber))
+}
 
 func TestTickDataProcessor_process(t *testing.T) {
 	dataStore := &FakeDataStore{}
@@ -79,12 +96,12 @@ func TestTickDataProcessor_process(t *testing.T) {
 	err := processor.process()
 	assert.NoError(t, err)
 	assert.Equal(t, 1000, dataStore.tickNumber)
-	assert.Equal(t, 1000, producer.count)
+	assert.Len(t, producer.sent, 1000)
 
 	err = processor.process()
 	assert.NoError(t, err)
 	assert.Equal(t, 12345, dataStore.tickNumber) // until latest tick
-	assert.Equal(t, 2345+1000, producer.count)   // previous and 1001 to 12345
+	assert.Len(t, producer.sent, 2345+1000)      // previous and 1001 to 12345
 }
 
 func TestTickDataProcessor_process_doNotSendEmptyTicks(t *testing.T) {
@@ -98,5 +115,5 @@ func TestTickDataProcessor_process_doNotSendEmptyTicks(t *testing.T) {
 	err := processor.processTickRange(context.Background(), 100, 10, 100)
 	assert.NoError(t, err)
 	assert.Equal(t, 100, dataStore.tickNumber)
-	assert.Equal(t, 0, producer.count)
+	assert.Len(t, producer.sent, 0)
 }

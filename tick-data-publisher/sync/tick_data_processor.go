@@ -58,6 +58,19 @@ func (p *TickDataProcessor) StartProcessing() {
 	}
 }
 
+func (p *TickDataProcessor) PublishCustomTicks(ticks []uint32) error {
+	log.Printf("[INFO] publishing custom ticks")
+	ctx := context.Background()
+	for _, tick := range ticks {
+		err := p.processTick(ctx, tick)
+		if err != nil {
+			return errors.Wrapf(err, "processing tick [%d]", tick)
+		}
+		log.Printf("Published tick [%d].", tick)
+	}
+	return nil
+}
+
 func (p *TickDataProcessor) process() error {
 	ctx := context.Background()
 	status, err := p.archiveClient.GetStatus(ctx)

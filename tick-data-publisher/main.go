@@ -41,13 +41,14 @@ func run() error {
 			ProduceTopic     string `conf:"default:qubic-tick-data"`
 		}
 		Sync struct {
-			InternalStoreFolder string `conf:"default:store"`
-			ServerPort          int    `conf:"default:8000"`
-			MetricsPort         int    `conf:"default:9999"`
-			MetricsNamespace    string `conf:"default:qubic-kafka"`
-			NumWorkers          int    `conf:"default:16"`   // maximum number of workers for parallel processing
-			StartTick           uint32 `conf:"optional"`     // overrides last processed tick
-			Enabled             bool   `conf:"default:true"` // only for testing
+			InternalStoreFolder string   `conf:"default:store"`
+			ServerPort          int      `conf:"default:8000"`
+			MetricsPort         int      `conf:"default:9999"`
+			MetricsNamespace    string   `conf:"default:qubic-kafka"`
+			NumWorkers          int      `conf:"default:16"` // maximum number of workers for parallel processing
+			PublishCustomTicks  []uint32 `conf:"optional"`
+			StartTick           uint32   `conf:"optional"`     // overrides last processed tick
+			Enabled             bool     `conf:"default:true"` // only for testing
 		}
 	}
 
@@ -117,13 +118,15 @@ func run() error {
 
 	producer := kafka.NewTickDataProducer(kcl)
 	procMetrics := metrics.NewProcessingMetrics(cfg.Sync.MetricsNamespace)
-	if cfg.Sync.Enabled {
-		processor := sync.NewTickDataProcessor(store, cl, producer, cfg.Sync.NumWorkers, procMetrics)
-		go processor.StartProcessing()
-	} else {
+	procErr := make(chan error, 1)
+	processor := sync.NewTickDataProcessor(store, cl, producer, cfg.Sync.NumWorkers, procMetrics)
+	if !cfg.Sync.Enabled {
 		log.Println("[WARN] main: Message consuming disabled")
+	} else if len(cfg.Sync.PublishCustomTicks) > 0 {
+		go func() { procErr <- processor.PublishCustomTicks(cfg.Sync.PublishCustomTicks) }()
+	} else {
+		go processor.StartProcessing()
 	}
-
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
@@ -151,6 +154,13 @@ func run() error {
 		case <-shutdown:
 			log.Println("main: Received shutdown signal, shutting down...")
 			return nil
+		case err := <-procErr:
+			if err != nil {
+				return fmt.Errorf("[ERROR] processing: %v", err)
+			} else {
+				log.Printf("main: Finished proessing.")
+				return nil
+			}
 		case err := <-metricsError:
 			return fmt.Errorf("[ERROR] starting server: %v", err)
 		case err := <-apiError:
