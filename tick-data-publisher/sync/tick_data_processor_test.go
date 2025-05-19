@@ -25,6 +25,7 @@ func (f *FakeDataStore) GetLastProcessedTick() (tick uint32, err error) {
 
 func defaultCreateTickData(tick uint32) (*domain.TickData, error) {
 	return &domain.TickData{
+		Epoch:      42,
 		TickNumber: tick,
 	}, nil
 }
@@ -116,4 +117,26 @@ func TestTickDataProcessor_process_doNotSendEmptyTicks(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 100, dataStore.tickNumber)
 	assert.Len(t, producer.sent, 0)
+}
+
+func TestTickDataProcessor_isEmpty(t *testing.T) {
+
+	assert.True(t, isEmpty(&domain.TickData{}))
+	assert.True(t, isEmpty(nil))
+	assert.True(t, isEmpty(&domain.TickData{
+		TickNumber: 123,
+		Epoch:      65535,
+	}))
+	assert.True(t, isEmpty(&domain.TickData{
+		TickNumber: 1,
+	}))
+	assert.True(t, isEmpty(&domain.TickData{
+		Epoch: 1,
+	}))
+
+	assert.False(t, isEmpty(&domain.TickData{
+		TickNumber: 1,
+		Epoch:      666,
+	}))
+
 }

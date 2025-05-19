@@ -76,6 +76,9 @@ func (p *TickProcessor) consumeBatch(ctx context.Context) (int, error) {
 func (p *TickProcessor) sendToElastic(ctx context.Context, tickDataList []*domain.TickData) error {
 	var documents []*elastic.EsDocument
 	for _, tickData := range tickDataList {
+		if tickData == nil || tickData.Epoch == 0 || tickData.TickNumber == 0 {
+			return errors.New("tick data is empty")
+		}
 		document, err := convertToDocument(tickData)
 		if err != nil {
 			return err

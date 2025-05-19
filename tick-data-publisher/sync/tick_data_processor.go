@@ -138,7 +138,7 @@ func (p *TickDataProcessor) processTick(ctx context.Context, tick uint32) error 
 	if err != nil {
 		return errors.Wrap(err, "get tick data")
 	}
-	if tickData != nil || (tickData == &domain.TickData{}) { // empty tick
+	if !isEmpty(tickData) {
 		err = p.producer.SendMessage(ctx, tickData)
 		if err != nil {
 			return errors.Wrap(err, "sending message")
@@ -147,6 +147,14 @@ func (p *TickDataProcessor) processTick(ctx context.Context, tick uint32) error 
 	p.processingMetrics.IncProcessedMessages()
 	p.processingMetrics.IncProcessedTicks()
 	return nil
+}
+
+func isEmpty(tickData *domain.TickData) bool {
+	return tickData == nil ||
+		(tickData == &domain.TickData{}) ||
+		tickData.TickNumber == 0 ||
+		tickData.Epoch == 0 ||
+		tickData.Epoch == 65535 // 2^16-1
 }
 
 func calculateNextTickRange(lastProcessedTick uint32, intervals []*domain.TickInterval) (uint32, uint32, uint32, error) {
