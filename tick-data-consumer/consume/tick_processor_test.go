@@ -78,7 +78,7 @@ func TestTickProcessor_consumeBatch_thenFetchSendCommit(t *testing.T) {
 func TestTickProcessor_consumeBatch_givenEmptyTick_thenError(t *testing.T) {
 	kafkaClient := &FakeKafkaClient{
 		tickDataList: []*domain.TickData{
-			{Epoch: 0, TickNumber: 0},
+			{Epoch: 65535, TickNumber: 0},
 		},
 	}
 	elasticClient := &FakeElasticClient{}
