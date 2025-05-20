@@ -3,7 +3,7 @@ name: Create custom status service snapshot image
 on:
   push:
     branches:
-      - 'feature/tick-data-ingest-status'
+      - 'bugfix/handle-invalid-empty-ticks'
 
 jobs:
   docker-publish:

@@ -162,6 +162,12 @@ func (p *TickProcessor) processTick(ctx context.Context, tick uint32) error {
 		return errors.Wrap(err, "get archiver transactions")
 	}
 
+	// we have some invalid empty ticks in epoch 154. We can safely ignore them.
+	if tickData.GetEpoch() == 65535 && tick > 22175000 && tick < 22187500 {
+		log.Printf("Correcting invalid empty tick data for tick [%d] to allow further processing.", tick)
+		tickData = nil
+	}
+
 	if p.syncTickData {
 		match, err := p.verifyTickData(ctx, tick, tickData)
 		if err != nil {

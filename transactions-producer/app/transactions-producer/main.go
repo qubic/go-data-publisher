@@ -134,12 +134,7 @@ func run() error {
 	if len(cfg.PublishCustomTicks) > 0 {
 		log.Printf("main: publishing custom ticks: %v", cfg.PublishCustomTicks)
 		go func() {
-			err = proc.PublishSingleTicks(cfg.PublishCustomTicks)
-			if err != nil {
-				procErrors <- err
-			} else {
-				log.Printf("main: finished processing without error.")
-			}
+			procErrors <- proc.PublishSingleTicks(cfg.PublishCustomTicks)
 		}()
 	} else {
 		go func() {
@@ -182,7 +177,8 @@ func run() error {
 			if err != nil {
 				return fmt.Errorf("processing error: %v", err)
 			} else {
-				return fmt.Errorf("finished processing")
+				log.Print("main: processing finished without error")
+				return nil
 			}
 		case err := <-serverErr:
 			return fmt.Errorf("server error: %v", err)

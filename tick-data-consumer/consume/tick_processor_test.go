@@ -7,6 +7,7 @@ import (
 	"github.com/qubic/tick-data-consumer/elastic"
 	"github.com/qubic/tick-data-consumer/metrics"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
@@ -53,7 +54,7 @@ var m = metrics.NewMetrics("test")
 func TestTickProcessor_consumeBatch_thenFetchSendCommit(t *testing.T) {
 	kafkaClient := &FakeKafkaClient{
 		tickDataList: []*domain.TickData{
-			{}, {},
+			{Epoch: 1, TickNumber: 1}, {Epoch: 1, TickNumber: 2},
 		},
 	}
 	elasticClient := &FakeElasticClient{}
@@ -72,6 +73,19 @@ func TestTickProcessor_consumeBatch_thenFetchSendCommit(t *testing.T) {
 	assert.Equal(t, 2, kafkaClient.commitCount)
 	assert.Equal(t, 2, kafkaClient.allowRebalanceCount)
 	assert.Equal(t, 4, elasticClient.bulkIndexCount)
+}
+
+func TestTickProcessor_consumeBatch_givenEmptyTick_thenError(t *testing.T) {
+	kafkaClient := &FakeKafkaClient{
+		tickDataList: []*domain.TickData{
+			{Epoch: 65535, TickNumber: 0},
+		},
+	}
+	elasticClient := &FakeElasticClient{}
+	processor := NewTickProcessor(kafkaClient, elasticClient, m)
+
+	_, err := processor.consumeBatch(context.Background())
+	require.Error(t, err)
 }
 
 func TestTickProcessor_consumeBatch_givenErrorSending_thenErrorAndNoCommit(t *testing.T) {
