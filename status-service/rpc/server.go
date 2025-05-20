@@ -56,6 +56,10 @@ func (s *StatusServiceServer) GetHealthCheck(ctx context.Context, empty *emptypb
 	return &protobuf.GetHealthCheckResponse{Status: "UP"}, nil
 }
 
+func (s *StatusServiceServer) GetTickIntervals(context.Context, *emptypb.Empty) (*protobuf.GetTickIntervalsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTickIntervals not implemented")
+}
+
 func (s *StatusServiceServer) Start(errChan chan error) error {
 
 	srv := grpc.NewServer(
