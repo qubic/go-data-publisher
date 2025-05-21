@@ -18,7 +18,6 @@ import (
 var ErrNotFound = errors.New("store resource not found")
 
 const lastProcessedTickKey = "lpt"
-const lastProcessedEpochKey = "lpe"
 const skippedTicksKey = "skipped"
 const processingStatus = "status"
 
@@ -41,14 +40,6 @@ func (ps *PebbleStore) GetLastProcessedTick() (uint32, error) {
 
 func (ps *PebbleStore) SetLastProcessedTick(tick uint32) error {
 	return ps.setUint32(lastProcessedTickKey, tick)
-}
-
-func (ps *PebbleStore) GetCurrentEpoch() (uint32, error) {
-	return ps.getUint32(lastProcessedEpochKey)
-}
-
-func (ps *PebbleStore) SetCurrentEpoch(epoch uint32) error {
-	return ps.setUint32(lastProcessedEpochKey, epoch)
 }
 
 func (ps *PebbleStore) SetSourceStatus(status *domain.Status) error {

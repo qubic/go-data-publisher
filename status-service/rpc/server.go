@@ -15,12 +15,12 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"net"
 	"net/http"
+	"time"
 )
 
 type StatusProvider interface {
 	GetLastProcessedTick() (tick uint32, err error)
 	GetSkippedTicks() ([]uint32, error)
-	GetCurrentEpoch() (uint32, error)
 	GetSourceStatus() (*domain.Status, error)
 }
 
@@ -32,10 +32,16 @@ type StatusServiceServer struct {
 	listenAddrHTTP      string
 	sp                  StatusProvider
 	cachedTickIntervals *protobuf.GetTickIntervalsResponse
+	cacheUpdated        time.Time
 }
 
 func NewStatusServiceServer(listenAddrGRPC string, listenAddrHTTP string, sp StatusProvider) *StatusServiceServer {
-	return &StatusServiceServer{listenAddrGRPC: listenAddrGRPC, listenAddrHTTP: listenAddrHTTP, sp: sp}
+	return &StatusServiceServer{
+		listenAddrGRPC: listenAddrGRPC,
+		listenAddrHTTP: listenAddrHTTP,
+		sp:             sp,
+		cacheUpdated:   time.Now(),
+	}
 }
 
 func (s *StatusServiceServer) GetSkippedTicks(context.Context, *emptypb.Empty) (*protobuf.GetSkippedTicksResponse, error) {
@@ -61,16 +67,13 @@ func (s *StatusServiceServer) GetHealthCheck(context.Context, *emptypb.Empty) (*
 }
 
 func (s *StatusServiceServer) GetTickIntervals(context.Context, *emptypb.Empty) (*protobuf.GetTickIntervalsResponse, error) {
-	epoch, err := s.sp.GetCurrentEpoch()
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "retrieving current epoch: %v", err)
-	}
-
-	if s.cachedTickIntervals == nil || epoch > s.cachedTickIntervals.CurrentEpoch {
-		s.cachedTickIntervals, err = createTickIntervalResponse(s.sp)
+	if s.cachedTickIntervals == nil || s.cacheUpdated.Before(time.Now().Add(-1*time.Minute)) {
+		response, err := createTickIntervalResponse(s.sp)
 		if err != nil {
 			return nil, err
 		}
+		s.cachedTickIntervals = response
+		s.cacheUpdated = time.Now()
 	}
 
 	return s.cachedTickIntervals, nil
@@ -81,22 +84,26 @@ func createTickIntervalResponse(sp StatusProvider) (*protobuf.GetTickIntervalsRe
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "getting status information: %v", err)
 	}
-
-	intervalCount := len(st.TickIntervals)
+	// we don't show the last interval as the to tick might not be up to date
+	// we take the initial tick from the last interval as there might be multiple intervals in the last epoch
+	var initialTick uint32
 	var intervals []*protobuf.TickInterval
+	lastIndex := len(st.TickIntervals) - 1
 	for i, interval := range st.TickIntervals {
-		if i < intervalCount-1 { // skip last interval
+		if i < lastIndex { // skip last interval
 			intervals = append(intervals, &protobuf.TickInterval{
 				Epoch:     interval.Epoch,
 				FirstTick: interval.From,
 				LastTick:  interval.To,
 			})
+		} else {
+			initialTick = interval.From
 		}
 	}
 	response := &protobuf.GetTickIntervalsResponse{
-		CurrentEpoch:  st.Epoch,
-		InitialTick:   st.InitialTick,
-		TickIntervals: intervals,
+		CurrentEpoch:      st.Epoch,
+		CurrentFirstTick:  max(initialTick, st.InitialTick),
+		PreviousIntervals: intervals,
 	}
 	return response, nil
 }

@@ -29,8 +29,6 @@ type SearchClient interface {
 type DataStore interface {
 	GetLastProcessedTick() (tick uint32, err error)
 	SetLastProcessedTick(tick uint32) error
-	GetCurrentEpoch() (uint32, error)
-	SetCurrentEpoch(uint32) error
 	SetSourceStatus(status *domain.Status) error
 	AddSkippedTick(tick uint32) error
 }
@@ -93,9 +91,10 @@ func (p *TickProcessor) sync() error {
 	p.processingMetrics.SetSourceTick(status.Epoch, status.Tick)
 
 	// processing status is needed by rpc clients
-	err = p.updateProcessingStatusIfEpochChanged(status)
+	// we update on every sync. no performance issue, see sleep.
+	err = p.dataStore.SetSourceStatus(status)
 	if err != nil {
-		return errors.Wrap(err, "update processing status")
+		return errors.Wrapf(err, "updating status: %v", status)
 	}
 
 	// wait a bit to allow latest tick to sync
@@ -289,24 +288,6 @@ func calculateNextTickRange(lastProcessedTick uint32, intervals []*domain.TickIn
 
 	// no delta found do not sync
 	return 0, 0, 0, nil
-}
-
-func (p *TickProcessor) updateProcessingStatusIfEpochChanged(status *domain.Status) error {
-	currEpoch, err := p.dataStore.GetCurrentEpoch()
-	if err != nil {
-		return errors.Wrap(err, "get current epoch")
-	}
-	if currEpoch < status.Epoch { // new epoch detected. update status.
-		err = p.dataStore.SetSourceStatus(status)
-		if err != nil {
-			return errors.Wrapf(err, "setting processing status: %v", status)
-		}
-		err = p.dataStore.SetCurrentEpoch(status.Epoch)
-		if err != nil {
-			return errors.Wrapf(err, "setting current epoch")
-		}
-	}
-	return nil
 }
 
 func elasticDebugString(td *elastic.TickData) string {

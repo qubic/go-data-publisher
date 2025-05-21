@@ -106,18 +106,8 @@ func (f *FakeArchiveClient) GetStatus(_ context.Context) (*domain.Status, error)
 
 type FakeDataStore struct {
 	tick        uint32
-	epoch       uint32
 	skippedTick uint32
 	status      *domain.Status
-}
-
-func (f *FakeDataStore) GetCurrentEpoch() (uint32, error) {
-	return f.epoch, nil
-}
-
-func (f *FakeDataStore) SetCurrentEpoch(epoch uint32) error {
-	f.epoch = epoch
-	return nil
 }
 
 func (f *FakeDataStore) SetSourceStatus(status *domain.Status) error {
@@ -451,7 +441,5 @@ func TestProcessor_Sync_GivenNewEpoch_ThenUpdateStatus(t *testing.T) {
 	err = processor.sync()
 	require.NoError(t, err)
 	assert.Equal(t, 1000, int(dataStore.tick))
-
-	assert.Equal(t, 123, int(dataStore.epoch)) // latest epoch
-	assert.Equal(t, status, dataStore.status)  // status stored
+	assert.Equal(t, status, dataStore.status) // status stored
 }

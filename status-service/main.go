@@ -47,7 +47,7 @@ func run() error {
 			TransactionIndex string        `conf:"default:qubic-transactions-alias"`
 			TickDataIndex    string        `conf:"default:qubic-tick-data-alias"`
 			CertificatePath  string        `conf:"default:http_ca.crt"`
-			Delay            time.Duration `conf:"default:850ms"`
+			Delay            time.Duration `conf:"default:800ms"`
 		}
 		Sync struct {
 			MetricsNamespace    string `conf:"default:qubic-status-service"`
@@ -99,12 +99,6 @@ func run() error {
 		return errors.Wrap(err, "initializing last processed tick")
 	}
 	log.Printf("Resuming from tick: [%d].", startTick)
-
-	// initialize epoch, if necessary
-	err = initializeCurrentEpoch(store)
-	if err != nil {
-		return errors.Wrap(err, "initializing current epoch")
-	}
 
 	cert, err := os.ReadFile(cfg.Elastic.CertificatePath)
 	if err != nil {
@@ -180,16 +174,4 @@ func initializeLastProcessedTick(startTick uint32, store *db.PebbleStore) (uint3
 	} else {
 		return lastProcessedTick, nil
 	}
-}
-
-func initializeCurrentEpoch(store *db.PebbleStore) error {
-	_, err := store.GetCurrentEpoch()
-	if err != nil {
-		if errors.Is(err, db.ErrNotFound) {
-			return store.SetCurrentEpoch(0)
-		} else {
-			return errors.Wrap(err, "getting epoch")
-		}
-	}
-	return nil
 }
