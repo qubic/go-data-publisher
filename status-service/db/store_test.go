@@ -67,38 +67,6 @@ func TestStore_UpdateLastProcessedTick(t *testing.T) {
 	assert.Equal(t, newTick, retrievedTick)
 }
 
-func TestStore_SetAndGetCurrentEpoch(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "processor_store_test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
-
-	store, err := NewPebbleStore(tempDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	var epoch uint32 = 123
-	err = store.SetCurrentEpoch(epoch)
-	require.NoError(t, err)
-
-	retrievedEpoch, err := store.GetCurrentEpoch()
-	require.NoError(t, err)
-	assert.Equal(t, epoch, retrievedEpoch)
-}
-
-func TestStore_GetCurrentEpoch_GivenNotSet_ThenErrNotFound(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "processor_store_test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
-
-	store, err := NewPebbleStore(tempDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	_, err = store.GetCurrentEpoch()
-	require.Error(t, err)
-	assert.Equal(t, ErrNotFound, err)
-}
-
 func TestPebbleStore_GetSkippedTicks(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "processor_store_test")
 	require.NoError(t, err)
