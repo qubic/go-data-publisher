@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/cockroachdb/pebble"
 	"github.com/pkg/errors"
+	"github.com/qubic/status-service/domain"
 	"github.com/qubic/status-service/util"
 	"log"
 	"path/filepath"
@@ -17,7 +18,9 @@ import (
 var ErrNotFound = errors.New("store resource not found")
 
 const lastProcessedTickKey = "lpt"
+const lastProcessedEpochKey = "lpe"
 const skippedTicksKey = "skipped"
+const processingStatus = "status"
 
 type PebbleStore struct {
 	db *pebble.DB
@@ -32,34 +35,33 @@ func NewPebbleStore(storeDir string) (*PebbleStore, error) {
 	return &PebbleStore{db: db}, nil
 }
 
-func (ps *PebbleStore) SetLastProcessedTick(tick uint32) error {
-	key := []byte(lastProcessedTickKey)
-	var value []byte
-	value = binary.BigEndian.AppendUint32(value, tick)
-
-	err := ps.db.Set(key, value, pebble.Sync)
-	if err != nil {
-		return errors.Wrapf(err, "setting key [%s] to [%d]", lastProcessedTickKey, tick)
-	}
-
-	return nil
+func (ps *PebbleStore) GetLastProcessedTick() (uint32, error) {
+	return ps.getUint32(lastProcessedTickKey)
 }
 
-func (ps *PebbleStore) GetLastProcessedTick() (tick uint32, err error) {
-	key := []byte(lastProcessedTickKey)
+func (ps *PebbleStore) SetLastProcessedTick(tick uint32) error {
+	return ps.setUint32(lastProcessedTickKey, tick)
+}
 
-	value, closer, err := ps.db.Get(key)
-	if errors.Is(err, pebble.ErrNotFound) {
-		log.Printf("[WARN] key [%s] not found.", lastProcessedTickKey)
-		return 0, ErrNotFound
-	}
+func (ps *PebbleStore) GetCurrentEpoch() (uint32, error) {
+	return ps.getUint32(lastProcessedEpochKey)
+}
+
+func (ps *PebbleStore) SetCurrentEpoch(epoch uint32) error {
+	return ps.setUint32(lastProcessedEpochKey, epoch)
+}
+
+func (ps *PebbleStore) SetSourceStatus(status *domain.Status) error {
+	return ps.save(processingStatus, status)
+}
+
+func (ps *PebbleStore) GetSourceStatus() (*domain.Status, error) {
+	var target *domain.Status
+	err := ps.load(processingStatus, &target)
 	if err != nil {
-		return 0, errors.Wrapf(err, "getting value for key [%s]", lastProcessedTickKey)
+		return nil, errors.Wrap(err, "loading processing status")
 	}
-	defer closer.Close()
-
-	tick = binary.BigEndian.Uint32(value)
-	return tick, nil
+	return target, nil
 }
 
 func (ps *PebbleStore) AddSkippedTick(tick uint32) error {
@@ -68,7 +70,7 @@ func (ps *PebbleStore) AddSkippedTick(tick uint32) error {
 		return errors.Wrap(err, "getting skipped ticks")
 	}
 	util.AddToSet(skippedTicks, fmt.Sprint(tick))
-	err = ps.saveSkippedTicksSet(skippedTicks)
+	err = ps.save(skippedTicksKey, skippedTicks)
 	if err != nil {
 		return errors.Wrap(err, "saving skipped ticks")
 	}
@@ -96,56 +98,83 @@ func (ps *PebbleStore) GetSkippedTicks() ([]uint32, error) {
 	return tickList, nil
 }
 
-func (ps *PebbleStore) saveSkippedTicksSet(set map[string]bool) error {
-	// encode
-	buffer := new(bytes.Buffer)
-	encoder := gob.NewEncoder(buffer)
-	err := encoder.Encode(set)
+func (ps *PebbleStore) loadSkippedTicksSet() (map[string]bool, error) {
+	var result map[string]bool
+	err := ps.load(skippedTicksKey, &result)
 	if err != nil {
-		return errors.Wrap(err, "encoding set")
+		if errors.Is(err, pebble.ErrNotFound) {
+			log.Println("[WARN] Skipped ticks not found.")
+			return util.NewSet(), nil
+		} else {
+			return nil, err
+		}
 	}
-
-	// store
-	key := []byte(skippedTicksKey)
-	err = ps.db.Set(key, buffer.Bytes(), pebble.Sync) // sync to prevent data loss. performance not important.
-	if err != nil {
-		return errors.Wrap(err, "saving set")
-	}
-	return nil
+	return result, nil
 }
 
-func (ps *PebbleStore) loadSkippedTicksSet() (map[string]bool, error) {
-	// load
-	key := []byte(skippedTicksKey)
+func (ps *PebbleStore) load(keyStr string, target any) error {
+	key := []byte(keyStr)
 	value, closer, err := ps.db.Get(key)
-	if errors.Is(err, pebble.ErrNotFound) {
-		log.Printf("[WARN] key [%s] not found.", skippedTicksKey)
-		return util.NewSet(), nil
-	}
 	if err != nil {
-		return nil, errors.Wrapf(err, "getting value for key [%s]", lastProcessedTickKey)
+		return errors.Wrapf(err, "getting value for key [%s]", keyStr)
 	}
 	defer closer.Close()
 
 	// decode
 	buffer := bytes.NewBuffer(value)
 	decoder := gob.NewDecoder(buffer)
-	var skippedTicks map[string]bool
-	err = decoder.Decode(&skippedTicks)
+	err = decoder.Decode(target)
 	if err != nil {
-		return nil, errors.Wrap(err, "deserializing skipped ticks")
-	}
-
-	return skippedTicks, nil
-}
-
-func (ps *PebbleStore) deleteLastProcessedTick() error {
-	key := []byte(lastProcessedTickKey)
-	err := ps.db.Delete(key, pebble.Sync)
-	if err != nil {
-		return errors.Wrapf(err, "deleting key [%s]", lastProcessedTickKey)
+		return errors.Wrapf(err, "deserializing value for key [%s]", keyStr)
 	}
 	return nil
+}
+
+func (ps *PebbleStore) save(keyStr string, source any) error {
+	buffer := new(bytes.Buffer)
+	encoder := gob.NewEncoder(buffer)
+	err := encoder.Encode(source)
+	if err != nil {
+		return errors.Wrap(err, "encoding object")
+	}
+
+	// store
+	key := []byte(keyStr)
+	err = ps.db.Set(key, buffer.Bytes(), pebble.Sync) // sync to prevent data loss. lower performance.
+	if err != nil {
+		return errors.Wrap(err, "saving object")
+	}
+	return nil
+}
+
+func (ps *PebbleStore) setUint32(keyStr string, value uint32) error {
+	key := []byte(keyStr)
+	var val []byte
+	val = binary.BigEndian.AppendUint32(val, value)
+
+	err := ps.db.Set(key, val, pebble.Sync)
+	if err != nil {
+		return errors.Wrapf(err, "setting key [%s] to [%d]", keyStr, value)
+	}
+
+	return nil
+}
+
+func (ps *PebbleStore) getUint32(keyStr string) (value uint32, err error) {
+	key := []byte(keyStr)
+
+	binVal, closer, err := ps.db.Get(key)
+	if errors.Is(err, pebble.ErrNotFound) {
+		log.Printf("[WARN] key [%s] not found.", keyStr)
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, errors.Wrapf(err, "getting value for key [%s]", keyStr)
+	}
+	defer closer.Close()
+
+	value = binary.BigEndian.Uint32(binVal)
+	return value, nil
 }
 
 func (ps *PebbleStore) Close() error {

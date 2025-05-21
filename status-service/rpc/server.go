@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/qubic/status-service/domain"
 	"github.com/qubic/status-service/protobuf"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -19,22 +20,25 @@ import (
 type StatusProvider interface {
 	GetLastProcessedTick() (tick uint32, err error)
 	GetSkippedTicks() ([]uint32, error)
+	GetCurrentEpoch() (uint32, error)
+	GetSourceStatus() (*domain.Status, error)
 }
 
 var _ protobuf.StatusServiceServer = &StatusServiceServer{}
 
 type StatusServiceServer struct {
 	protobuf.UnimplementedStatusServiceServer
-	listenAddrGRPC string
-	listenAddrHTTP string
-	sp             StatusProvider
+	listenAddrGRPC      string
+	listenAddrHTTP      string
+	sp                  StatusProvider
+	cachedTickIntervals *protobuf.GetTickIntervalsResponse
 }
 
 func NewStatusServiceServer(listenAddrGRPC string, listenAddrHTTP string, sp StatusProvider) *StatusServiceServer {
 	return &StatusServiceServer{listenAddrGRPC: listenAddrGRPC, listenAddrHTTP: listenAddrHTTP, sp: sp}
 }
 
-func (s *StatusServiceServer) GetSkippedTicks(ctx context.Context, empty *emptypb.Empty) (*protobuf.GetSkippedTicksResponse, error) {
+func (s *StatusServiceServer) GetSkippedTicks(context.Context, *emptypb.Empty) (*protobuf.GetSkippedTicksResponse, error) {
 	ticks, err := s.sp.GetSkippedTicks()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "calling provider to get skipped ticks: %v", err)
@@ -43,7 +47,7 @@ func (s *StatusServiceServer) GetSkippedTicks(ctx context.Context, empty *emptyp
 	return &protobuf.GetSkippedTicksResponse{SkippedTicks: ticks}, nil
 }
 
-func (s *StatusServiceServer) GetStatus(ctx context.Context, empty *emptypb.Empty) (*protobuf.GetStatusResponse, error) {
+func (s *StatusServiceServer) GetStatus(context.Context, *emptypb.Empty) (*protobuf.GetStatusResponse, error) {
 	lastProcessedTick, err := s.sp.GetLastProcessedTick()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "calling provider to get last processed tick: %v", err)
@@ -52,12 +56,49 @@ func (s *StatusServiceServer) GetStatus(ctx context.Context, empty *emptypb.Empt
 	return &protobuf.GetStatusResponse{LastProcessedTick: lastProcessedTick}, nil
 }
 
-func (s *StatusServiceServer) GetHealthCheck(ctx context.Context, empty *emptypb.Empty) (*protobuf.GetHealthCheckResponse, error) {
+func (s *StatusServiceServer) GetHealthCheck(context.Context, *emptypb.Empty) (*protobuf.GetHealthCheckResponse, error) {
 	return &protobuf.GetHealthCheckResponse{Status: "UP"}, nil
 }
 
 func (s *StatusServiceServer) GetTickIntervals(context.Context, *emptypb.Empty) (*protobuf.GetTickIntervalsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetTickIntervals not implemented")
+	epoch, err := s.sp.GetCurrentEpoch()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "retrieving current epoch: %v", err)
+	}
+
+	if s.cachedTickIntervals == nil || epoch > s.cachedTickIntervals.CurrentEpoch {
+		s.cachedTickIntervals, err = createTickIntervalResponse(s.sp)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return s.cachedTickIntervals, nil
+}
+
+func createTickIntervalResponse(sp StatusProvider) (*protobuf.GetTickIntervalsResponse, error) {
+	st, err := sp.GetSourceStatus()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "getting status information: %v", err)
+	}
+
+	intervalCount := len(st.TickIntervals)
+	var intervals []*protobuf.TickInterval
+	for i, interval := range st.TickIntervals {
+		if i < intervalCount-1 { // skip last interval
+			intervals = append(intervals, &protobuf.TickInterval{
+				Epoch:     interval.Epoch,
+				FirstTick: interval.From,
+				LastTick:  interval.To,
+			})
+		}
+	}
+	response := &protobuf.GetTickIntervalsResponse{
+		CurrentEpoch:  st.Epoch,
+		InitialTick:   st.InitialTick,
+		TickIntervals: intervals,
+	}
+	return response, nil
 }
 
 func (s *StatusServiceServer) Start(errChan chan error) error {

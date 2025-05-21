@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/qubic/go-archiver/protobuff"
+	"github.com/qubic/status-service/domain"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
@@ -12,18 +13,6 @@ import (
 
 type Client struct {
 	api protobuff.ArchiveServiceClient
-}
-
-type Status struct {
-	LatestEpoch   uint32
-	LatestTick    uint32
-	TickIntervals []*TickInterval
-}
-
-type TickInterval struct {
-	Epoch uint32
-	From  uint32
-	To    uint32
 }
 
 func NewClient(host string) (*Client, error) {
@@ -37,25 +26,33 @@ func NewClient(host string) (*Client, error) {
 	return &cl, nil
 }
 
-func (c *Client) GetStatus(ctx context.Context) (*Status, error) {
+func (c *Client) GetStatus(ctx context.Context) (*domain.Status, error) {
 	s, err := c.api.GetStatus(ctx, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "calling GetStatus api")
 	}
 
-	var intervals []*TickInterval
-	for _, epochIntervals := range s.GetProcessedTickIntervalsPerEpoch() {
+	var intervals []*domain.TickInterval
+	epochs := s.GetProcessedTickIntervalsPerEpoch()
+	for _, epochIntervals := range epochs {
 		for _, interval := range epochIntervals.Intervals {
-			intervals = append(intervals, &TickInterval{
+			intervals = append(intervals, &domain.TickInterval{
 				Epoch: epochIntervals.Epoch,
 				From:  interval.InitialProcessedTick,
 				To:    interval.LastProcessedTick,
 			})
 		}
 	}
-	status := Status{
-		LatestTick:    s.GetLastProcessedTick().GetTickNumber(),
-		LatestEpoch:   s.GetLastProcessedTick().GetEpoch(),
+
+	initialTick, err := calculateInitialTickOfCurrentEpoch(epochs)
+	if err != nil {
+		return nil, err
+	}
+
+	status := domain.Status{
+		Tick:          s.GetLastProcessedTick().GetTickNumber(),
+		Epoch:         s.GetLastProcessedTick().GetEpoch(),
+		InitialTick:   initialTick,
 		TickIntervals: intervals,
 	}
 	return &status, nil
@@ -78,4 +75,15 @@ func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*protobuff
 		log.Printf("[INFO] Archiver tick [%d] has no transactions.", tickNumber)
 	}
 	return response.GetTickData(), nil // can return nil, for example in case of empty tick
+}
+
+func calculateInitialTickOfCurrentEpoch(epochs []*protobuff.ProcessedTickIntervalsPerEpoch) (uint32, error) {
+	numberOfEpochs := len(epochs)
+	if numberOfEpochs > 0 {
+		latestEpoch := epochs[numberOfEpochs-1]
+		if len(latestEpoch.GetIntervals()) > 0 {
+			return latestEpoch.Intervals[0].InitialProcessedTick, nil
+		}
+	}
+	return 0, errors.New("calculating initial tick")
 }

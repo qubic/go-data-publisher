@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/qubic/go-archiver/protobuff"
-	"github.com/qubic/status-service/archiver"
+	"github.com/qubic/status-service/domain"
 	"github.com/qubic/status-service/elastic"
 	"github.com/qubic/status-service/metrics"
 	"github.com/qubic/status-service/util"
@@ -17,7 +17,7 @@ import (
 )
 
 type ArchiveClient interface {
-	GetStatus(ctx context.Context) (*archiver.Status, error)
+	GetStatus(ctx context.Context) (*domain.Status, error)
 	GetTickData(ctx context.Context, tickNumber uint32) (*protobuff.TickData, error)
 }
 
@@ -27,8 +27,11 @@ type SearchClient interface {
 }
 
 type DataStore interface {
-	SetLastProcessedTick(tick uint32) error
 	GetLastProcessedTick() (tick uint32, err error)
+	SetLastProcessedTick(tick uint32) error
+	GetCurrentEpoch() (uint32, error)
+	SetCurrentEpoch(uint32) error
+	SetSourceStatus(status *domain.Status) error
 	AddSkippedTick(tick uint32) error
 }
 
@@ -41,14 +44,16 @@ type TickProcessor struct {
 	syncTickData       bool
 	skipErroneousTicks bool
 	maxWorkers         int
+	elasticQueryDelay  time.Duration // time to delay checking elastic
 	errorsCount        uint
 }
 
 type Config struct {
-	SyncTransactions bool
-	SyncTickData     bool
-	SkipTicks        bool
-	NumMaxWorkers    int
+	SyncTransactions  bool
+	SyncTickData      bool
+	SkipTicks         bool
+	NumMaxWorkers     int
+	ElasticQueryDelay time.Duration
 }
 
 func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, dataStore DataStore, m *metrics.Metrics, config Config) *TickProcessor {
@@ -61,6 +66,7 @@ func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, d
 		syncTickData:       config.SyncTickData,
 		skipErroneousTicks: config.SkipTicks,
 		maxWorkers:         max(1, config.NumMaxWorkers), // one worker minimum
+		elasticQueryDelay:  config.ElasticQueryDelay,
 	}
 	return &processor
 }
@@ -84,10 +90,16 @@ func (p *TickProcessor) sync() error {
 	if err != nil {
 		return errors.Wrap(err, "get archive status")
 	}
-	p.processingMetrics.SetSourceTick(status.LatestEpoch, status.LatestTick)
+	p.processingMetrics.SetSourceTick(status.Epoch, status.Tick)
+
+	// processing status is needed by rpc clients
+	err = p.updateProcessingStatusIfEpochChanged(status)
+	if err != nil {
+		return errors.Wrap(err, "update processing status")
+	}
 
 	// wait a bit to allow latest tick to sync
-	time.Sleep(800 * time.Millisecond)
+	time.Sleep(p.elasticQueryDelay)
 
 	tick, err := p.dataStore.GetLastProcessedTick()
 	if err != nil {
@@ -98,10 +110,14 @@ func (p *TickProcessor) sync() error {
 	if err != nil {
 		return errors.Wrap(err, "calculating tick range")
 	}
-	end = min(status.LatestTick, end) // don't exceed lastest tick
+	end = min(status.Tick, end) // don't exceed lastest tick
 
 	if start <= end && start > 0 && end > 0 && epoch > 0 {
-		log.Printf("Processing ticks from [%d] to [%d] for epoch [%d].", start, end, epoch)
+		if start == end {
+			log.Printf("Processing tick [%d].", start)
+		} else {
+			log.Printf("Processing ticks from [%d] to [%d] for epoch [%d].", start, end, epoch)
+		}
 		// if start == end then process one tick
 		err = p.processTickRange(ctx, epoch, start, end)
 		if err != nil {
@@ -258,7 +274,7 @@ func (p *TickProcessor) verifyTickTransactions(ctx context.Context, tick uint32,
 	return true, nil
 }
 
-func calculateNextTickRange(lastProcessedTick uint32, intervals []*archiver.TickInterval) (uint32, uint32, uint32, error) {
+func calculateNextTickRange(lastProcessedTick uint32, intervals []*domain.TickInterval) (uint32, uint32, uint32, error) {
 	if len(intervals) == 0 {
 		return 0, 0, 0, errors.New("invalid argument: missing tick intervals")
 	}
@@ -273,6 +289,24 @@ func calculateNextTickRange(lastProcessedTick uint32, intervals []*archiver.Tick
 
 	// no delta found do not sync
 	return 0, 0, 0, nil
+}
+
+func (p *TickProcessor) updateProcessingStatusIfEpochChanged(status *domain.Status) error {
+	currEpoch, err := p.dataStore.GetCurrentEpoch()
+	if err != nil {
+		return errors.Wrap(err, "get current epoch")
+	}
+	if currEpoch < status.Epoch { // new epoch detected. update status.
+		err = p.dataStore.SetSourceStatus(status)
+		if err != nil {
+			return errors.Wrapf(err, "setting processing status: %v", status)
+		}
+		err = p.dataStore.SetCurrentEpoch(status.Epoch)
+		if err != nil {
+			return errors.Wrapf(err, "setting current epoch")
+		}
+	}
+	return nil
 }
 
 func elasticDebugString(td *elastic.TickData) string {
