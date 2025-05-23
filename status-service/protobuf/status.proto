@@ -18,7 +18,24 @@ message GetSkippedTicksResponse {
   repeated uint32 skipped_ticks = 1;
 }
 
+message TickInterval {
+  uint32 epoch = 1;
+  uint32 first_tick = 2;
+  uint32 last_tick = 3;
+}
+
+message GetTickIntervalsResponse {
+  repeated TickInterval intervals = 1;
+}
+
 service StatusService {
+
+  rpc GetTickIntervals(google.protobuf.Empty) returns (GetTickIntervalsResponse) {
+    option (google.api.http) = {
+      get: "/v1/tickIntervals"
+    };
+  }
+
   rpc GetSkippedTicks(google.protobuf.Empty) returns (GetSkippedTicksResponse) {
     option (google.api.http) = {
       get: "/v1/skippedTicks"

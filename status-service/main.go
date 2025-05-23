@@ -17,6 +17,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 const envPrefix = "QUBIC_STATUS_SERVICE"
@@ -40,12 +41,13 @@ func run() error {
 			MetricsHttpHost string `conf:"default:0.0.0.0:9999"`
 		}
 		Elastic struct {
-			Addresses        []string `conf:"default:https://localhost:9200"`
-			Username         string   `conf:"default:qubic-query"`
-			Password         string   `conf:"optional"`
-			TransactionIndex string   `conf:"default:qubic-transactions-alias"`
-			TickDataIndex    string   `conf:"default:qubic-tick-data-alias"`
-			CertificatePath  string   `conf:"default:http_ca.crt"`
+			Addresses        []string      `conf:"default:https://localhost:9200"`
+			Username         string        `conf:"default:qubic-query"`
+			Password         string        `conf:"optional"`
+			TransactionIndex string        `conf:"default:qubic-transactions-alias"`
+			TickDataIndex    string        `conf:"default:qubic-tick-data-alias"`
+			CertificatePath  string        `conf:"default:http_ca.crt"`
+			Delay            time.Duration `conf:"default:800ms"`
 		}
 		Sync struct {
 			MetricsNamespace    string `conf:"default:qubic-status-service"`
@@ -89,18 +91,14 @@ func run() error {
 	if err != nil {
 		return errors.Wrap(err, "creating db")
 	}
+	defer store.Close()
 
-	lastProcessedTick, err := store.GetLastProcessedTick()
-	if cfg.Sync.StartTick > 0 || errors.Is(err, db.ErrNotFound) {
-		setErr := store.SetLastProcessedTick(cfg.Sync.StartTick)
-		if setErr != nil {
-			return errors.Wrap(err, "setting last processed tick")
-		}
-	} else if err != nil {
-		return errors.Wrap(err, "getting last processed tick")
-	} else {
-		log.Printf("Resuming from last processed tick: [%d].", lastProcessedTick)
+	// initialize last processed tick, if necessary
+	startTick, err := initializeLastProcessedTick(cfg.Sync.StartTick, store)
+	if err != nil {
+		return errors.Wrap(err, "initializing last processed tick")
 	}
+	log.Printf("Resuming from tick: [%d].", startTick)
 
 	cert, err := os.ReadFile(cfg.Elastic.CertificatePath)
 	if err != nil {
@@ -122,10 +120,11 @@ func run() error {
 
 	m := metrics.NewMetrics(cfg.Sync.MetricsNamespace)
 	processor := sync.NewTickProcessor(cl, elasticClient, store, m, sync.Config{
-		SyncTransactions: cfg.Sync.Transactions,
-		SyncTickData:     cfg.Sync.TickData,
-		SkipTicks:        cfg.Sync.SkipTicks,
-		NumMaxWorkers:    cfg.Sync.NumMaxWorkers,
+		SyncTransactions:  cfg.Sync.Transactions,
+		SyncTickData:      cfg.Sync.TickData,
+		SkipTicks:         cfg.Sync.SkipTicks,
+		NumMaxWorkers:     cfg.Sync.NumMaxWorkers,
+		ElasticQueryDelay: cfg.Elastic.Delay,
 	})
 	if cfg.Sync.Transactions || cfg.Sync.TickData {
 		go processor.Synchronize()
@@ -163,5 +162,16 @@ func run() error {
 		case err := <-serverError:
 			return errors.Wrapf(err, "[ERROR] starting server endpoint(s).")
 		}
+	}
+}
+
+func initializeLastProcessedTick(startTick uint32, store *db.PebbleStore) (uint32, error) {
+	lastProcessedTick, err := store.GetLastProcessedTick()
+	if startTick > 0 || errors.Is(err, db.ErrNotFound) {
+		return startTick, store.SetLastProcessedTick(startTick)
+	} else if err != nil {
+		return 0, errors.Wrap(err, "getting last processed tick")
+	} else {
+		return lastProcessedTick, nil
 	}
 }

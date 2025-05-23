@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"github.com/qubic/go-archiver/protobuff"
-	"github.com/qubic/status-service/archiver"
+	"github.com/qubic/status-service/domain"
 	"github.com/qubic/status-service/elastic"
 	"github.com/qubic/status-service/metrics"
 	"github.com/stretchr/testify/assert"
@@ -80,24 +80,25 @@ func (f *FakeArchiveClient) GetTickData(_ context.Context, tickNumber uint32) (*
 	}, nil
 }
 
-func (f *FakeArchiveClient) GetStatus(_ context.Context) (*archiver.Status, error) {
+func (f *FakeArchiveClient) GetStatus(_ context.Context) (*domain.Status, error) {
 
-	interval1 := &archiver.TickInterval{
+	interval1 := &domain.TickInterval{
 		Epoch: 100,
 		From:  1,
 		To:    1000,
 	}
 
-	interval2 := &archiver.TickInterval{
+	interval2 := &domain.TickInterval{
 		Epoch: 123,
 		From:  10000,
 		To:    123456,
 	}
 
-	status := &archiver.Status{
-		LatestEpoch:   123,
-		LatestTick:    12345,
-		TickIntervals: []*archiver.TickInterval{interval1, interval2},
+	status := &domain.Status{
+		Epoch:         123,
+		Tick:          12345,
+		InitialTick:   10000,
+		TickIntervals: []*domain.TickInterval{interval1, interval2},
 	}
 
 	return status, nil
@@ -106,6 +107,12 @@ func (f *FakeArchiveClient) GetStatus(_ context.Context) (*archiver.Status, erro
 type FakeDataStore struct {
 	tick        uint32
 	skippedTick uint32
+	status      *domain.Status
+}
+
+func (f *FakeDataStore) SetSourceStatus(status *domain.Status) error {
+	f.status = status
+	return nil
 }
 
 func (f *FakeDataStore) AddSkippedTick(tick uint32) error {
@@ -417,4 +424,22 @@ func TestProcessor_SyncAll_GivenErrorWithMultipleWorkers_ThenLastProcessedTickIs
 	err = processor.sync()
 	assert.Error(t, err)
 	assert.Equal(t, 660, int(dataStore.tick)) // last batch is from 661-670
+}
+
+func TestProcessor_Sync_GivenNewEpoch_ThenUpdateStatus(t *testing.T) {
+	archiveClient := &FakeArchiveClient{}
+	elasticClient := &FakeElasticClient{}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTickData:  true,
+		NumMaxWorkers: 1,
+	})
+
+	status, err := archiveClient.GetStatus(nil)
+	require.NoError(t, err)
+
+	err = processor.sync()
+	require.NoError(t, err)
+	assert.Equal(t, 1000, int(dataStore.tick))
+	assert.Equal(t, status, dataStore.status) // status stored
 }

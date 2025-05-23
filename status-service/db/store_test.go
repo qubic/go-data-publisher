@@ -1,18 +1,20 @@
 package db
 
 import (
+	"github.com/qubic/status-service/domain"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 )
 
 func TestStore_SetAndGetLastProcessedTick(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "processor_store_test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
 	store, err := NewPebbleStore(tempDir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer store.Close()
 
 	var tick uint32 = 123
@@ -26,11 +28,11 @@ func TestStore_SetAndGetLastProcessedTick(t *testing.T) {
 
 func TestStore_GetLastProcessedTickNotSet(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "processor_store_test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
 	store, err := NewPebbleStore(tempDir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer store.Close()
 
 	_, err = store.GetLastProcessedTick()
@@ -40,11 +42,11 @@ func TestStore_GetLastProcessedTickNotSet(t *testing.T) {
 
 func TestStore_UpdateLastProcessedTick(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "processor_store_test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
 	store, err := NewPebbleStore(tempDir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer store.Close()
 
 	var initialTick uint32 = 456
@@ -67,11 +69,11 @@ func TestStore_UpdateLastProcessedTick(t *testing.T) {
 
 func TestPebbleStore_GetSkippedTicks(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "processor_store_test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
 	store, err := NewPebbleStore(tempDir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer store.Close()
 
 	ticks, err := store.GetSkippedTicks()
@@ -82,11 +84,11 @@ func TestPebbleStore_GetSkippedTicks(t *testing.T) {
 
 func TestStore_AddSkippedTick(t *testing.T) {
 	tempDir, err := os.MkdirTemp("", "processor_store_test")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
 	store, err := NewPebbleStore(tempDir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer store.Close()
 
 	assert.NoError(t, store.AddSkippedTick(12345))
@@ -98,4 +100,48 @@ func TestStore_AddSkippedTick(t *testing.T) {
 	assert.Contains(t, skippedTicks, uint32(12345))
 	assert.Contains(t, skippedTicks, uint32(123456))
 	assert.NotContains(t, skippedTicks, uint32(666))
+}
+
+func TestStore_SetAndGetProcessingStatus(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "processor_store_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	store, err := NewPebbleStore(tempDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	status := &domain.Status{
+		Epoch:       43,
+		Tick:        42,
+		InitialTick: 41,
+		TickIntervals: []*domain.TickInterval{
+			{
+				Epoch: 1,
+				From:  100,
+				To:    200,
+			},
+		},
+	}
+
+	err = store.SetSourceStatus(status)
+	require.NoError(t, err)
+
+	retrievedStatus, err := store.GetSourceStatus()
+	require.NoError(t, err)
+	assert.Equal(t, status, retrievedStatus)
+}
+
+func TestStore_GetProcessingStatus_GivenNone_thenError(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "processor_store_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	store, err := NewPebbleStore(tempDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	_, err = store.GetSourceStatus()
+	require.Error(t, err)
+
 }

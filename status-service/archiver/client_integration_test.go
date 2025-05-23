@@ -22,8 +22,8 @@ func TestArchiverClient_getStatus(t *testing.T) {
 
 	log.Printf("Status: %+v", status)
 	assert.NotNil(t, status)
-	assert.Greater(t, int(status.LatestTick), 20000000)
-	assert.Greater(t, int(status.LatestEpoch), 150)
+	assert.Greater(t, int(status.Tick), 20000000)
+	assert.Greater(t, int(status.Epoch), 150)
 	assert.NotEmpty(t, status.TickIntervals)
 }
 
