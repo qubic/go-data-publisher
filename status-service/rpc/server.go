@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -33,6 +34,7 @@ type StatusServiceServer struct {
 	sp                  StatusProvider
 	cachedTickIntervals *protobuf.GetTickIntervalsResponse
 	cacheUpdated        time.Time
+	mu                  sync.Mutex
 }
 
 func NewStatusServiceServer(listenAddrGRPC string, listenAddrHTTP string, sp StatusProvider) *StatusServiceServer {
@@ -67,45 +69,57 @@ func (s *StatusServiceServer) GetHealthCheck(context.Context, *emptypb.Empty) (*
 }
 
 func (s *StatusServiceServer) GetTickIntervals(context.Context, *emptypb.Empty) (*protobuf.GetTickIntervalsResponse, error) {
-	if s.cachedTickIntervals == nil || s.cacheUpdated.Before(time.Now().Add(-1*time.Minute)) {
+	// cache because this method is called very often and does some computations
+	s.mu.Lock() // lock so that we do not get multiple threads inside the `if`
+	if s.cachedTickIntervals == nil || s.cacheUpdated.Before(time.Now().Add(-1*time.Second)) {
+		// refresh cache
 		response, err := createTickIntervalResponse(s.sp)
 		if err != nil {
+			s.mu.Unlock()
 			return nil, err
 		}
 		s.cachedTickIntervals = response
 		s.cacheUpdated = time.Now()
 	}
+	s.mu.Unlock()
 
+	// default case
 	return s.cachedTickIntervals, nil
 }
 
 func createTickIntervalResponse(sp StatusProvider) (*protobuf.GetTickIntervalsResponse, error) {
-	st, err := sp.GetSourceStatus()
+	sourceStatus, err := sp.GetSourceStatus()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "getting status information: %v", err)
 	}
+
+	lastProcessedTick, err := sp.GetLastProcessedTick()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "getting last processed tick: %v", err)
+	}
+
 	// we don't show the last interval as the to tick might not be up to date
 	// we take the initial tick from the last interval as there might be multiple intervals in the last epoch
-	var initialTick uint32
-	var intervals []*protobuf.TickInterval
-	lastIndex := len(st.TickIntervals) - 1
-	for i, interval := range st.TickIntervals {
-		if i < lastIndex { // skip last interval
+	intervalsCount := len(sourceStatus.TickIntervals)
+	intervals := make([]*protobuf.TickInterval, 0, intervalsCount)
+	for i, interval := range sourceStatus.TickIntervals {
+		if i < intervalsCount-1 {
 			intervals = append(intervals, &protobuf.TickInterval{
 				Epoch:     interval.Epoch,
 				FirstTick: interval.From,
 				LastTick:  interval.To,
 			})
-		} else {
-			initialTick = interval.From
+		} else { // last interval
+			intervals = append(intervals, &protobuf.TickInterval{
+				Epoch:     interval.Epoch,
+				FirstTick: interval.From,
+				LastTick:  lastProcessedTick, // fix last interval
+			})
 		}
 	}
-	response := &protobuf.GetTickIntervalsResponse{
-		CurrentEpoch:      st.Epoch,
-		CurrentFirstTick:  max(initialTick, st.InitialTick),
-		PreviousIntervals: intervals,
-	}
-	return response, nil
+	return &protobuf.GetTickIntervalsResponse{
+		Intervals: intervals,
+	}, nil
 }
 
 func (s *StatusServiceServer) Start(errChan chan error) error {

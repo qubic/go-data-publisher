@@ -25,9 +25,7 @@ message TickInterval {
 }
 
 message GetTickIntervalsResponse {
-  uint32 current_epoch = 1;
-  uint32 current_first_tick = 2;
-  repeated TickInterval previous_intervals = 3;
+  repeated TickInterval intervals = 1;
 }
 
 service StatusService {
