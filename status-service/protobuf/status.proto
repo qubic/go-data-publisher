@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package status.service.pb;
 
-option go_package = "github.com/qubic/status-service/protobuf/";
+option go_package = "github.com/qubic/go-data-publisher/status-service/protobuf/";
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
 

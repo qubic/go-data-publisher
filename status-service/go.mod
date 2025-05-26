@@ -1,4 +1,4 @@
-module github.com/qubic/status-service
+module github.com/qubic/go-data-publisher/status-service
 
 go 1.24.0
 

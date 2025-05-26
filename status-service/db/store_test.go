@@ -1,7 +1,7 @@
 package db
 
 import (
-	"github.com/qubic/status-service/domain"
+	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"os"

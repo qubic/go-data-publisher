@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/qubic/go-archiver/protobuff"
-	"github.com/qubic/status-service/domain"
+	"github.com/qubic/go-data-publisher/status-service/domain"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
