@@ -9,6 +9,7 @@ require (
 	github.com/cockroachdb/pebble v1.1.5
 	github.com/elastic/go-elasticsearch/v8 v8.18.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0
+	github.com/jellydator/ttlcache/v3 v3.3.0
 	github.com/joho/godotenv v1.5.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0

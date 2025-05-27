@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ardanlabs/conf"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/jellydator/ttlcache/v3"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/go-data-publisher/status-service/archiver"
@@ -12,6 +13,7 @@ import (
 	"github.com/qubic/go-data-publisher/status-service/metrics"
 	"github.com/qubic/go-data-publisher/status-service/rpc"
 	"github.com/qubic/go-data-publisher/status-service/sync"
+	"google.golang.org/protobuf/proto"
 	"log"
 	"net/http"
 	"os"
@@ -128,6 +130,7 @@ func run() error {
 	})
 	if cfg.Sync.Transactions || cfg.Sync.TickData {
 		go processor.Synchronize()
+		log.Println("main: starting to process")
 	} else {
 		log.Println("[WARN] main: sync disabled")
 	}
@@ -136,13 +139,21 @@ func run() error {
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
 	// status and metrics endpoint
+	var messageCache = ttlcache.New[string, proto.Message](
+		ttlcache.WithTTL[string, proto.Message](time.Second),
+		ttlcache.WithDisableTouchOnHit[string, proto.Message](), // don't refresh ttl upon getting the item from cache
+	)
+	go messageCache.Start()
+	defer messageCache.Stop()
+	server := rpc.NewStatusServiceServer(cfg.Server.GrpcHost, cfg.Server.HttpHost, store, messageCache)
 	serverError := make(chan error, 1)
-	server := rpc.NewStatusServiceServer(cfg.Server.GrpcHost, cfg.Server.HttpHost, store)
 	err = server.Start(serverError)
 	if err != nil {
 		return fmt.Errorf("starting server: %w", err)
 	}
+	log.Println("main: started web server")
 
+	// metrics endpoint
 	metricsServerError := make(chan error, 1)
 	go func() {
 		log.Printf("main: Starting metrics server on addr [%s].", cfg.Server.MetricsHttpHost)

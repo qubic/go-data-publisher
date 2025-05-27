@@ -70,6 +70,12 @@ service StatusService {
     };
   }
 
+  rpc GetArchiverStatus(google.protobuf.Empty) returns (GetArchiverStatusResponse) {
+    option (google.api.http) = {
+      get: "/v1/archiverStatus"
+    };
+  }
+
   rpc GetSkippedTicks(google.protobuf.Empty) returns (GetSkippedTicksResponse) {
     option (google.api.http) = {
       get: "/v1/skippedTicks"
