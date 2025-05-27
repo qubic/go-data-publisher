@@ -80,27 +80,33 @@ func (f *FakeArchiveClient) GetTickData(_ context.Context, tickNumber uint32) (*
 	}, nil
 }
 
-func (f *FakeArchiveClient) GetStatus(_ context.Context) (*domain.Status, error) {
-
-	interval1 := &domain.TickInterval{
-		Epoch: 100,
-		From:  1,
-		To:    1000,
+func (f *FakeArchiveClient) GetStatus(context.Context) (*protobuff.GetStatusResponse, error) {
+	status := &protobuff.GetStatusResponse{
+		LastProcessedTick: &protobuff.ProcessedTick{
+			TickNumber: 12345,
+			Epoch:      123,
+		},
+		ProcessedTickIntervalsPerEpoch: []*protobuff.ProcessedTickIntervalsPerEpoch{
+			{
+				Epoch: 100,
+				Intervals: []*protobuff.ProcessedTickInterval{
+					{
+						InitialProcessedTick: 1,
+						LastProcessedTick:    1000,
+					},
+				},
+			},
+			{
+				Epoch: 123,
+				Intervals: []*protobuff.ProcessedTickInterval{
+					{
+						InitialProcessedTick: 10000,
+						LastProcessedTick:    123456,
+					},
+				},
+			},
+		},
 	}
-
-	interval2 := &domain.TickInterval{
-		Epoch: 123,
-		From:  10000,
-		To:    123456,
-	}
-
-	status := &domain.Status{
-		Epoch:         123,
-		Tick:          12345,
-		InitialTick:   10000,
-		TickIntervals: []*domain.TickInterval{interval1, interval2},
-	}
-
 	return status, nil
 }
 
@@ -435,11 +441,15 @@ func TestProcessor_Sync_GivenNewEpoch_ThenUpdateStatus(t *testing.T) {
 		NumMaxWorkers: 1,
 	})
 
-	status, err := archiveClient.GetStatus(nil)
+	archiverStatus, err := archiveClient.GetStatus(nil)
+	require.NoError(t, err)
+
+	domainStatus, err := domain.ConvertFromArchiverStatus(archiverStatus)
 	require.NoError(t, err)
 
 	err = processor.sync()
 	require.NoError(t, err)
 	assert.Equal(t, 1000, int(dataStore.tick))
-	assert.Equal(t, status, dataStore.status) // status stored
+
+	assert.Equal(t, domainStatus, dataStore.status) // status stored
 }

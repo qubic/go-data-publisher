@@ -17,7 +17,7 @@ import (
 )
 
 type ArchiveClient interface {
-	GetStatus(ctx context.Context) (*domain.Status, error)
+	GetStatus(ctx context.Context) (*protobuff.GetStatusResponse, error)
 	GetTickData(ctx context.Context, tickNumber uint32) (*protobuff.TickData, error)
 }
 
@@ -84,15 +84,23 @@ func (p *TickProcessor) Synchronize() {
 
 func (p *TickProcessor) sync() error {
 	ctx := context.Background()
-	status, err := p.archiveClient.GetStatus(ctx)
+	archiverStatus, err := p.archiveClient.GetStatus(ctx)
 	if err != nil {
 		return errors.Wrap(err, "get archive status")
 	}
+
+	// TODO cache archiver status
+
+	status, err := domain.ConvertFromArchiverStatus(archiverStatus)
+	if err != nil {
+		return errors.Wrap(err, "convert archive status")
+	}
+
 	p.processingMetrics.SetSourceTick(status.Epoch, status.Tick)
 
 	// processing status is needed by rpc clients
 	// we update on every sync. no performance issue, see sleep.
-	err = p.dataStore.SetSourceStatus(status)
+	err = p.dataStore.SetSourceStatus(status) // TODO replace with cache
 	if err != nil {
 		return errors.Wrapf(err, "updating status: %v", status)
 	}
