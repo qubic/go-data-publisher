@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/qubic/go-archiver/protobuff"
+	archproto "github.com/qubic/go-archiver/protobuff"
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/elastic"
 	"github.com/qubic/go-data-publisher/status-service/metrics"
@@ -17,8 +17,8 @@ import (
 )
 
 type ArchiveClient interface {
-	GetStatus(ctx context.Context) (*protobuff.GetStatusResponse, error)
-	GetTickData(ctx context.Context, tickNumber uint32) (*protobuff.TickData, error)
+	GetStatus(ctx context.Context) (*archproto.GetStatusResponse, error)
+	GetTickData(ctx context.Context, tickNumber uint32) (*archproto.TickData, error)
 }
 
 type SearchClient interface {
@@ -30,6 +30,7 @@ type DataStore interface {
 	GetLastProcessedTick() (tick uint32, err error)
 	SetLastProcessedTick(tick uint32) error
 	SetSourceStatus(status *domain.Status) error
+	SetArchiverStatus(status *archproto.GetStatusResponse) error
 	AddSkippedTick(tick uint32) error
 }
 
@@ -89,21 +90,22 @@ func (p *TickProcessor) sync() error {
 		return errors.Wrap(err, "get archive status")
 	}
 
-	// TODO cache archiver status
+	err = p.dataStore.SetArchiverStatus(archiverStatus) // store for rpc clients
+	if err != nil {
+		return errors.Wrapf(err, "setting archiver status: %v", archiverStatus)
+	}
 
 	status, err := domain.ConvertFromArchiverStatus(archiverStatus)
 	if err != nil {
 		return errors.Wrap(err, "convert archive status")
 	}
 
-	p.processingMetrics.SetSourceTick(status.Epoch, status.Tick)
-
-	// processing status is needed by rpc clients
-	// we update on every sync. no performance issue, see sleep.
-	err = p.dataStore.SetSourceStatus(status) // TODO replace with cache
+	err = p.dataStore.SetSourceStatus(status) // store for rpc clients
 	if err != nil {
-		return errors.Wrapf(err, "updating status: %v", status)
+		return errors.Wrapf(err, "setting status: %v", status)
 	}
+
+	p.processingMetrics.SetSourceTick(status.Epoch, status.Tick)
 
 	// wait a bit to allow latest tick to sync
 	time.Sleep(p.elasticQueryDelay)
@@ -226,7 +228,7 @@ func (p *TickProcessor) handleTickMismatch(tick uint32) error {
 	}
 }
 
-func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, archiveTd *protobuff.TickData) (bool, error) {
+func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, archiveTd *archproto.TickData) (bool, error) {
 	elasticTd, err := p.searchClient.GetTickData(ctx, tick)
 	if err != nil {
 		return false, errors.Wrap(err, "get elastic tick data")
@@ -257,7 +259,7 @@ func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, archive
 	return match, nil
 }
 
-func (p *TickProcessor) verifyTickTransactions(ctx context.Context, tick uint32, tickData *protobuff.TickData) (bool, error) {
+func (p *TickProcessor) verifyTickTransactions(ctx context.Context, tick uint32, tickData *archproto.TickData) (bool, error) {
 	// query elastic for transactions
 	elasticTransactions, err := p.searchClient.GetTransactionHashes(ctx, tick)
 	if err != nil {
@@ -302,7 +304,7 @@ func elasticDebugString(td *elastic.TickData) string {
 	return fmt.Sprintf("tick %d, epoch %d, signature %s", td.TickNumber, td.Epoch, td.Signature)
 }
 
-func archiveDebugString(td *protobuff.TickData) string {
+func archiveDebugString(td *archproto.TickData) string {
 	return fmt.Sprintf("tick %d, epoch %d, signature hex %s", td.TickNumber, td.Epoch, td.SignatureHex)
 }
 

@@ -111,9 +111,15 @@ func (f *FakeArchiveClient) GetStatus(context.Context) (*protobuff.GetStatusResp
 }
 
 type FakeDataStore struct {
-	tick        uint32
-	skippedTick uint32
-	status      *domain.Status
+	tick           uint32
+	skippedTick    uint32
+	status         *domain.Status
+	archiverStatus *protobuff.GetStatusResponse
+}
+
+func (f *FakeDataStore) SetArchiverStatus(status *protobuff.GetStatusResponse) error {
+	f.archiverStatus = status
+	return nil
 }
 
 func (f *FakeDataStore) SetSourceStatus(status *domain.Status) error {
@@ -432,7 +438,7 @@ func TestProcessor_SyncAll_GivenErrorWithMultipleWorkers_ThenLastProcessedTickIs
 	assert.Equal(t, 660, int(dataStore.tick)) // last batch is from 661-670
 }
 
-func TestProcessor_Sync_GivenNewEpoch_ThenUpdateStatus(t *testing.T) {
+func TestProcessor_Sync_GivenNewEpoch_ThenSetStatus(t *testing.T) {
 	archiveClient := &FakeArchiveClient{}
 	elasticClient := &FakeElasticClient{}
 	dataStore := &FakeDataStore{}
@@ -452,4 +458,23 @@ func TestProcessor_Sync_GivenNewEpoch_ThenUpdateStatus(t *testing.T) {
 	assert.Equal(t, 1000, int(dataStore.tick))
 
 	assert.Equal(t, domainStatus, dataStore.status) // status stored
+}
+
+func TestProcessor_Sync_GivenNewEpoch_ThenSetArchiverStatus(t *testing.T) {
+	archiveClient := &FakeArchiveClient{}
+	elasticClient := &FakeElasticClient{}
+	dataStore := &FakeDataStore{}
+	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
+		SyncTickData:  true,
+		NumMaxWorkers: 1,
+	})
+
+	archiverStatus, err := archiveClient.GetStatus(nil)
+	require.NoError(t, err)
+
+	err = processor.sync()
+	require.NoError(t, err)
+	assert.Equal(t, 1000, int(dataStore.tick))
+
+	assert.Equal(t, archiverStatus, dataStore.archiverStatus) // status stored
 }
