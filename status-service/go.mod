@@ -8,13 +8,16 @@ require (
 	github.com/ardanlabs/conf v1.5.0
 	github.com/cockroachdb/pebble v1.1.5
 	github.com/elastic/go-elasticsearch/v8 v8.18.0
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0
 	github.com/joho/godotenv v1.5.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
 	github.com/qubic/go-archiver v0.10.4
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/sync v0.10.0
+	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1
 	google.golang.org/grpc v1.67.1
+	google.golang.org/protobuf v1.36.5
 )
 
 require (
@@ -33,7 +36,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
@@ -50,7 +52,5 @@ require (
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.21.0 // indirect
-	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
-	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

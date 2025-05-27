@@ -23,6 +23,7 @@ type StatusProvider interface {
 	GetLastProcessedTick() (tick uint32, err error)
 	GetSkippedTicks() ([]uint32, error)
 	GetSourceStatus() (*domain.Status, error)
+	GetArchiverStatus() (*protobuf.GetArchiverStatusResponse, error)
 }
 
 var _ protobuf.StatusServiceServer = &StatusServiceServer{}
