@@ -68,7 +68,11 @@ func (s *StatusCache) GetArchiverStatus() (*protobuf.GetArchiverStatusResponse, 
 
 	item := s.archiverStatusCache.Get(archiverStatusKey)
 	if item == nil {
-		response, err := createArchiverStatusResponse(s.statusProvider)
+		tickIntervals, err := s.GetTickIntervals()
+		if err != nil {
+			return nil, errors.Wrap(err, "getting tick intervals")
+		}
+		response, err := createArchiverStatusResponse(s.statusProvider, tickIntervals)
 		if err != nil {
 			return nil, errors.Wrap(err, "creating archiver status")
 		}
@@ -77,11 +81,10 @@ func (s *StatusCache) GetArchiverStatus() (*protobuf.GetArchiverStatusResponse, 
 	} else {
 		return item.Value(), nil
 	}
-
 }
 
-func createArchiverStatusResponse(sp StatusProvider) (*protobuf.GetArchiverStatusResponse, error) {
-	lastProcessedTick, err := sp.GetLastProcessedTick()
+func createArchiverStatusResponse(sp StatusProvider, tickIntervals *protobuf.GetTickIntervalsResponse) (*protobuf.GetArchiverStatusResponse, error) {
+	tick, err := sp.GetLastProcessedTick()
 	if err != nil {
 		return nil, errors.Wrap(err, "getting last processed tick")
 	}
@@ -90,12 +93,76 @@ func createArchiverStatusResponse(sp StatusProvider) (*protobuf.GetArchiverStatu
 		return nil, errors.Wrap(err, "getting archiver status")
 	}
 
-	// replace last processed tick (keep intervals as is)
-	epoch := findEpoch(archiverStatus.ProcessedTickIntervalsPerEpoch, lastProcessedTick)
-	archiverStatus.LastProcessedTick.TickNumber = lastProcessedTick
-	archiverStatus.LastProcessedTick.Epoch = epoch
+	// get epoch for current tick (needed for archiver data structure)
+	epoch := findEpoch(archiverStatus.ProcessedTickIntervalsPerEpoch, tick)
 
-	return archiverStatus, nil
+	// remove lastProcessedTicksPerEpoch for later epochs
+	archiverStatus.LastProcessedTicksPerEpoch = removeFutureLastProcessedTicks(epoch, tick, archiverStatus.GetLastProcessedTicksPerEpoch())
+
+	// remove skipped ticks that are in the future
+	archiverStatus.SkippedTicks = removeFutureSkippedTicks(tick, archiverStatus.GetSkippedTicks())
+
+	// remove processed tick intervals that are in the future
+	var tickIntervalsPerEpochList []*protobuf.ProcessedTickIntervalsPerEpoch
+	tickIntervalsPerEpoch := &protobuf.ProcessedTickIntervalsPerEpoch{ // dummy
+		Epoch: 0,
+	}
+	for _, interval := range tickIntervals.GetIntervals() {
+		if interval.Epoch > tickIntervalsPerEpoch.Epoch { // create new epoch
+			tickIntervalsPerEpoch = &protobuf.ProcessedTickIntervalsPerEpoch{
+				Epoch:     interval.Epoch,
+				Intervals: []*protobuf.ProcessedTickInterval{},
+			}
+			tickIntervalsPerEpochList = append(tickIntervalsPerEpochList, tickIntervalsPerEpoch)
+		}
+		tickInterval := &protobuf.ProcessedTickInterval{
+			InitialProcessedTick: interval.FirstTick,
+			LastProcessedTick:    interval.LastTick,
+		}
+		tickIntervalsPerEpoch.Intervals = append(tickIntervalsPerEpoch.Intervals, tickInterval)
+	}
+
+	status := &protobuf.GetArchiverStatusResponse{
+		LastProcessedTick: &protobuf.ProcessedTick{
+			TickNumber: tick,
+			Epoch:      epoch,
+		},
+		ProcessedTickIntervalsPerEpoch: tickIntervalsPerEpochList,
+		LastProcessedTicksPerEpoch:     removeFutureLastProcessedTicks(epoch, tick, archiverStatus.GetLastProcessedTicksPerEpoch()),
+		SkippedTicks:                   removeFutureSkippedTicks(tick, archiverStatus.GetSkippedTicks()),
+		EmptyTicksPerEpoch:             removeFutureEmptyTicks(epoch, archiverStatus.GetEmptyTicksPerEpoch()),
+	}
+
+	return status, nil
+}
+
+func removeFutureEmptyTicks(epoch uint32, emptyTicks map[uint32]uint32) map[uint32]uint32 {
+	for key := range emptyTicks {
+		if key > epoch {
+			delete(emptyTicks, key)
+		}
+	}
+	return emptyTicks
+}
+
+func removeFutureLastProcessedTicks(epoch, tick uint32, lastProcessedTicks map[uint32]uint32) map[uint32]uint32 {
+	for key := range lastProcessedTicks {
+		if key > epoch {
+			delete(lastProcessedTicks, key)
+		} else if key == epoch {
+			lastProcessedTicks[epoch] = tick
+		}
+	}
+	return lastProcessedTicks
+}
+
+func removeFutureSkippedTicks(tick uint32, skippedTickIntervals []*protobuf.SkippedTicksInterval) []*protobuf.SkippedTicksInterval {
+	for index, skipped := range skippedTickIntervals {
+		if skipped.StartTick > tick {
+			return skippedTickIntervals[:index]
+		}
+	}
+	return skippedTickIntervals
 }
 
 func findEpoch(allEpochsIntervals []*protobuf.ProcessedTickIntervalsPerEpoch, tick uint32) uint32 {

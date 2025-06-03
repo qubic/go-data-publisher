@@ -93,6 +93,9 @@ func TestStatusCache_GetTickIntervals(t *testing.T) {
 }
 
 func TestStatusCache_GetArchiverStatus(t *testing.T) {
+	tickIntervalsCache := createTickIntervalsCache()
+	defer tickIntervalsCache.Stop()
+
 	archiverStatusCache := createArchiverStatusCache()
 	defer archiverStatusCache.Stop()
 
@@ -100,7 +103,7 @@ func TestStatusCache_GetArchiverStatus(t *testing.T) {
 		lastProcessedTick: 12345,
 	}
 
-	statusCache := NewStatusCache(statusProvider, archiverStatusCache, nil)
+	statusCache := NewStatusCache(statusProvider, archiverStatusCache, tickIntervalsCache)
 	status, err := statusCache.GetArchiverStatus()
 	require.NoError(t, err)
 	require.NotNil(t, status)
@@ -111,7 +114,7 @@ func TestStatusCache_GetArchiverStatus(t *testing.T) {
 	assert.Equal(t, 1, int(status.ProcessedTickIntervalsPerEpoch[0].Intervals[0].InitialProcessedTick))
 	assert.Equal(t, 1000, int(status.ProcessedTickIntervalsPerEpoch[0].Intervals[0].LastProcessedTick))
 	assert.Equal(t, 10000, int(status.ProcessedTickIntervalsPerEpoch[1].Intervals[0].InitialProcessedTick))
-	assert.Equal(t, 123456, int(status.ProcessedTickIntervalsPerEpoch[1].Intervals[0].LastProcessedTick))
+	assert.Equal(t, 12345, int(status.ProcessedTickIntervalsPerEpoch[1].Intervals[0].LastProcessedTick)) // update tick here
 
 }
 
@@ -127,12 +130,16 @@ func TestStatusCache_GetTickIntervals_givenLastTickInFirstInterval_thenReturnOnl
 	status, err := statusCache.GetTickIntervals()
 	require.NoError(t, err)
 	require.NotNil(t, status)
+
 	assert.Len(t, status.Intervals, 1)
 	assert.Equal(t, 1, int(status.Intervals[0].FirstTick))
 	assert.Equal(t, 666, int(status.Intervals[0].LastTick))
 }
 
 func TestStatusCache_GetArchiverStatus_givenLastTickInFirstInterval_thenReturnCorrectLatestTickEpoch(t *testing.T) {
+	tickIntervalsCache := createTickIntervalsCache()
+	defer tickIntervalsCache.Stop()
+
 	archiverStatusCache := createArchiverStatusCache()
 	defer archiverStatusCache.Stop()
 
@@ -140,17 +147,15 @@ func TestStatusCache_GetArchiverStatus_givenLastTickInFirstInterval_thenReturnCo
 		lastProcessedTick: 666,
 	}
 
-	statusCache := NewStatusCache(statusProvider, archiverStatusCache, nil)
+	statusCache := NewStatusCache(statusProvider, archiverStatusCache, tickIntervalsCache)
 	status, err := statusCache.GetArchiverStatus()
 	require.NoError(t, err)
 	assert.Equal(t, 666, int(status.LastProcessedTick.TickNumber))
 	assert.Equal(t, 100, int(status.LastProcessedTick.Epoch))
 
-	assert.Len(t, status.ProcessedTickIntervalsPerEpoch, 2)
+	assert.Len(t, status.ProcessedTickIntervalsPerEpoch, 1) // remove last epoch
 	assert.Equal(t, 1, int(status.ProcessedTickIntervalsPerEpoch[0].Intervals[0].InitialProcessedTick))
-	assert.Equal(t, 1000, int(status.ProcessedTickIntervalsPerEpoch[0].Intervals[0].LastProcessedTick))
-	assert.Equal(t, 10000, int(status.ProcessedTickIntervalsPerEpoch[1].Intervals[0].InitialProcessedTick))
-	assert.Equal(t, 123456, int(status.ProcessedTickIntervalsPerEpoch[1].Intervals[0].LastProcessedTick))
+	assert.Equal(t, 666, int(status.ProcessedTickIntervalsPerEpoch[0].Intervals[0].LastProcessedTick)) // replace with current tick
 
 }
 

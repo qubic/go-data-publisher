@@ -64,7 +64,7 @@ func (ps *PebbleStore) SetArchiverStatus(status *archiverproto.GetStatusResponse
 }
 
 func (ps *PebbleStore) GetArchiverStatus() (*protobuf.GetArchiverStatusResponse, error) {
-	var target protobuf.GetArchiverStatusResponse
+	var target protobuf.GetArchiverStatusResponse // ATTENTION: other data type than the saved one
 	err := ps.loadProto(archiverStatusKey, &target)
 	if err != nil {
 		return nil, errors.Wrap(err, "loading archiver status")
