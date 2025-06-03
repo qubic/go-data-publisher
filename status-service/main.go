@@ -11,9 +11,9 @@ import (
 	"github.com/qubic/go-data-publisher/status-service/db"
 	"github.com/qubic/go-data-publisher/status-service/elastic"
 	"github.com/qubic/go-data-publisher/status-service/metrics"
+	"github.com/qubic/go-data-publisher/status-service/protobuf"
 	"github.com/qubic/go-data-publisher/status-service/rpc"
 	"github.com/qubic/go-data-publisher/status-service/sync"
-	"google.golang.org/protobuf/proto"
 	"log"
 	"net/http"
 	"os"
@@ -138,14 +138,22 @@ func run() error {
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
-	// status and metrics endpoint
-	var messageCache = ttlcache.New[string, proto.Message](
-		ttlcache.WithTTL[string, proto.Message](time.Second),
-		ttlcache.WithDisableTouchOnHit[string, proto.Message](), // don't refresh ttl upon getting the item from cache
+	var archiverStatusCache = ttlcache.New[string, *protobuf.GetArchiverStatusResponse](
+		ttlcache.WithTTL[string, *protobuf.GetArchiverStatusResponse](time.Second),
+		ttlcache.WithDisableTouchOnHit[string, *protobuf.GetArchiverStatusResponse](), // don't refresh ttl upon getting the item from cache
 	)
-	go messageCache.Start()
-	defer messageCache.Stop()
-	server := rpc.NewStatusServiceServer(cfg.Server.GrpcHost, cfg.Server.HttpHost, store, messageCache)
+	go archiverStatusCache.Start()
+	defer archiverStatusCache.Stop()
+
+	var tickIntervalsCache = ttlcache.New[string, *protobuf.GetTickIntervalsResponse](
+		ttlcache.WithTTL[string, *protobuf.GetTickIntervalsResponse](time.Second),
+		ttlcache.WithDisableTouchOnHit[string, *protobuf.GetTickIntervalsResponse](), // don't refresh ttl upon getting the item from cache
+	)
+	go tickIntervalsCache.Start()
+	defer tickIntervalsCache.Stop()
+
+	statusCache := rpc.NewStatusCache(store, archiverStatusCache, tickIntervalsCache)
+	server := rpc.NewStatusServiceServer(cfg.Server.GrpcHost, cfg.Server.HttpHost, statusCache)
 	serverError := make(chan error, 1)
 	err = server.Start(serverError)
 	if err != nil {

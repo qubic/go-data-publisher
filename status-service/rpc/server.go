@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
-	"github.com/jellydator/ttlcache/v3"
-	"github.com/pkg/errors"
-	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/protobuf"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -14,19 +11,10 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"net"
 	"net/http"
-	"sync"
 )
-
-type StatusProvider interface {
-	GetLastProcessedTick() (tick uint32, err error)
-	GetSkippedTicks() ([]uint32, error)
-	GetSourceStatus() (*domain.Status, error)
-	GetArchiverStatus() (*protobuf.GetArchiverStatusResponse, error)
-}
 
 var _ protobuf.StatusServiceServer = &StatusServiceServer{}
 
@@ -35,25 +23,21 @@ const archiverStatusKey = "archiver_status"
 
 type StatusServiceServer struct {
 	protobuf.UnimplementedStatusServiceServer
-	listenAddrGRPC     string
-	listenAddrHTTP     string
-	sp                 StatusProvider
-	messageCache       *ttlcache.Cache[string, proto.Message]
-	tickIntervalLock   sync.Mutex
-	archiverStatusLock sync.Mutex
+	listenAddrGRPC string
+	listenAddrHTTP string
+	statusCache    *StatusCache
 }
 
-func NewStatusServiceServer(listenAddrGRPC string, listenAddrHTTP string, sp StatusProvider, messageCache *ttlcache.Cache[string, proto.Message]) *StatusServiceServer {
+func NewStatusServiceServer(listenAddrGRPC string, listenAddrHTTP string, statusCache *StatusCache) *StatusServiceServer {
 	return &StatusServiceServer{
 		listenAddrGRPC: listenAddrGRPC,
 		listenAddrHTTP: listenAddrHTTP,
-		sp:             sp,
-		messageCache:   messageCache,
+		statusCache:    statusCache,
 	}
 }
 
 func (s *StatusServiceServer) GetStatus(context.Context, *emptypb.Empty) (*protobuf.GetStatusResponse, error) {
-	lastProcessedTick, err := s.sp.GetLastProcessedTick()
+	lastProcessedTick, err := s.statusCache.GetLastProcessedTick()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "getting last processed tick: %v", err)
 	}
@@ -61,106 +45,32 @@ func (s *StatusServiceServer) GetStatus(context.Context, *emptypb.Empty) (*proto
 	return &protobuf.GetStatusResponse{LastProcessedTick: lastProcessedTick}, nil
 }
 
-func (s *StatusServiceServer) GetHealthCheck(context.Context, *emptypb.Empty) (*protobuf.GetHealthCheckResponse, error) {
-	return &protobuf.GetHealthCheckResponse{Status: "UP"}, nil
-}
-
 func (s *StatusServiceServer) GetArchiverStatus(context.Context, *emptypb.Empty) (*protobuf.GetArchiverStatusResponse, error) {
-	var response *protobuf.GetArchiverStatusResponse
-	s.archiverStatusLock.Lock() // lock so that we do not get multiple threads inside the `if`
-	item := s.messageCache.Get(archiverStatusKey)
-	if item == nil {
-		var err error
-		response, err = createArchiverStatusResponse(s.sp)
-		if err != nil {
-			s.archiverStatusLock.Unlock()
-			return nil, status.Errorf(codes.Internal, "creating archiver status: %v", err)
-		}
-		s.messageCache.Set(archiverStatusKey, response, ttlcache.DefaultTTL)
-	} else {
-		response = item.Value().(*protobuf.GetArchiverStatusResponse)
+	response, err := s.statusCache.GetArchiverStatus()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "getting archiver status: %v", err)
 	}
-	s.archiverStatusLock.Unlock()
 	return response, nil
 }
 
 func (s *StatusServiceServer) GetTickIntervals(context.Context, *emptypb.Empty) (*protobuf.GetTickIntervalsResponse, error) {
-	var response *protobuf.GetTickIntervalsResponse
-	s.tickIntervalLock.Lock() // lock so that we do not get multiple threads inside the `if`
-	item := s.messageCache.Get(tickIntervalsKey)
-	if item == nil {
-		var err error
-		response, err = createTickIntervalResponse(s.sp)
-		if err != nil {
-			s.tickIntervalLock.Unlock()
-			return nil, status.Errorf(codes.Internal, "creating tick interval response: %v", err)
-		}
-		s.messageCache.Set(tickIntervalsKey, response, ttlcache.DefaultTTL)
-	} else {
-		response = item.Value().(*protobuf.GetTickIntervalsResponse)
+	response, err := s.statusCache.GetTickIntervals()
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "getting tick intervalse: %v", err)
 	}
-	s.tickIntervalLock.Unlock()
 	return response, nil
 }
 
 func (s *StatusServiceServer) GetSkippedTicks(context.Context, *emptypb.Empty) (*protobuf.GetSkippedTicksResponse, error) {
-	ticks, err := s.sp.GetSkippedTicks()
+	ticks, err := s.statusCache.GetSkippedTicks()
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "calling provider to get skipped ticks: %v", err)
 	}
-
 	return &protobuf.GetSkippedTicksResponse{SkippedTicks: ticks}, nil
 }
 
-func createArchiverStatusResponse(sp StatusProvider) (*protobuf.GetArchiverStatusResponse, error) {
-	lastProcessedTick, err := sp.GetLastProcessedTick()
-	if err != nil {
-		return nil, errors.Wrap(err, "getting last processed tick")
-	}
-	archiverStatus, err := sp.GetArchiverStatus()
-	if err != nil {
-		return nil, errors.Wrap(err, "getting archiver status")
-	}
-	// replace last processed tick
-	archiverStatus.LastProcessedTick.TickNumber = lastProcessedTick
-	lastIntervals := archiverStatus.ProcessedTickIntervalsPerEpoch[len(archiverStatus.LastProcessedTicksPerEpoch)-1].Intervals
-	lastIntervals[len(lastIntervals)-1].LastProcessedTick = lastProcessedTick
-	return archiverStatus, nil
-}
-
-func createTickIntervalResponse(sp StatusProvider) (*protobuf.GetTickIntervalsResponse, error) {
-	sourceStatus, err := sp.GetSourceStatus()
-	if err != nil {
-		return nil, errors.Wrap(err, "getting source status")
-	}
-
-	lastProcessedTick, err := sp.GetLastProcessedTick()
-	if err != nil {
-		return nil, errors.Wrap(err, "getting last processed tick")
-	}
-
-	// we don't show the last interval as the to tick might not be up to date
-	// we take the initial tick from the last interval as there might be multiple intervals in the last epoch
-	intervalsCount := len(sourceStatus.TickIntervals)
-	intervals := make([]*protobuf.TickInterval, 0, intervalsCount)
-	for i, interval := range sourceStatus.TickIntervals {
-		if i < intervalsCount-1 {
-			intervals = append(intervals, &protobuf.TickInterval{
-				Epoch:     interval.Epoch,
-				FirstTick: interval.From,
-				LastTick:  interval.To,
-			})
-		} else { // last interval
-			intervals = append(intervals, &protobuf.TickInterval{
-				Epoch:     interval.Epoch,
-				FirstTick: interval.From,
-				LastTick:  lastProcessedTick, // fix last interval
-			})
-		}
-	}
-	return &protobuf.GetTickIntervalsResponse{
-		Intervals: intervals,
-	}, nil
+func (s *StatusServiceServer) GetHealthCheck(context.Context, *emptypb.Empty) (*protobuf.GetHealthCheckResponse, error) {
+	return &protobuf.GetHealthCheckResponse{Status: "UP"}, nil
 }
 
 func (s *StatusServiceServer) Start(errChan chan error) error {
