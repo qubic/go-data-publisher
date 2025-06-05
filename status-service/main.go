@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"github.com/ardanlabs/conf"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/jellydator/ttlcache/v3"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/go-data-publisher/status-service/archiver"
 	"github.com/qubic/go-data-publisher/status-service/db"
 	"github.com/qubic/go-data-publisher/status-service/elastic"
 	"github.com/qubic/go-data-publisher/status-service/metrics"
+	"github.com/qubic/go-data-publisher/status-service/protobuf"
 	"github.com/qubic/go-data-publisher/status-service/rpc"
 	"github.com/qubic/go-data-publisher/status-service/sync"
 	"log"
@@ -128,6 +130,7 @@ func run() error {
 	})
 	if cfg.Sync.Transactions || cfg.Sync.TickData {
 		go processor.Synchronize()
+		log.Println("main: starting to process")
 	} else {
 		log.Println("[WARN] main: sync disabled")
 	}
@@ -135,14 +138,30 @@ func run() error {
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
-	// status and metrics endpoint
+	var archiverStatusCache = ttlcache.New[string, *protobuf.GetArchiverStatusResponse](
+		ttlcache.WithTTL[string, *protobuf.GetArchiverStatusResponse](time.Second),
+		ttlcache.WithDisableTouchOnHit[string, *protobuf.GetArchiverStatusResponse](), // don't refresh ttl upon getting the item from cache
+	)
+	go archiverStatusCache.Start()
+	defer archiverStatusCache.Stop()
+
+	var tickIntervalsCache = ttlcache.New[string, *protobuf.GetTickIntervalsResponse](
+		ttlcache.WithTTL[string, *protobuf.GetTickIntervalsResponse](time.Second),
+		ttlcache.WithDisableTouchOnHit[string, *protobuf.GetTickIntervalsResponse](), // don't refresh ttl upon getting the item from cache
+	)
+	go tickIntervalsCache.Start()
+	defer tickIntervalsCache.Stop()
+
+	statusCache := rpc.NewStatusCache(store, archiverStatusCache, tickIntervalsCache)
+	server := rpc.NewStatusServiceServer(cfg.Server.GrpcHost, cfg.Server.HttpHost, statusCache)
 	serverError := make(chan error, 1)
-	server := rpc.NewStatusServiceServer(cfg.Server.GrpcHost, cfg.Server.HttpHost, store)
 	err = server.Start(serverError)
 	if err != nil {
 		return fmt.Errorf("starting server: %w", err)
 	}
+	log.Println("main: started web server")
 
+	// metrics endpoint
 	metricsServerError := make(chan error, 1)
 	go func() {
 		log.Printf("main: Starting metrics server on addr [%s].", cfg.Server.MetricsHttpHost)

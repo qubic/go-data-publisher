@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"github.com/cockroachdb/pebble"
 	"github.com/pkg/errors"
+	archiverproto "github.com/qubic/go-archiver/protobuff"
 	"github.com/qubic/go-data-publisher/status-service/domain"
+	"github.com/qubic/go-data-publisher/status-service/protobuf"
 	"github.com/qubic/go-data-publisher/status-service/util"
+	"google.golang.org/protobuf/proto"
 	"log"
 	"path/filepath"
 	"sort"
@@ -19,7 +22,8 @@ var ErrNotFound = errors.New("store resource not found")
 
 const lastProcessedTickKey = "lpt"
 const skippedTicksKey = "skipped"
-const processingStatus = "status"
+const processingStatusKey = "status"
+const archiverStatusKey = "archiverStatus"
 
 type PebbleStore struct {
 	db *pebble.DB
@@ -43,16 +47,29 @@ func (ps *PebbleStore) SetLastProcessedTick(tick uint32) error {
 }
 
 func (ps *PebbleStore) SetSourceStatus(status *domain.Status) error {
-	return ps.save(processingStatus, status)
+	return ps.save(processingStatusKey, status)
 }
 
 func (ps *PebbleStore) GetSourceStatus() (*domain.Status, error) {
 	var target *domain.Status
-	err := ps.load(processingStatus, &target)
+	err := ps.load(processingStatusKey, &target)
 	if err != nil {
 		return nil, errors.Wrap(err, "loading processing status")
 	}
 	return target, nil
+}
+
+func (ps *PebbleStore) SetArchiverStatus(status *archiverproto.GetStatusResponse) error {
+	return ps.saveProto(archiverStatusKey, status)
+}
+
+func (ps *PebbleStore) GetArchiverStatus() (*protobuf.GetArchiverStatusResponse, error) {
+	var target protobuf.GetArchiverStatusResponse // ATTENTION: other data type than the saved one
+	err := ps.loadProto(archiverStatusKey, &target)
+	if err != nil {
+		return nil, errors.Wrap(err, "loading archiver status")
+	}
+	return &target, nil
 }
 
 func (ps *PebbleStore) AddSkippedTick(tick uint32) error {
@@ -103,6 +120,23 @@ func (ps *PebbleStore) loadSkippedTicksSet() (map[string]bool, error) {
 	return result, nil
 }
 
+func (ps *PebbleStore) save(keyStr string, source any) error {
+	buffer := new(bytes.Buffer)
+	encoder := gob.NewEncoder(buffer)
+	err := encoder.Encode(source)
+	if err != nil {
+		return errors.Wrap(err, "encoding object")
+	}
+
+	// store
+	key := []byte(keyStr)
+	err = ps.db.Set(key, buffer.Bytes(), pebble.Sync) // sync to prevent data loss. lower performance.
+	if err != nil {
+		return errors.Wrap(err, "saving object")
+	}
+	return nil
+}
+
 func (ps *PebbleStore) load(keyStr string, target any) error {
 	key := []byte(keyStr)
 	value, closer, err := ps.db.Get(key)
@@ -121,19 +155,33 @@ func (ps *PebbleStore) load(keyStr string, target any) error {
 	return nil
 }
 
-func (ps *PebbleStore) save(keyStr string, source any) error {
-	buffer := new(bytes.Buffer)
-	encoder := gob.NewEncoder(buffer)
-	err := encoder.Encode(source)
+func (ps *PebbleStore) saveProto(keyStr string, source proto.Message) error {
+	marshalled, err := proto.Marshal(source)
 	if err != nil {
-		return errors.Wrap(err, "encoding object")
+		return errors.Wrap(err, "marshalling object")
 	}
 
 	// store
 	key := []byte(keyStr)
-	err = ps.db.Set(key, buffer.Bytes(), pebble.Sync) // sync to prevent data loss. lower performance.
+	err = ps.db.Set(key, marshalled, pebble.Sync) // sync to prevent data loss. lower performance.
 	if err != nil {
 		return errors.Wrap(err, "saving object")
+	}
+	return nil
+}
+
+func (ps *PebbleStore) loadProto(keyStr string, target proto.Message) error {
+	key := []byte(keyStr)
+	value, closer, err := ps.db.Get(key)
+	if err != nil {
+		return errors.Wrapf(err, "getting value for key [%s]", keyStr)
+	}
+	defer closer.Close()
+
+	// decode
+	err = proto.Unmarshal(value, target)
+	if err != nil {
+		return errors.Wrapf(err, "unmarshalling value for key [%s]", keyStr)
 	}
 	return nil
 }

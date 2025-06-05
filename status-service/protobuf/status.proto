@@ -28,11 +28,51 @@ message GetTickIntervalsResponse {
   repeated TickInterval intervals = 1;
 }
 
+// start of archiver compatible status response
+message GetArchiverStatusResponse {
+  ProcessedTick last_processed_tick = 1;
+  map<uint32, uint32> last_processed_ticks_per_epoch = 2;
+  repeated SkippedTicksInterval skipped_ticks = 3;
+  repeated ProcessedTickIntervalsPerEpoch processed_tick_intervals_per_epoch = 4;
+  map<uint32, uint32> empty_ticks_per_epoch = 5;
+}
+
+message ProcessedTick {
+  uint32 tick_number = 1;
+  uint32 epoch = 2;
+}
+
+message ProcessedTickInterval {
+  uint32 initial_processed_tick = 1;
+  uint32 last_processed_tick = 2;
+}
+
+message ProcessedTickIntervalsPerEpoch {
+  uint32 epoch = 1;
+  repeated ProcessedTickInterval intervals = 2;
+}
+
+message SkippedTicksInterval {
+  uint32 start_tick = 1;
+  uint32 end_tick = 2;
+}
+
+message SkippedTicksIntervalList {
+  repeated SkippedTicksInterval skipped_ticks = 1;
+}
+// end of archiver compatible status response
+
 service StatusService {
 
   rpc GetTickIntervals(google.protobuf.Empty) returns (GetTickIntervalsResponse) {
     option (google.api.http) = {
       get: "/v1/tickIntervals"
+    };
+  }
+
+  rpc GetArchiverStatus(google.protobuf.Empty) returns (GetArchiverStatusResponse) {
+    option (google.api.http) = {
+      get: "/v1/archiverStatus"
     };
   }
 
