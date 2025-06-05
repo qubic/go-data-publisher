@@ -40,8 +40,8 @@ func NewStatusServiceServer(listenAddrGRPC string, listenAddrHTTP string, status
 func (s *StatusServiceServer) GetStatus(context.Context, *emptypb.Empty) (*protobuf.GetStatusResponse, error) {
 	lastProcessedTick, err := s.statusCache.GetLastProcessedTick()
 	if err != nil {
-		log.Printf("[ERROR] getting last processed tick: %v", err)
-		return nil, status.Errorf(codes.Internal, "getting last processed tick: %v", err)
+		log.Printf("[ERROR] getting status (last processed tick): %v", err)
+		return nil, status.Error(codes.Internal, "getting status")
 	}
 
 	return &protobuf.GetStatusResponse{LastProcessedTick: lastProcessedTick}, nil
@@ -51,7 +51,7 @@ func (s *StatusServiceServer) GetArchiverStatus(context.Context, *emptypb.Empty)
 	response, err := s.statusCache.GetArchiverStatus()
 	if err != nil {
 		log.Printf("[ERROR] getting archiver status: %v", err)
-		return nil, status.Errorf(codes.Internal, "getting archiver status: %v", err)
+		return nil, status.Error(codes.Internal, "getting archiver status")
 	}
 	return response, nil
 }
@@ -60,7 +60,7 @@ func (s *StatusServiceServer) GetTickIntervals(context.Context, *emptypb.Empty) 
 	response, err := s.statusCache.GetTickIntervals()
 	if err != nil {
 		log.Printf("[ERROR] getting tick intervals: %v", err)
-		return nil, status.Errorf(codes.Internal, "getting tick intervalse: %v", err)
+		return nil, status.Error(codes.Internal, "getting tick intervals")
 	}
 	return response, nil
 }
@@ -69,7 +69,7 @@ func (s *StatusServiceServer) GetSkippedTicks(context.Context, *emptypb.Empty) (
 	ticks, err := s.statusCache.GetSkippedTicks()
 	if err != nil {
 		log.Printf("[ERROR] getting skipped ticks: %v", err)
-		return nil, status.Errorf(codes.Internal, "getting skipped ticks: %v", err)
+		return nil, status.Error(codes.Internal, "getting skipped ticks")
 	}
 	return &protobuf.GetSkippedTicksResponse{SkippedTicks: ticks}, nil
 }
