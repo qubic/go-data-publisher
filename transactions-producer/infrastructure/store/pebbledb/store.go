@@ -7,10 +7,7 @@ import (
 	"github.com/cockroachdb/pebble"
 	"github.com/qubic/transactions-producer/entities"
 	"path/filepath"
-	"strconv"
 )
-
-const maxTickNumber = ^uint32(0)
 
 const lastProcessedTickPerEpochKey = 0x00
 
@@ -27,9 +24,9 @@ func NewProcessorStore(storeDir string) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
-func (ps *Store) SetLastProcessedTick(epoch, tick uint32) error {
+func (ps *Store) SetLastProcessedTick(tick uint32) error {
 	key := []byte{lastProcessedTickPerEpochKey}
-	key = binary.BigEndian.AppendUint32(key, epoch)
+	key = binary.BigEndian.AppendUint32(key, 0)
 
 	var value []byte
 	value = binary.BigEndian.AppendUint32(value, tick)
@@ -42,9 +39,9 @@ func (ps *Store) SetLastProcessedTick(epoch, tick uint32) error {
 	return nil
 }
 
-func (ps *Store) GetLastProcessedTick(epoch uint32) (tick uint32, err error) {
+func (ps *Store) GetLastProcessedTick() (tick uint32, err error) {
 	key := []byte{lastProcessedTickPerEpochKey}
-	key = binary.BigEndian.AppendUint32(key, epoch)
+	key = binary.BigEndian.AppendUint32(key, 0)
 
 	value, closer, err := ps.db.Get(key)
 	if errors.Is(err, pebble.ErrNotFound) {
@@ -59,34 +56,6 @@ func (ps *Store) GetLastProcessedTick(epoch uint32) (tick uint32, err error) {
 	tick = binary.BigEndian.Uint32(value)
 
 	return tick, nil
-}
-
-func (ps *Store) GetLastProcessedTickForAllEpochs() (map[uint32]uint32, error) {
-	upperBound := append([]byte{lastProcessedTickPerEpochKey}, []byte(strconv.FormatUint(uint64(maxTickNumber), 10))...)
-	iter, err := ps.db.NewIter(&pebble.IterOptions{
-		LowerBound: []byte{lastProcessedTickPerEpochKey},
-		UpperBound: upperBound,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("creating iterator: %v", err)
-	}
-	defer iter.Close()
-
-	ticksPerEpoch := make(map[uint32]uint32)
-	for iter.First(); iter.Valid(); iter.Next() {
-		key := iter.Key()
-
-		value, err := iter.ValueAndErr()
-		if err != nil {
-			return nil, fmt.Errorf("getting value from iter: %v", err)
-		}
-
-		epochNumber := binary.BigEndian.Uint32(key[1:])
-		tickNumber := binary.BigEndian.Uint32(value)
-		ticksPerEpoch[epochNumber] = tickNumber
-	}
-
-	return ticksPerEpoch, nil
 }
 
 func (ps *Store) Close() error {

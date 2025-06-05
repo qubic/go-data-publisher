@@ -14,6 +14,7 @@ require (
 	github.com/twmb/franz-go v1.18.1
 	github.com/twmb/franz-go/plugin/kprom v1.2.0
 	go.uber.org/zap v1.27.0
+	golang.org/x/sync v0.12.0
 	google.golang.org/grpc v1.71.1
 )
 
