@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/transactions-producer/domain"
+	"github.com/qubic/transactions-producer/entities"
 	"github.com/qubic/transactions-producer/external/archiver"
 	"github.com/qubic/transactions-producer/external/kafka"
 	"github.com/qubic/transactions-producer/infrastructure/store/pebbledb"
@@ -44,18 +45,16 @@ func run() error {
 	sLogger := logger.Sugar()
 
 	var cfg struct {
-		InternalStoreFolder                 string        `conf:"default:store"`
-		ArchiverGrpcHost                    string        `conf:"default:127.0.0.1:6001"`
-		ArchiverReadTimeout                 time.Duration `conf:"default:20s"`
-		BatchSize                           int           `conf:"default:100"`
-		NrWorkers                           int           `conf:"default:20"`
-		PublishCustomTicks                  []uint32      `conf:"optional"`
-		OverrideLastProcessedTick           bool          `conf:"default:false"`
-		OverrideLastProcessedTickEpochValue uint32        `conf:"default:155"`
-		OverrideLastProcessedTickValue      uint32        `conf:"default:22669394"`
-		Kafka                               struct {
+		InternalStoreFolder            string        `conf:"default:store"`
+		ArchiverGrpcHost               string        `conf:"default:127.0.0.1:6001"`
+		ArchiverReadTimeout            time.Duration `conf:"default:30s"`
+		NrWorkers                      int           `conf:"default:20"`
+		PublishCustomTicks             []uint32      `conf:"optional"`
+		OverrideLastProcessedTick      bool          `conf:"default:false"`
+		OverrideLastProcessedTickValue uint32        `conf:"default:0"`
+		Kafka                          struct {
 			BootstrapServers []string `conf:"default:localhost:9092"`
-			TxTopic          string   `conf:"default:qubic-transactions"`
+			TxTopic          string   `conf:"default:qubic-transactions-local"`
 		}
 		MetricsNamespace string `conf:"default:qubic-kafka"`
 		MetricsPort      int    `conf:"default:9999"`
@@ -92,12 +91,25 @@ func run() error {
 		return fmt.Errorf("creating processor store: %v", err)
 	}
 
+	if cfg.OverrideLastProcessedTick || err != entities.ErrStoreEntityNotFound {
+		log.Printf("main: overriding last processed tick with [%d].", cfg.OverrideLastProcessedTickValue)
+
+	}
+
+	lpt, err := procStore.GetLastProcessedTick()
 	if cfg.OverrideLastProcessedTick {
-		log.Printf("main: overriding last processed tick with [%d] and epoch [%d].",
-			cfg.OverrideLastProcessedTickValue, cfg.OverrideLastProcessedTickEpochValue)
-		if err := procStore.SetLastProcessedTick(cfg.OverrideLastProcessedTickEpochValue, cfg.OverrideLastProcessedTickValue); err != nil {
+		log.Printf("main: overriding last processed tick with [%d].", cfg.OverrideLastProcessedTickValue)
+		if err := procStore.SetLastProcessedTick(cfg.OverrideLastProcessedTickValue); err != nil {
 			return fmt.Errorf("setting last processed tick: %v", err)
 		}
+	} else if err == entities.ErrStoreEntityNotFound {
+		log.Println("main: initializing last processed tick.")
+		err = procStore.SetLastProcessedTick(0)
+		if err != nil {
+			return fmt.Errorf("setting last processed tick: %v", err)
+		}
+	} else {
+		log.Printf("main: resuming from  last processed tick [%d].", lpt)
 	}
 
 	kafkaMetrics := kprom.NewMetrics(cfg.MetricsNamespace,
@@ -122,7 +134,7 @@ func run() error {
 	}
 
 	metrics := domain.NewMetrics(cfg.MetricsNamespace)
-	proc := domain.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, kafkaClient, procStore, cfg.BatchSize, sLogger, metrics)
+	proc := domain.NewProcessor(archiverClient, cfg.ArchiverReadTimeout, kafkaClient, procStore, cfg.NrWorkers, sLogger, metrics)
 	if err != nil {
 		return fmt.Errorf("creating processor: %v", err)
 	}
@@ -138,21 +150,21 @@ func run() error {
 		}()
 	} else {
 		go func() {
-			procErrors <- proc.Start(cfg.NrWorkers)
+			procErrors <- proc.Start()
 		}()
 	}
 
 	serverErr := make(chan error, 1)
 	go func() {
-		log.Printf("main: Starting status and metrics endpoint on port [%d]", cfg.MetricsPort)
+		log.Printf("main: starting status and metrics endpoint on port [%d]", cfg.MetricsPort)
 		http.HandleFunc("/v1/status", func(w http.ResponseWriter, r *http.Request) {
-			epochsLastProcessedTick, err := procStore.GetLastProcessedTickForAllEpochs()
+			lastProcessedTick, err := procStore.GetLastProcessedTick()
 			if err != nil {
-				http.Error(w, fmt.Sprintf("getting last processed tick for all epochs: %v", err), http.StatusInternalServerError)
+				http.Error(w, fmt.Sprintf("getting last processed tick: %v", err), http.StatusInternalServerError)
 				return
 			}
-			response := map[string]map[uint32]uint32{
-				"lastProcessedTicks": epochsLastProcessedTick,
+			response := map[string]uint32{
+				"lastProcessedTick": lastProcessedTick,
 			}
 			data, err := json.Marshal(response)
 			if err != nil {

@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 	"os"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 )
@@ -41,7 +42,7 @@ func (mf *MockFetcher) GetTickTransactions(_ context.Context, tick uint32) ([]en
 	}
 
 	if mf.emptyTicks != nil && slices.Contains(mf.emptyTicks, tick) {
-		return nil, entities.ErrEmptyTick
+		return []entities.Tx{}, nil
 	}
 
 	return []entities.Tx{
@@ -64,6 +65,7 @@ func (mf *MockFetcher) GetTickTransactions(_ context.Context, tick uint32) ([]en
 type MockPublisher struct {
 	publishedTickTransactions []entities.TickTransactions
 	shouldError               bool
+	locker                    sync.Mutex
 }
 
 func (mp *MockPublisher) PublishTickTransactions(tickTransactions []entities.TickTransactions) error {
@@ -71,10 +73,75 @@ func (mp *MockPublisher) PublishTickTransactions(tickTransactions []entities.Tic
 	if mp.shouldError {
 		return ErrMock
 	}
-
+	mp.locker.Lock() // increment might not work with many threads otherwise
 	mp.publishedTickTransactions = append(mp.publishedTickTransactions, tickTransactions...)
-
+	mp.locker.Unlock()
 	return nil
+}
+
+func TestTxProcessor_process(t *testing.T) {
+
+	fetcher := MockFetcher{
+		processedTickIntervalsPerEpoch: []entities.ProcessedTickIntervalsPerEpoch{
+			{
+				Epoch: 100,
+				Intervals: []entities.ProcessedTickInterval{
+					{
+						InitialProcessedTick: 10000001,
+						LastProcessedTick:    10000101,
+					},
+				},
+			},
+			{
+				Epoch: 103,
+				Intervals: []entities.ProcessedTickInterval{
+					{
+						InitialProcessedTick: 40000000,
+						LastProcessedTick:    40000000,
+					},
+					{
+						InitialProcessedTick: 50000001,
+						LastProcessedTick:    50000010,
+					},
+				},
+			},
+		},
+	}
+
+	fetcher.emptyTicks = append(fetcher.emptyTicks, 10000042)
+
+	publisher := MockPublisher{}
+
+	dbDir, err := os.MkdirTemp("", "pebble_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(dbDir)
+	store, err := pebbledb.NewProcessorStore(dbDir)
+	require.NoError(t, err)
+	defer store.Close()
+	err = store.SetLastProcessedTick(0)
+	require.NoError(t, err)
+
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 10, logger.Sugar(), metrics)
+
+	err = txProcessor.process() // first interval
+	require.NoError(t, err)
+	require.Equal(t, 100, len(publisher.publishedTickTransactions)) // one empty tick
+
+	err = txProcessor.process() // second interval
+	require.NoError(t, err)
+	require.Equal(t, 100+1, len(publisher.publishedTickTransactions))
+
+	err = txProcessor.process() // third interval
+	require.NoError(t, err)
+	require.Equal(t, 100+1+10, len(publisher.publishedTickTransactions))
+
+	err = txProcessor.process() // no new ticks
+	require.NoError(t, err)
+	require.Equal(t, 100+1+10, len(publisher.publishedTickTransactions))
+
 }
 
 func TestTxProcessor_RunCycle(t *testing.T) {
@@ -230,14 +297,21 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 	store, err := pebbledb.NewProcessorStore(dbDir)
 	require.NoError(t, err)
 	defer store.Close()
+	err = store.SetLastProcessedTick(0)
+	require.NoError(t, err)
 
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 
-	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 100, logger.Sugar(), metrics)
+	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 10, logger.Sugar(), metrics)
 
-	err = txProcessor.runCycle(2)
+	err = txProcessor.process() // first interval
 	require.NoError(t, err)
+	err = txProcessor.process() // second interval
+	require.NoError(t, err)
+	err = txProcessor.process() // third interval
+	require.NoError(t, err)
+
 	require.Equal(t, 6, len(publisher.publishedTickTransactions))
 
 	got := publisher.publishedTickTransactions
@@ -292,7 +366,7 @@ func TestTxProcessor_PublishSingleTicks(t *testing.T) {
 	}
 	publisher := MockPublisher{}
 
-	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 100, logger.Sugar(), metrics)
+	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 10, logger.Sugar(), metrics)
 	err = txProcessor.PublishSingleTicks([]uint32{10000001, 10000002, 5000020})
 	require.NoError(t, err)
 
@@ -311,129 +385,6 @@ func TestTxProcessor_PublishSingleTicks(t *testing.T) {
 	assert.Len(t, got[0].Transactions, 1)
 }
 
-func TestTxProcessor_GetStartingTicksForEpochs(t *testing.T) {
-
-	dbDir, err := os.MkdirTemp("", "pebble_test")
-	require.NoError(t, err)
-	defer os.RemoveAll(dbDir)
-
-	store, err := pebbledb.NewProcessorStore(dbDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// For testing case where store entity is found, and LPT matches last tick of last epoch interval
-	err = store.SetLastProcessedTick(102, 26000000)
-	require.NoError(t, err)
-	// For testing case where store entity is found, but epoch didn't finish syncing
-	err = store.SetLastProcessedTick(103, 26000001)
-	require.NoError(t, err)
-
-	txProcessor := NewProcessor(nil, 0, nil, store, 0, nil, metrics)
-
-	testData := []struct {
-		name           string
-		epochIntervals []entities.ProcessedTickIntervalsPerEpoch
-		expected       map[uint32]uint32
-	}{
-		{
-			name: "TestStartingTickForEpochs_1",
-			epochIntervals: []entities.ProcessedTickIntervalsPerEpoch{
-				{
-					Epoch: 100,
-					Intervals: []entities.ProcessedTickInterval{
-						{
-							InitialProcessedTick: 10000000,
-							LastProcessedTick:    10000001,
-						},
-					},
-				},
-				{
-					Epoch: 101,
-					Intervals: []entities.ProcessedTickInterval{
-						{
-							InitialProcessedTick: 23154312,
-							LastProcessedTick:    23343121,
-						},
-						{
-							InitialProcessedTick: 24000000,
-							LastProcessedTick:    25000000,
-						},
-					},
-				},
-				{
-					Epoch: 102,
-					Intervals: []entities.ProcessedTickInterval{
-						{
-							InitialProcessedTick: 25000001,
-							LastProcessedTick:    26000000,
-						},
-					},
-				},
-				{
-					Epoch: 103,
-					Intervals: []entities.ProcessedTickInterval{
-						{
-							InitialProcessedTick: 26000001,
-							LastProcessedTick:    26000020,
-						},
-					},
-				},
-			},
-			expected: map[uint32]uint32{
-				100: 10000000, // Case: Store entity not found
-				101: 23154312, // Case: Store entity not found
-				102: 0,        // Case: LPT exists and matches last tick of last interval
-				103: 26000002, // Case: LPY exists but epoch didn't finish syncing
-			},
-		},
-		{
-			name: "TestStartingTickForEpochs_2",
-			epochIntervals: []entities.ProcessedTickIntervalsPerEpoch{
-				{
-					Epoch: 200,
-					Intervals: []entities.ProcessedTickInterval{
-						{
-							InitialProcessedTick: 15678915,
-							LastProcessedTick:    16947864,
-						},
-					},
-				},
-				{
-					Epoch: 201,
-					Intervals: []entities.ProcessedTickInterval{
-						{
-							InitialProcessedTick: 18764568,
-							LastProcessedTick:    19748735,
-						},
-						{
-							InitialProcessedTick: 20648978,
-							LastProcessedTick:    21549873,
-						},
-					},
-				},
-			},
-			expected: map[uint32]uint32{
-				200: 15678915,
-				201: 18764568,
-			},
-		},
-	}
-
-	for _, testRun := range testData {
-		t.Run(testRun.name, func(t *testing.T) {
-
-			got, err := txProcessor.getStartingTicksForEpochs(testRun.epochIntervals)
-			require.NoError(t, err)
-
-			if diff := cmp.Diff(testRun.expected, got); diff != "" {
-				t.Fatalf("Unexpected result: %v", diff)
-			}
-
-		})
-	}
-
-}
-
 func TestTxProcessor_ProcessBatch(t *testing.T) {
 
 	fetcher := MockFetcher{}
@@ -450,7 +401,7 @@ func TestTxProcessor_ProcessBatch(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	require.NoError(t, err)
 
-	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 100, logger.Sugar(), metrics)
+	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 10, logger.Sugar(), metrics)
 
 	testData := []struct {
 		name                 string
@@ -478,26 +429,7 @@ func TestTxProcessor_ProcessBatch(t *testing.T) {
 				},
 			},
 		},
-		// Error on fetcher cannot be tested, as gatherTickTransactionsBatch keeps on retrying in case of error.
-		/*{
-			name:                 "TestFetcherError",
-			shouldFetcherError:   true,
-			shouldPublisherError: false,
-			errorExpected:        true,
-			epochTickIntervals: entities.ProcessedTickIntervalsPerEpoch{
-				Epoch: 100,
-				Intervals: []entities.ProcessedTickInterval{
-					{
-						InitialProcessedTick: 10000001,
-						LastProcessedTick:    10000002,
-					},
-					{
-						InitialProcessedTick: 10000016,
-						LastProcessedTick:    10000017,
-					},
-				},
-			},
-		},*/
+
 		{
 			name:                 "TestPublisherError",
 			shouldFetcherError:   false,
@@ -524,26 +456,27 @@ func TestTxProcessor_ProcessBatch(t *testing.T) {
 
 			epoch := testRun.epochTickIntervals.Epoch
 			startingTick := testRun.epochTickIntervals.Intervals[0].InitialProcessedTick
+			lastTick := testRun.epochTickIntervals.Intervals[len(testRun.epochTickIntervals.Intervals)-1].LastProcessedTick
 			fetcher.shouldError = testRun.shouldFetcherError
 			publisher.shouldError = testRun.shouldPublisherError
 
 			lptExpected := startingTick
-			err = store.SetLastProcessedTick(epoch, startingTick)
+			err = store.SetLastProcessedTick(startingTick)
 			require.NoError(t, err)
 
-			_, err := txProcessor.processBatch(startingTick, testRun.epochTickIntervals)
+			err = txProcessor.processTickRange(epoch, startingTick, lastTick)
 
 			if testRun.errorExpected {
 				require.Error(t, err)
 
-				lptGot, err := store.GetLastProcessedTick(epoch)
+				lptGot, err := store.GetLastProcessedTick()
 				require.NoError(t, err)
 				if lptExpected != lptGot {
 					t.Fatalf("LPT changed when it should have remained the same. Expected: %d, Got: %d", lptExpected, lptGot)
 				}
 			} else {
 				require.NoError(t, err)
-				lptGot, err := store.GetLastProcessedTick(epoch)
+				lptGot, err := store.GetLastProcessedTick()
 				require.NoError(t, err)
 				if lptExpected == lptGot {
 					t.Fatalf("LPT didnt change when it should have. Expected: %d, Got: %d", lptExpected, lptGot)
@@ -553,294 +486,4 @@ func TestTxProcessor_ProcessBatch(t *testing.T) {
 
 		})
 	}
-}
-
-func TestTxProcessor_GatherTickTransactionsBatch(t *testing.T) {
-
-	fetcher := MockFetcher{}
-	publisher := MockPublisher{}
-
-	dbDir, err := os.MkdirTemp("", "pebble_test")
-	require.NoError(t, err)
-	defer os.RemoveAll(dbDir)
-	store, err := pebbledb.NewProcessorStore(dbDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	logger, err := zap.NewDevelopment()
-	require.NoError(t, err)
-
-	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 100, logger.Sugar(), metrics)
-
-	testData := []struct {
-		name                     string
-		epochTickIntervals       entities.ProcessedTickIntervalsPerEpoch
-		emptyTicks               []uint32
-		expectedTickTransactions []entities.TickTransactions
-	}{
-		{
-			name: "TestLastIntervalTickIsEmpty",
-			epochTickIntervals: entities.ProcessedTickIntervalsPerEpoch{
-				Epoch: 100,
-				Intervals: []entities.ProcessedTickInterval{
-					{
-						InitialProcessedTick: 10000000,
-						LastProcessedTick:    10000003,
-					},
-				},
-			},
-			emptyTicks: []uint32{10000003},
-			expectedTickTransactions: []entities.TickTransactions{
-				{
-					Epoch:      100,
-					TickNumber: 10000000,
-					Transactions: []entities.Tx{
-						{
-							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-							Amount:     100,
-							TickNumber: 10000000,
-							InputType:  0,
-							InputSize:  0,
-							Input:      "",
-							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-							Timestamp:  1744610180,
-							MoneyFlew:  true,
-						},
-					},
-				},
-				{
-					Epoch:      100,
-					TickNumber: 10000001,
-					Transactions: []entities.Tx{
-						{
-							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-							Amount:     100,
-							TickNumber: 10000001,
-							InputType:  0,
-							InputSize:  0,
-							Input:      "",
-							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-							Timestamp:  1744610180,
-							MoneyFlew:  true,
-						},
-					},
-				},
-				{
-					Epoch:      100,
-					TickNumber: 10000002,
-					Transactions: []entities.Tx{
-						{
-							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-							Amount:     100,
-							TickNumber: 10000002,
-							InputType:  0,
-							InputSize:  0,
-							Input:      "",
-							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-							Timestamp:  1744610180,
-							MoneyFlew:  true,
-						},
-					},
-				},
-				{
-					Epoch:        100,
-					TickNumber:   10000003,
-					Transactions: []entities.Tx{},
-				},
-			},
-		},
-		{
-			name: "TestEmptyTickInMiddleOfInterval",
-			epochTickIntervals: entities.ProcessedTickIntervalsPerEpoch{
-				Epoch: 100,
-				Intervals: []entities.ProcessedTickInterval{
-					{
-						InitialProcessedTick: 10000000,
-						LastProcessedTick:    10000003,
-					},
-				},
-			},
-			emptyTicks: []uint32{10000001},
-			expectedTickTransactions: []entities.TickTransactions{
-				{
-					Epoch:      100,
-					TickNumber: 10000000,
-					Transactions: []entities.Tx{
-						{
-							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-							Amount:     100,
-							TickNumber: 10000000,
-							InputType:  0,
-							InputSize:  0,
-							Input:      "",
-							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-							Timestamp:  1744610180,
-							MoneyFlew:  true,
-						},
-					},
-				},
-				{
-					Epoch:        100,
-					TickNumber:   10000001,
-					Transactions: []entities.Tx{},
-				},
-				{
-					Epoch:      100,
-					TickNumber: 10000002,
-					Transactions: []entities.Tx{
-						{
-							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-							Amount:     100,
-							TickNumber: 10000002,
-							InputType:  0,
-							InputSize:  0,
-							Input:      "",
-							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-							Timestamp:  1744610180,
-							MoneyFlew:  true,
-						},
-					},
-				},
-				{
-					Epoch:      100,
-					TickNumber: 10000003,
-					Transactions: []entities.Tx{
-						{
-							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-							Amount:     100,
-							TickNumber: 10000003,
-							InputType:  0,
-							InputSize:  0,
-							Input:      "",
-							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-							Timestamp:  1744610180,
-							MoneyFlew:  true,
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "TestNoEmptyTicks",
-			epochTickIntervals: entities.ProcessedTickIntervalsPerEpoch{
-				Epoch: 100,
-				Intervals: []entities.ProcessedTickInterval{
-					{
-						InitialProcessedTick: 10000000,
-						LastProcessedTick:    10000003,
-					},
-				},
-			},
-			emptyTicks: []uint32{},
-			expectedTickTransactions: []entities.TickTransactions{
-				{
-					Epoch:      100,
-					TickNumber: 10000000,
-					Transactions: []entities.Tx{
-						{
-							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-							Amount:     100,
-							TickNumber: 10000000,
-							InputType:  0,
-							InputSize:  0,
-							Input:      "",
-							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-							Timestamp:  1744610180,
-							MoneyFlew:  true,
-						},
-					},
-				},
-				{
-					Epoch:      100,
-					TickNumber: 10000001,
-					Transactions: []entities.Tx{
-						{
-							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-							Amount:     100,
-							TickNumber: 10000001,
-							InputType:  0,
-							InputSize:  0,
-							Input:      "",
-							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-							Timestamp:  1744610180,
-							MoneyFlew:  true,
-						},
-					},
-				},
-				{
-					Epoch:      100,
-					TickNumber: 10000002,
-					Transactions: []entities.Tx{
-						{
-							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-							Amount:     100,
-							TickNumber: 10000002,
-							InputType:  0,
-							InputSize:  0,
-							Input:      "",
-							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-							Timestamp:  1744610180,
-							MoneyFlew:  true,
-						},
-					},
-				},
-				{
-					Epoch:      100,
-					TickNumber: 10000003,
-					Transactions: []entities.Tx{
-						{
-							TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-							SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-							DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-							Amount:     100,
-							TickNumber: 10000003,
-							InputType:  0,
-							InputSize:  0,
-							Input:      "",
-							Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-							Timestamp:  1744610180,
-							MoneyFlew:  true,
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for _, testRun := range testData {
-		t.Run(testRun.name, func(t *testing.T) {
-
-			fetcher.emptyTicks = testRun.emptyTicks
-
-			epoch := testRun.epochTickIntervals.Epoch
-			startTick := testRun.epochTickIntervals.Intervals[0].InitialProcessedTick
-
-			gotTxs, _, err := txProcessor.gatherTickTransactionsBatch(epoch, startTick, testRun.epochTickIntervals)
-			require.NoError(t, err)
-
-			if diff := cmp.Diff(testRun.expectedTickTransactions, gotTxs); diff != "" {
-				t.Fatalf("Unexpected result: %v", diff)
-			}
-
-		})
-	}
-
 }

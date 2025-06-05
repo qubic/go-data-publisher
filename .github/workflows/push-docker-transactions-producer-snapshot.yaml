@@ -3,7 +3,7 @@ name: Release transactions-producer
 on:
   push:
     branches:
-      - feature/publish-custom-ticks
+      - feature/refactor-transaction-publishing
 
 jobs:
   docker-publish:
