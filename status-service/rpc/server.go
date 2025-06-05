@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"log"
 	"net"
 	"net/http"
 )
@@ -39,6 +40,7 @@ func NewStatusServiceServer(listenAddrGRPC string, listenAddrHTTP string, status
 func (s *StatusServiceServer) GetStatus(context.Context, *emptypb.Empty) (*protobuf.GetStatusResponse, error) {
 	lastProcessedTick, err := s.statusCache.GetLastProcessedTick()
 	if err != nil {
+		log.Printf("[ERROR] getting last processed tick: %v", err)
 		return nil, status.Errorf(codes.Internal, "getting last processed tick: %v", err)
 	}
 
@@ -48,6 +50,7 @@ func (s *StatusServiceServer) GetStatus(context.Context, *emptypb.Empty) (*proto
 func (s *StatusServiceServer) GetArchiverStatus(context.Context, *emptypb.Empty) (*protobuf.GetArchiverStatusResponse, error) {
 	response, err := s.statusCache.GetArchiverStatus()
 	if err != nil {
+		log.Printf("[ERROR] getting archiver status: %v", err)
 		return nil, status.Errorf(codes.Internal, "getting archiver status: %v", err)
 	}
 	return response, nil
@@ -56,6 +59,7 @@ func (s *StatusServiceServer) GetArchiverStatus(context.Context, *emptypb.Empty)
 func (s *StatusServiceServer) GetTickIntervals(context.Context, *emptypb.Empty) (*protobuf.GetTickIntervalsResponse, error) {
 	response, err := s.statusCache.GetTickIntervals()
 	if err != nil {
+		log.Printf("[ERROR] getting tick intervals: %v", err)
 		return nil, status.Errorf(codes.Internal, "getting tick intervalse: %v", err)
 	}
 	return response, nil
@@ -64,7 +68,8 @@ func (s *StatusServiceServer) GetTickIntervals(context.Context, *emptypb.Empty) 
 func (s *StatusServiceServer) GetSkippedTicks(context.Context, *emptypb.Empty) (*protobuf.GetSkippedTicksResponse, error) {
 	ticks, err := s.statusCache.GetSkippedTicks()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "calling provider to get skipped ticks: %v", err)
+		log.Printf("[ERROR] getting skipped ticks: %v", err)
+		return nil, status.Errorf(codes.Internal, "getting skipped ticks: %v", err)
 	}
 	return &protobuf.GetSkippedTicksResponse{SkippedTicks: ticks}, nil
 }
