@@ -91,11 +91,6 @@ func run() error {
 		return fmt.Errorf("creating processor store: %v", err)
 	}
 
-	if cfg.OverrideLastProcessedTick || err != entities.ErrStoreEntityNotFound {
-		log.Printf("main: overriding last processed tick with [%d].", cfg.OverrideLastProcessedTickValue)
-
-	}
-
 	lpt, err := procStore.GetLastProcessedTick()
 	if cfg.OverrideLastProcessedTick {
 		log.Printf("main: overriding last processed tick with [%d].", cfg.OverrideLastProcessedTickValue)
