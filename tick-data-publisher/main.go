@@ -37,8 +37,8 @@ func run() error {
 			ArchiverGrpcHost string `conf:"default:localhost:8010"`
 		}
 		Broker struct {
-			BootstrapServers string `conf:"default:localhost:9092"`
-			ProduceTopic     string `conf:"default:qubic-tick-data"`
+			BootstrapServers []string `conf:"default:localhost:9092"`
+			ProduceTopic     string   `conf:"default:qubic-tick-data"`
 		}
 		Sync struct {
 			InternalStoreFolder string   `conf:"default:store"`
@@ -84,7 +84,7 @@ func run() error {
 		kprom.Gatherer(prometheus.DefaultGatherer))
 	kcl, err := kgo.NewClient(
 		kgo.WithHooks(m),
-		kgo.SeedBrokers(cfg.Broker.BootstrapServers),
+		kgo.SeedBrokers(cfg.Broker.BootstrapServers...),
 		kgo.DefaultProduceTopic(cfg.Broker.ProduceTopic),
 		kgo.ProducerBatchCompression(kgo.ZstdCompression()),
 	)

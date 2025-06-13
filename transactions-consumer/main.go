@@ -45,11 +45,11 @@ func run() error {
 			Stub        bool     `conf:"optional"` // only for testing
 		}
 		Broker struct {
-			BootstrapServers string `conf:"default:localhost:9092"`
-			MetricsPort      int    `conf:"default:9999"`
-			MetricsNamespace string `conf:"default:qubic-kafka"`
-			ConsumeTopic     string `conf:"default:qubic-transactions"`
-			ConsumerGroup    string `conf:"default:qubic-elastic"`
+			BootstrapServers []string `conf:"default:localhost:9092"`
+			MetricsPort      int      `conf:"default:9999"`
+			MetricsNamespace string   `conf:"default:qubic-kafka"`
+			ConsumeTopic     string   `conf:"default:qubic-transactions"`
+			ConsumerGroup    string   `conf:"default:qubic-elastic"`
 		}
 		Sync struct {
 			Enabled bool `conf:"default:true"` // only for testing
@@ -88,7 +88,7 @@ func run() error {
 		kprom.Gatherer(prometheus.DefaultGatherer))
 	kcl, err := kgo.NewClient(
 		kgo.WithHooks(m),
-		kgo.SeedBrokers(cfg.Broker.BootstrapServers),
+		kgo.SeedBrokers(cfg.Broker.BootstrapServers...),
 		kgo.ConsumeTopics(cfg.Broker.ConsumeTopic),
 		kgo.ConsumerGroup(cfg.Broker.ConsumerGroup),
 		kgo.BlockRebalanceOnPoll(),
