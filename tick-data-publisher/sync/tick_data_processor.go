@@ -52,8 +52,6 @@ func (p *TickDataProcessor) StartProcessing() {
 		err := p.process()
 		if err != nil {
 			log.Printf("Error processing tick data: %v", err)
-		} else {
-			log.Printf("Synced tick data")
 		}
 	}
 }
