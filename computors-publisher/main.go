@@ -146,6 +146,5 @@ func run() error {
 			return fmt.Errorf("[ERROR] starting api server: %v", err)
 		}
 	}
-
 	return nil
 }
