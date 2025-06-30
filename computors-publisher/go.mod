@@ -7,7 +7,6 @@ toolchain go1.24.2
 require (
 	github.com/ardanlabs/conf/v3 v3.8.0
 	github.com/cockroachdb/pebble v1.1.5
-	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
 	github.com/qubic/go-archiver v0.11.1
 	github.com/stretchr/testify v1.10.0
@@ -35,6 +34,7 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect

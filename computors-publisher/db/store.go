@@ -2,8 +2,9 @@ package db
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"github.com/cockroachdb/pebble"
-	"github.com/pkg/errors"
 	"io"
 	"log"
 	"path/filepath"
@@ -20,7 +21,7 @@ type PebbleStore struct {
 func NewPebbleStore(storeDir string) (*PebbleStore, error) {
 	db, err := pebble.Open(filepath.Join(storeDir, "computors-publisher"), &pebble.Options{})
 	if err != nil {
-		return nil, errors.Wrap(err, "opening pebble db")
+		return nil, fmt.Errorf("oppening pebble db: %w", err)
 	}
 
 	return &PebbleStore{db: db}, nil
@@ -34,7 +35,7 @@ func (ps *PebbleStore) SetLastProcessedEpoch(epoch uint32) error {
 
 	err := ps.db.Set(key, value, pebble.Sync)
 	if err != nil {
-		return errors.Wrapf(err, "setting last processed epoch to %d", epoch)
+		return fmt.Errorf("setting last processed epoch to %d: %w", epoch, err)
 	}
 	return nil
 }
@@ -48,7 +49,7 @@ func (ps *PebbleStore) GetLastProcessedEpoch() (uint32, error) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
-		return 0, errors.Wrap(err, "getting last processed epoch")
+		return 0, fmt.Errorf("getting last processed epoch: %w", err)
 	}
 	defer func(closer io.Closer) {
 		err := closer.Close()

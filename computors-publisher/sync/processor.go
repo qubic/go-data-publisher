@@ -3,8 +3,8 @@ package sync
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
 	"github.com/qubic/computors-publisher/domain"
+	"github.com/qubic/computors-publisher/metrics"
 	"log"
 	"time"
 )
@@ -24,16 +24,18 @@ type Producer interface {
 }
 
 type EpochComputorsProcessor struct {
-	archiveClient ArchiveClient
-	dataStore     DataStore
-	Producer      Producer
+	archiveClient     ArchiveClient
+	dataStore         DataStore
+	Producer          Producer
+	processingMetrics *metrics.ProcessingMetrics
 }
 
-func NewEpochComputorsProcessor(client ArchiveClient, store DataStore, producer Producer) *EpochComputorsProcessor {
+func NewEpochComputorsProcessor(client ArchiveClient, store DataStore, producer Producer, metrics *metrics.ProcessingMetrics) *EpochComputorsProcessor {
 	return &EpochComputorsProcessor{
-		archiveClient: client,
-		dataStore:     store,
-		Producer:      producer,
+		archiveClient:     client,
+		dataStore:         store,
+		Producer:          producer,
+		processingMetrics: metrics,
 	}
 }
 
@@ -42,14 +44,14 @@ func (p *EpochComputorsProcessor) StartProcessing() error {
 	// do one initial process(), so we do not wait until first tick
 	err := p.process()
 	if err != nil {
-		return errors.Wrap(err, "processing epoch computors")
+		return fmt.Errorf("processing epoch computors: %w", err)
 	}
 
-	ticker := time.Tick(1 * time.Hour * 24)
+	ticker := time.Tick(time.Second)
 	for range ticker {
 		err := p.process()
 		if err != nil {
-			return errors.Wrap(err, "processing epoch computors")
+			return fmt.Errorf("processing epoch computors: %w", err)
 		}
 	}
 	return nil
@@ -59,11 +61,11 @@ func (p *EpochComputorsProcessor) process() error {
 
 	status, err := p.archiveClient.GetStatus(context.Background())
 	if err != nil {
-		return errors.Wrap(err, "getting archive status")
+		return fmt.Errorf("getting archive status: %w", err)
 	}
 	lastProcessedEpoch, err := p.dataStore.GetLastProcessedEpoch()
 	if err != nil {
-		return errors.Wrap(err, "getting last processed epoch")
+		return fmt.Errorf("getting last processed epoch: %w", err)
 	}
 	if lastProcessedEpoch == 0 {
 		lastProcessedEpoch = status.EpochList[0]
@@ -75,7 +77,7 @@ func (p *EpochComputorsProcessor) process() error {
 		return nil
 	}
 	if lastProcessedEpoch > currentEpoch {
-		return errors.Errorf("last processes epoch [%d] is larger than current netowrk epoch [%d]", lastProcessedEpoch, currentEpoch)
+		return fmt.Errorf("last processed epoch [%d] is larger than current epoch [%d]: %w", lastProcessedEpoch, currentEpoch, err)
 	}
 
 	var epochsToProcess []uint32
@@ -90,7 +92,7 @@ func (p *EpochComputorsProcessor) process() error {
 		}
 
 		if startIndex == -1 {
-			return errors.Errorf("last processed epoch %d not found in epoch list", lastProcessedEpoch)
+			return fmt.Errorf("last processed epoch %d not found in epoch list", lastProcessedEpoch)
 		}
 		epochsToProcess = status.EpochList[startIndex:]
 
@@ -101,38 +103,47 @@ func (p *EpochComputorsProcessor) process() error {
 	for _, epoch := range epochsToProcess {
 		err = p.processEpoch(epoch)
 		if err != nil {
-			return errors.Wrapf(err, "processing epoch %d", epoch)
+			return fmt.Errorf("processing epoch %d: %w", epoch, err)
 		}
 	}
 	return nil
+}
+
+func (p *EpochComputorsProcessor) fetchArchiverComputorList(epoch uint32) (*domain.EpochComputors, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	epochComputorList, err := p.archiveClient.GetEpochComputors(ctx, epoch)
+	if err != nil {
+		return nil, fmt.Errorf("getting archive computor list for epoch [%d]: %w", epoch, err)
+	}
+
+	return epochComputorList, nil
+
 }
 
 func (p *EpochComputorsProcessor) processEpoch(epoch uint32) error {
 
 	fmt.Printf("Processing epoch [%d]\n", epoch)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-
-	epochComputorList, err := p.archiveClient.GetEpochComputors(ctx, epoch)
+	epochComputorList, err := p.fetchArchiverComputorList(epoch)
 	if err != nil {
-		return errors.Wrapf(err, "getting archive computor list for epoch [%d]", epoch)
+		return fmt.Errorf("fetching archive computor list: %w", err)
 	}
 	if epochComputorList.Epoch != epoch {
-		return errors.Errorf("wrong epoch coputor list returned by archier. expected [%d] got [%d]", epoch, epochComputorList.Epoch)
+		return fmt.Errorf("wrong epoch computor list returned by archiver. expected [%d] got [%d]", epoch, epochComputorList.Epoch)
 	}
 
 	fmt.Printf("Processed epoch: %d\n", epoch)
 
-	err = p.Producer.SendMessage(ctx, epochComputorList)
+	err = p.Producer.SendMessage(context.Background(), epochComputorList)
 	if err != nil {
-		return errors.Wrapf(err, "producing epoch computor list record for epoch [%d]", epoch)
+		return fmt.Errorf("producing epoch computor list record for epoch [%d]: %w", epoch, err)
 	}
 
 	err = p.dataStore.SetLastProcessedEpoch(epoch)
 	if err != nil {
-		return errors.Wrapf(err, "failed to store last processed epoch [%d]", epoch)
+		return fmt.Errorf("failed to store last processed epoch [%d]: %w", epoch, err)
 	}
-
+	p.processingMetrics.SetProcessedEpoch(epoch)
 	return nil
 }
