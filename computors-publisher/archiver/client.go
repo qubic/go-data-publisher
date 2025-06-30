@@ -4,7 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
 	"github.com/qubic/computors-publisher/domain"
 	"github.com/qubic/go-archiver/protobuff"
 	"google.golang.org/grpc"
@@ -19,7 +20,7 @@ type Client struct {
 func NewClient(host string) (*Client, error) {
 	archiverConnection, err := grpc.NewClient(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, errors.Wrap(err, "creating archiver connection")
+		return nil, fmt.Errorf("creating archiver client: %w", err)
 	}
 
 	return &Client{api: protobuff.NewArchiveServiceClient(archiverConnection)}, nil
@@ -28,7 +29,7 @@ func NewClient(host string) (*Client, error) {
 func (c *Client) GetStatus(ctx context.Context) (*domain.Status, error) {
 	status, err := c.api.GetStatus(ctx, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "getting archiver status")
+		return nil, fmt.Errorf("getting archive status: %w", err)
 	}
 
 	var epochs []uint32
@@ -49,7 +50,7 @@ func (c *Client) GetEpochComputors(ctx context.Context, epoch uint32) (*domain.E
 	}
 	response, err := c.api.GetComputors(ctx, &request)
 	if err != nil {
-		return nil, errors.Wrap(err, "getting archiver computor list")
+		return nil, fmt.Errorf("getting archiver computor list: %w", err)
 	}
 	if response == nil {
 		return nil, errors.New("nil epoch computor list response")
@@ -60,7 +61,7 @@ func (c *Client) GetEpochComputors(ctx context.Context, epoch uint32) (*domain.E
 
 	computorList, err := convertComputorList(response.GetComputors())
 	if err != nil {
-		return nil, errors.Wrap(err, "converting epoch computor list")
+		return nil, fmt.Errorf("converting epoch computor list: %w", err)
 	}
 
 	return computorList, nil
@@ -70,7 +71,7 @@ func (c *Client) GetEpochComputors(ctx context.Context, epoch uint32) (*domain.E
 func convertComputorList(computors *protobuff.Computors) (*domain.EpochComputors, error) {
 	sigBytes, err := hex.DecodeString(computors.SignatureHex)
 	if err != nil {
-		return nil, errors.Wrapf(err, "decoding computor list signature [%s]", computors.SignatureHex)
+		return nil, fmt.Errorf("decoding computor list signature [%s]: %w", computors.SignatureHex, err)
 	}
 
 	return &domain.EpochComputors{

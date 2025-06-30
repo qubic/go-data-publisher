@@ -1,15 +1,16 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/ardanlabs/conf/v3"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/computors-publisher/api"
 	"github.com/qubic/computors-publisher/archiver"
 	"github.com/qubic/computors-publisher/db"
 	"github.com/qubic/computors-publisher/kafka"
+	"github.com/qubic/computors-publisher/metrics"
 	"github.com/qubic/computors-publisher/sync"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/plugin/kprom"
@@ -44,6 +45,7 @@ func run() error {
 			ServerPort          int    `conf:"default:8000"`
 			MetricsPort         int    `conf:"default:9999"`
 			MetricsNamespace    string `conf:"default:qubic-kafka"`
+			StartEpoch          uint32 `conf:"optional"`
 		}
 	}
 
@@ -58,7 +60,7 @@ func run() error {
 
 	out, err := conf.String(&cfg)
 	if err != nil {
-		return errors.Wrap(err, "generating config for output")
+		return fmt.Errorf("generating config for output: %w", err)
 	}
 	log.Printf("main: Config :\n%v\n", out)
 
@@ -78,30 +80,39 @@ func run() error {
 
 	store, err := db.NewPebbleStore(cfg.Sync.InternalStoreFolder)
 	if err != nil {
-		return errors.Wrap(err, "creating store")
+		return fmt.Errorf("creating pebble store: %w", err)
 	}
 
 	_, err = store.GetLastProcessedEpoch()
 	if err != nil {
 		if !errors.Is(err, db.ErrNotFound) {
-			return errors.Wrap(err, "getting last processed epoch")
+			return fmt.Errorf("getting last processed epoch: %w", err)
 		}
 
 		log.Println("[INFO]: Initializing database with last processed epoch as 0.")
 		err := store.SetLastProcessedEpoch(0)
 		if err != nil {
-			return errors.Wrap(err, "initializing database value")
+			return fmt.Errorf("initializing database value: %w", err)
 		}
-
 	}
+	if cfg.Sync.StartEpoch > 0 {
+		log.Printf("[INFO]: Overriding last processed epoch to %d", cfg.Sync.StartEpoch)
+		err = store.SetLastProcessedEpoch(cfg.Sync.StartEpoch)
+		if err != nil {
+			return fmt.Errorf("setting last processed epoch: %w", err)
+		}
+	}
+
+	procMetrics := metrics.NewProcessingMetrics(cfg.Sync.MetricsNamespace)
+
 	archiverClient, err := archiver.NewClient(cfg.Client.ArchiverGrpcHost)
 	if err != nil {
-		return errors.Wrap(err, "creating archiver client")
+		return fmt.Errorf("creating archiver client: %w", err)
 	}
 	kafkaProducer := kafka.NewEpochComputorsProducer(kcl)
 
 	procErr := make(chan error, 1)
-	processor := sync.NewEpochComputorsProcessor(archiverClient, store, kafkaProducer)
+	processor := sync.NewEpochComputorsProcessor(archiverClient, store, kafkaProducer, procMetrics)
 	go func() {
 		procErr <- processor.StartProcessing()
 	}()
