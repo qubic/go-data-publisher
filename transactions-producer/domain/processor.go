@@ -77,6 +77,7 @@ func (p *Processor) PublishSingleTicks(ticks []uint32) error {
 			return fmt.Errorf("getting epoch for tick [%d]: %v", tick, err)
 		}
 
+		p.logger.Infow("Trying to publish transactions", "tick", tick)
 		err = p.processTick(epoch, tick)
 		if err != nil {
 			return fmt.Errorf("processing tick [%d]: %v", tick, err)
