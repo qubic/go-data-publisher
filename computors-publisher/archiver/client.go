@@ -40,7 +40,12 @@ func (c *Client) GetStatus(ctx context.Context) (*domain.Status, error) {
 
 	slices.Sort(epochs) // make sure epochs are not out of order
 
-	return &domain.Status{EpochList: epochs}, nil
+	return &domain.Status{
+		LastProcessedTick: domain.ProcessedTick{
+			TickNumber: status.LastProcessedTick.TickNumber,
+			Epoch:      status.LastProcessedTick.Epoch,
+		},
+		EpochList: epochs}, nil
 }
 
 func (c *Client) GetEpochComputors(ctx context.Context, epoch uint32) (*domain.EpochComputors, error) {

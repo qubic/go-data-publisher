@@ -1,5 +1,10 @@
 package domain
 
+type ProcessedTick struct {
+	TickNumber uint32
+	Epoch      uint32
+}
 type Status struct {
-	EpochList []uint32
+	LastProcessedTick ProcessedTick
+	EpochList         []uint32
 }
