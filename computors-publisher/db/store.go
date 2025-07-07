@@ -13,6 +13,7 @@ import (
 var ErrNotFound = errors.New("store resource not found")
 
 const epochKey byte = 0x00
+const computorListSumKey byte = 0x01
 
 type PebbleStore struct {
 	db *pebble.DB
@@ -60,6 +61,38 @@ func (ps *PebbleStore) GetLastProcessedEpoch() (uint32, error) {
 
 	epoch := binary.LittleEndian.Uint32(value)
 	return epoch, nil
+}
+
+func (ps *PebbleStore) SetLastStoredComputorListSum(epoch uint32, sum []byte) error {
+
+	key := []byte{computorListSumKey}
+	binary.LittleEndian.AppendUint32(key, epoch)
+
+	err := ps.db.Set(key, sum, pebble.Sync)
+	if err != nil {
+		return fmt.Errorf("storing last computor list sum for epoch [%d]: %w", epoch, err)
+	}
+
+	return nil
+}
+
+func (ps *PebbleStore) GetLastStoredComputorListSum(epoch uint32) ([]byte, error) {
+
+	key := []byte{computorListSumKey}
+	binary.LittleEndian.PutUint32(key, epoch)
+
+	value, closer, err := ps.db.Get(key)
+	if errors.Is(err, pebble.ErrNotFound) {
+		log.Printf("[WARN]: No last stored computor list sum has been found.")
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("getting last stored computor list sum for epoch [%d]: %w", epoch, err)
+	}
+	defer closer.Close()
+
+	return value, nil
+
 }
 
 func (ps *PebbleStore) Close() error {

@@ -1,8 +1,13 @@
 package sync
 
 import (
+	"bytes"
 	"context"
+	"crypto/md5"
+	"encoding/gob"
+	"errors"
 	"fmt"
+	"github.com/qubic/computors-publisher/db"
 	"github.com/qubic/computors-publisher/domain"
 	"github.com/qubic/computors-publisher/metrics"
 	"log"
@@ -17,6 +22,8 @@ type ArchiveClient interface {
 type DataStore interface {
 	SetLastProcessedEpoch(epoch uint32) error
 	GetLastProcessedEpoch() (uint32, error)
+	SetLastStoredComputorListSum(epoch uint32, sum []byte) error
+	GetLastStoredComputorListSum(epoch uint32) ([]byte, error)
 }
 
 type Producer interface {
@@ -101,7 +108,7 @@ func (p *EpochComputorsProcessor) process() error {
 	}
 
 	for _, epoch := range epochsToProcess {
-		err = p.processEpoch(epoch)
+		err = p.processEpoch(epoch, *status)
 		if err != nil {
 			return fmt.Errorf("processing epoch %d: %w", epoch, err)
 		}
@@ -121,9 +128,14 @@ func (p *EpochComputorsProcessor) fetchArchiverComputorList(epoch uint32) (*doma
 
 }
 
-func (p *EpochComputorsProcessor) processEpoch(epoch uint32) error {
+func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status domain.Status) error {
 
 	fmt.Printf("Processing epoch [%d]\n", epoch)
+
+	lastStoredComputorListSum, err := p.dataStore.GetLastStoredComputorListSum(epoch)
+	if err != nil && errors.Is(err, db.ErrNotFound) {
+		return fmt.Errorf("getting last stored computor list for epoch [%d]: %w", epoch, err)
+	}
 
 	epochComputorList, err := p.fetchArchiverComputorList(epoch)
 	if err != nil {
@@ -133,11 +145,26 @@ func (p *EpochComputorsProcessor) processEpoch(epoch uint32) error {
 		return fmt.Errorf("wrong epoch computor list returned by archiver. expected [%d] got [%d]", epoch, epochComputorList.Epoch)
 	}
 
-	fmt.Printf("Processed epoch: %d\n", epoch)
+	currentSum, err := computeComputorListSum(*epochComputorList)
+	if err != nil {
+		return fmt.Errorf("computing current computor list list sum for epoch [%d]: %w", epoch, err)
+	}
+
+	if bytes.Equal(currentSum, lastStoredComputorListSum) {
+		fmt.Printf("No new computor list for epoch [%d]\n", epoch)
+		return nil
+	}
+
+	epochComputorList.TickNumber = status.LastProcessedTick.TickNumber
 
 	err = p.Producer.SendMessage(context.Background(), epochComputorList)
 	if err != nil {
 		return fmt.Errorf("producing epoch computor list record for epoch [%d]: %w", epoch, err)
+	}
+
+	err = p.dataStore.SetLastStoredComputorListSum(epoch, currentSum)
+	if err != nil {
+		return fmt.Errorf("setting last stored computor list sum for epoch [%d]: %w", epoch, err)
 	}
 
 	err = p.dataStore.SetLastProcessedEpoch(epoch)
@@ -145,5 +172,25 @@ func (p *EpochComputorsProcessor) processEpoch(epoch uint32) error {
 		return fmt.Errorf("failed to store last processed epoch [%d]: %w", epoch, err)
 	}
 	p.processingMetrics.SetProcessedEpoch(epoch)
+
+	fmt.Printf("Processed epoch: %d\n", epoch)
 	return nil
+}
+
+func computeComputorListSum(computors domain.EpochComputors) ([]byte, error) {
+
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+
+	computors.TickNumber = 0 // we do not want to take the tick number into consideration
+
+	err := enc.Encode(computors)
+	if err != nil {
+		return nil, fmt.Errorf("encoding computor list: %w", err)
+	}
+
+	s := md5.New()
+	s.Write(buf.Bytes())
+	sum := s.Sum(nil)
+	return sum, nil
 }
