@@ -25,7 +25,6 @@ func NewClient(kafkaClient *kgo.Client, metrics *metrics.Metrics) *Client {
 }
 
 func (c *Client) PollMessages(ctx context.Context) ([]*domain.TickData, error) {
-	defer c.kcl.AllowRebalance()            // because of the kgo.BlockRebalanceOnPoll() option
 	fetches := c.kcl.PollRecords(ctx, 1000) // batch process max x messages in one run
 	if errs := fetches.Errors(); len(errs) > 0 {
 		// Only non-retryable errors are returned.
