@@ -48,6 +48,9 @@ func NewEpochComputorsProcessor(client ArchiveClient, store DataStore, producer 
 
 func (p *EpochComputorsProcessor) StartProcessing() error {
 
+	// TODO I think we should not return an error here but retry if something goes wrong.
+	//      There is always the possibility that one of the services we call is down temporarily.
+
 	// do one initial process(), so we do not wait until first tick
 	err := p.process()
 	if err != nil {
@@ -70,6 +73,7 @@ func (p *EpochComputorsProcessor) process() error {
 	if err != nil {
 		return fmt.Errorf("getting archive status: %w", err)
 	}
+
 	lastProcessedEpoch, err := p.dataStore.GetLastProcessedEpoch()
 	if err != nil {
 		return fmt.Errorf("getting last processed epoch: %w", err)
@@ -116,18 +120,6 @@ func (p *EpochComputorsProcessor) process() error {
 	return nil
 }
 
-func (p *EpochComputorsProcessor) fetchArchiverComputorList(epoch uint32) (*domain.EpochComputors, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-	epochComputorList, err := p.archiveClient.GetEpochComputors(ctx, epoch)
-	if err != nil {
-		return nil, fmt.Errorf("getting archive computor list for epoch [%d]: %w", epoch, err)
-	}
-
-	return epochComputorList, nil
-
-}
-
 func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status domain.Status) error {
 
 	fmt.Printf("Processing epoch [%d]\n", epoch)
@@ -155,6 +147,8 @@ func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status domain.Statu
 		return nil
 	}
 
+	// TODO this is only true for the current epoch. We should not do this for old epochs. Not sure if the tick number
+	//      should be part of the domain object as we do not really know the correct tick number.
 	epochComputorList.TickNumber = status.LastProcessedTick.TickNumber
 
 	err = p.Producer.SendMessage(context.Background(), epochComputorList)
@@ -177,11 +171,26 @@ func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status domain.Statu
 	return nil
 }
 
+func (p *EpochComputorsProcessor) fetchArchiverComputorList(epoch uint32) (*domain.EpochComputors, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	epochComputorList, err := p.archiveClient.GetEpochComputors(ctx, epoch)
+	if err != nil {
+		return nil, fmt.Errorf("getting archive computor list for epoch [%d]: %w", epoch, err)
+	}
+
+	return epochComputorList, nil
+
+}
+
 func computeComputorListSum(computors domain.EpochComputors) ([]byte, error) {
 
 	var buf bytes.Buffer
 	enc := gob.NewEncoder(&buf)
 
+	// TODO I don't think we should add the tick number 0 to the hash. Either use a different object for the
+	//      message or create the hash from the relevant parts explicitly. See events consumer for an example
+	//      for hash generation.
 	computors.TickNumber = 0 // we do not want to take the tick number into consideration
 
 	err := enc.Encode(computors)
@@ -189,7 +198,7 @@ func computeComputorListSum(computors domain.EpochComputors) ([]byte, error) {
 		return nil, fmt.Errorf("encoding computor list: %w", err)
 	}
 
-	s := md5.New()
+	s := md5.New() // TODO shouldn't we take K12 as it is used everywhere else, too?
 	s.Write(buf.Bytes())
 	sum := s.Sum(nil)
 	return sum, nil
