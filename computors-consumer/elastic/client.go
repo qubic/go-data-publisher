@@ -3,9 +3,9 @@ package elastic
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
-	"github.com/pkg/errors"
 	"log"
 	"runtime"
 	"time"
@@ -33,10 +33,10 @@ func (c *Client) BulkIndex(ctx context.Context, data []*EsDocument) error {
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Index:      c.indexName,              // The default index name
 		Client:     c.esClient,               // The Elasticsearch client
-		NumWorkers: min(runtime.NumCPU(), 2), // 8 parallel connections are enough
+		NumWorkers: min(runtime.NumCPU(), 8), // 8 parallel connections are enough
 	})
 	if err != nil {
-		return errors.Wrap(err, "Error creating bulk indexer")
+		return fmt.Errorf("creating bulk indexer: %w", err)
 	}
 
 	for _, d := range data {
@@ -59,13 +59,13 @@ func (c *Client) BulkIndex(ctx context.Context, data []*EsDocument) error {
 
 	err = bi.Close(ctx)
 	if err != nil {
-		return errors.Wrap(err, "Error closing bulk indexer")
+		return fmt.Errorf("closing bulk indexer: %w", err)
 	}
 
 	biStats := bi.Stats()
 	end := time.Now().UnixMilli()
 	if biStats.NumFailed > 0 {
-		return errors.Errorf("%d errors indexing [%d] documents",
+		return fmt.Errorf("%d errors indexing [%d] documents",
 			biStats.NumFailed,
 			biStats.NumFlushed,
 		)

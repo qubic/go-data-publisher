@@ -10,6 +10,7 @@ import (
 	"github.com/qubic/computors-consumer/consume"
 	"github.com/qubic/computors-consumer/elastic"
 	"github.com/qubic/computors-consumer/kafka"
+	"github.com/qubic/computors-consumer/metrics"
 	"github.com/qubic/computors-consumer/status"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/plugin/kprom"
@@ -65,7 +66,7 @@ func run() error {
 
 	out, err := conf.String(&cfg)
 	if err != nil {
-		return errors.Wrap(err, "generating config for output")
+		return fmt.Errorf("generating config for output: %w", err)
 	}
 	log.Printf("main: Config :\n%v\n", out)
 
@@ -102,7 +103,8 @@ func run() error {
 
 	elasticClient := elastic.NewClient(esClient, cfg.Elastic.IndexName)
 	kafkaClient := kafka.NewClient(kcl)
-	processor := consume.NewEpochProcessor(kafkaClient, elasticClient)
+	consumeMetrics := metrics.NewMetrics(cfg.Sync.MetricsNamespace)
+	processor := consume.NewEpochProcessor(kafkaClient, elasticClient, consumeMetrics)
 
 	procError := make(chan error, 1)
 	go func() {
