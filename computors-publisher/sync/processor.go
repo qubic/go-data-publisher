@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/md5"
+	"encoding/binary"
 	"encoding/gob"
 	"errors"
 	"fmt"
 	"github.com/qubic/computors-publisher/db"
 	"github.com/qubic/computors-publisher/domain"
 	"github.com/qubic/computors-publisher/metrics"
+	"github.com/qubic/go-qubic/common"
 	"log"
 	"time"
 )
@@ -46,28 +48,23 @@ func NewEpochComputorsProcessor(client ArchiveClient, store DataStore, producer 
 	}
 }
 
-func (p *EpochComputorsProcessor) StartProcessing() error {
-
-	// TODO I think we should not return an error here but retry if something goes wrong.
-	//      There is always the possibility that one of the services we call is down temporarily.
-
-	// do one initial process(), so we do not wait until first tick
-	err := p.process()
-	if err != nil {
-		return fmt.Errorf("processing epoch computors: %w", err)
-	}
-
-	ticker := time.Tick(time.Second)
+func (p *EpochComputorsProcessor) StartProcessing() {
+	// do one initial processing, so we do not wait until first tick
+	p.process()
+	ticker := time.Tick(time.Second * 10)
 	for range ticker {
-		err := p.process()
-		if err != nil {
-			return fmt.Errorf("processing epoch computors: %w", err)
-		}
+		p.process()
 	}
-	return nil
 }
 
-func (p *EpochComputorsProcessor) process() error {
+func (p *EpochComputorsProcessor) process() {
+	err := p.processEpochs()
+	if err != nil {
+		log.Printf("Error processing epoch computors: %v", err)
+	}
+}
+
+func (p *EpochComputorsProcessor) processEpochs() error {
 
 	status, err := p.archiveClient.GetStatus(context.Background())
 	if err != nil {
@@ -91,24 +88,9 @@ func (p *EpochComputorsProcessor) process() error {
 		return fmt.Errorf("last processed epoch [%d] is larger than current epoch [%d]: %w", lastProcessedEpoch, currentEpoch, err)
 	}
 
-	var epochsToProcess []uint32
-
-	if currentEpoch-lastProcessedEpoch > 1 { // Process multiple epochs
-		startIndex := -1
-		for i, epoch := range status.EpochList {
-			if epoch == lastProcessedEpoch {
-				startIndex = i
-				break
-			}
-		}
-
-		if startIndex == -1 {
-			return fmt.Errorf("last processed epoch %d not found in epoch list", lastProcessedEpoch)
-		}
-		epochsToProcess = status.EpochList[startIndex:]
-
-	} else {
-		epochsToProcess = []uint32{currentEpoch}
+	epochsToProcess, err := p.findEpochsToPublish(status, currentEpoch, lastProcessedEpoch)
+	if err != nil {
+		return fmt.Errorf("finding epochs to publish: %w", err)
 	}
 
 	for _, epoch := range epochsToProcess {
@@ -122,7 +104,7 @@ func (p *EpochComputorsProcessor) process() error {
 
 func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status domain.Status) error {
 
-	fmt.Printf("Processing epoch [%d]\n", epoch)
+	fmt.Printf("Processing epoch [%d].", epoch)
 
 	lastStoredComputorListSum, err := p.dataStore.GetLastStoredComputorListSum(epoch)
 	if err != nil && errors.Is(err, db.ErrNotFound) {
@@ -137,13 +119,13 @@ func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status domain.Statu
 		return fmt.Errorf("wrong epoch computor list returned by archiver. expected [%d] got [%d]", epoch, epochComputorList.Epoch)
 	}
 
-	currentSum, err := computeComputorListSum(*epochComputorList)
+	currentSum, err := computeComputorsChecksum(*epochComputorList)
 	if err != nil {
-		return fmt.Errorf("computing current computor list list sum for epoch [%d]: %w", epoch, err)
+		return fmt.Errorf("computing computors checksum for epoch [%d]: %w", epoch, err)
 	}
 
 	if bytes.Equal(currentSum, lastStoredComputorListSum) {
-		fmt.Printf("No new computor list for epoch [%d]\n", epoch)
+		fmt.Printf("No new computor list for epoch [%d].", epoch)
 		return nil
 	}
 
@@ -167,8 +149,26 @@ func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status domain.Statu
 	}
 	p.processingMetrics.SetProcessedEpoch(epoch)
 
-	fmt.Printf("Processed epoch: %d\n", epoch)
+	fmt.Printf("Processed epoch: %d.", epoch)
 	return nil
+}
+
+func (p *EpochComputorsProcessor) findEpochsToPublish(status *domain.Status, currentEpoch, lastProcessedEpoch uint32) ([]uint32, error) {
+	if currentEpoch-lastProcessedEpoch > 1 { // Process multiple epochs
+		startIndex := -1
+		for i, epoch := range status.EpochList {
+			if epoch == lastProcessedEpoch {
+				startIndex = i
+				break
+			}
+		}
+		if startIndex == -1 {
+			return nil, fmt.Errorf("last processed epoch %d not found in epoch list", lastProcessedEpoch)
+		}
+		return status.EpochList[startIndex:], nil
+	} else {
+		return []uint32{currentEpoch}, nil
+	}
 }
 
 func (p *EpochComputorsProcessor) fetchArchiverComputorList(epoch uint32) (*domain.EpochComputors, error) {
@@ -202,4 +202,35 @@ func computeComputorListSum(computors domain.EpochComputors) ([]byte, error) {
 	s.Write(buf.Bytes())
 	sum := s.Sum(nil)
 	return sum, nil
+}
+
+func computeComputorsChecksum(computors domain.EpochComputors) ([]byte, error) {
+	var buff bytes.Buffer
+
+	// epoch
+	err := binary.Write(&buff, binary.LittleEndian, computors.Epoch)
+	if err != nil {
+		return nil, fmt.Errorf("writing epoch to buffer: %w", err)
+	}
+
+	// computors
+	for _, identity := range computors.Identities {
+		_, err = buff.Write([]byte(identity))
+		if err != nil {
+			return nil, fmt.Errorf("writing identity [%s] to buffer: %w", identity, err)
+		}
+	}
+
+	// signature
+	_, err = buff.Write([]byte(computors.Signature))
+	if err != nil {
+		return nil, fmt.Errorf("writing signature [%s] to buffer: %w", computors.Signature, err)
+	}
+
+	// k12 hash
+	hash, err := common.K12Hash(buff.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("generating hash: %w", err)
+	}
+	return hash[:], nil
 }

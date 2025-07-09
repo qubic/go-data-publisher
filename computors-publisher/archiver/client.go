@@ -31,25 +31,40 @@ func (c *Client) GetStatus(ctx context.Context) (*domain.Status, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting archive status: %w", err)
 	}
+	return convertStatus(status), nil
+}
 
+func convertStatus(status *protobuff.GetStatusResponse) *domain.Status {
 	var epochs []uint32
-
 	for epoch := range status.LastProcessedTicksPerEpoch {
 		epochs = append(epochs, epoch)
 	}
-
 	slices.Sort(epochs) // make sure epochs are not out of order
+
+	var tickIntervals = make(map[uint32][]*domain.TickInterval, len(epochs))
+	for _, epochTickInterval := range status.ProcessedTickIntervalsPerEpoch {
+		epoch := epochTickInterval.Epoch
+		intervals := make([]*domain.TickInterval, 0, len(epochTickInterval.Intervals))
+		for _, tickInterval := range epochTickInterval.Intervals {
+			intervals = append(intervals, &domain.TickInterval{
+				FirstTick: tickInterval.InitialProcessedTick,
+				LastTick:  tickInterval.LastProcessedTick,
+			})
+		}
+		tickIntervals[epoch] = intervals
+	}
 
 	return &domain.Status{
 		LastProcessedTick: domain.ProcessedTick{
 			TickNumber: status.LastProcessedTick.TickNumber,
 			Epoch:      status.LastProcessedTick.Epoch,
 		},
-		EpochList: epochs}, nil
+		EpochList:     epochs,
+		TickIntervals: tickIntervals,
+	}
 }
 
 func (c *Client) GetEpochComputors(ctx context.Context, epoch uint32) (*domain.EpochComputors, error) {
-
 	request := protobuff.GetComputorsRequest{
 		Epoch: epoch,
 	}
@@ -68,9 +83,7 @@ func (c *Client) GetEpochComputors(ctx context.Context, epoch uint32) (*domain.E
 	if err != nil {
 		return nil, fmt.Errorf("converting epoch computor list: %w", err)
 	}
-
 	return computorList, nil
-
 }
 
 func convertComputorList(computors *protobuff.Computors) (*domain.EpochComputors, error) {
