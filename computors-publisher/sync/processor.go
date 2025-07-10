@@ -3,9 +3,8 @@ package sync
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
 	"encoding/binary"
-	"encoding/gob"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/qubic/computors-publisher/db"
@@ -51,6 +50,7 @@ func NewEpochComputorsProcessor(client ArchiveClient, store DataStore, producer 
 func (p *EpochComputorsProcessor) StartProcessing() {
 	// do one initial processing, so we do not wait until first tick
 	p.process()
+	log.Println("Initial processing completed. Starting loop...")
 	ticker := time.Tick(time.Second * 10)
 	for range ticker {
 		p.process()
@@ -80,10 +80,6 @@ func (p *EpochComputorsProcessor) processEpochs() error {
 	}
 
 	currentEpoch := status.EpochList[len(status.EpochList)-1]
-	if lastProcessedEpoch == currentEpoch {
-		log.Printf("Epoch up to date.")
-		return nil
-	}
 	if lastProcessedEpoch > currentEpoch {
 		return fmt.Errorf("last processed epoch [%d] is larger than current epoch [%d]: %w", lastProcessedEpoch, currentEpoch, err)
 	}
@@ -94,7 +90,7 @@ func (p *EpochComputorsProcessor) processEpochs() error {
 	}
 
 	for _, epoch := range epochsToProcess {
-		err = p.processEpoch(epoch, *status)
+		err = p.processEpoch(epoch, status)
 		if err != nil {
 			return fmt.Errorf("processing epoch %d: %w", epoch, err)
 		}
@@ -102,12 +98,10 @@ func (p *EpochComputorsProcessor) processEpochs() error {
 	return nil
 }
 
-func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status domain.Status) error {
+func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status *domain.Status) error {
 
-	fmt.Printf("Processing epoch [%d].", epoch)
-
-	lastStoredComputorListSum, err := p.dataStore.GetLastStoredComputorListSum(epoch)
-	if err != nil && errors.Is(err, db.ErrNotFound) {
+	lastStoredChecksum, err := p.dataStore.GetLastStoredComputorListSum(epoch)
+	if err != nil && !errors.Is(err, db.ErrNotFound) {
 		return fmt.Errorf("getting last stored computor list for epoch [%d]: %w", epoch, err)
 	}
 
@@ -119,26 +113,36 @@ func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status domain.Statu
 		return fmt.Errorf("wrong epoch computor list returned by archiver. expected [%d] got [%d]", epoch, epochComputorList.Epoch)
 	}
 
-	currentSum, err := computeComputorsChecksum(*epochComputorList)
+	checksum, err := computeComputorsChecksum(*epochComputorList)
 	if err != nil {
 		return fmt.Errorf("computing computors checksum for epoch [%d]: %w", epoch, err)
 	}
 
-	if bytes.Equal(currentSum, lastStoredComputorListSum) {
-		fmt.Printf("No new computor list for epoch [%d].", epoch)
-		return nil
+	if bytes.Equal(checksum, lastStoredChecksum) {
+		return nil // same list already published
+	}
+	log.Printf("New computors list checksum [%s] for epoch [%d]. Previous: [%s]",
+		hex.EncodeToString(checksum), epoch,
+		hex.EncodeToString(lastStoredChecksum))
+
+	if epochComputorList.TickNumber == 0 {
+		// in the future the tick number should come from archiver (currently only one list per epoch is supported there).
+		epochComputorList.TickNumber, err = calculateTickNumber(status, epoch, len(lastStoredChecksum) == 0)
+		if err != nil {
+			return fmt.Errorf("calculating tick number: %w", err)
+		}
+	} else {
+		log.Printf("[WARN] tick number already set. Remove old tick number calculation code.")
 	}
 
-	// TODO this is only true for the current epoch. We should not do this for old epochs. Not sure if the tick number
-	//      should be part of the domain object as we do not really know the correct tick number.
-	epochComputorList.TickNumber = status.LastProcessedTick.TickNumber
-
+	log.Printf("Publish new list for epoch [%d], tick [%d], signature [%s].",
+		epochComputorList.Epoch, epochComputorList.TickNumber, epochComputorList.Signature)
 	err = p.Producer.SendMessage(context.Background(), epochComputorList)
 	if err != nil {
 		return fmt.Errorf("producing epoch computor list record for epoch [%d]: %w", epoch, err)
 	}
 
-	err = p.dataStore.SetLastStoredComputorListSum(epoch, currentSum)
+	err = p.dataStore.SetLastStoredComputorListSum(epoch, checksum)
 	if err != nil {
 		return fmt.Errorf("setting last stored computor list sum for epoch [%d]: %w", epoch, err)
 	}
@@ -149,7 +153,7 @@ func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status domain.Statu
 	}
 	p.processingMetrics.SetProcessedEpoch(epoch)
 
-	fmt.Printf("Processed epoch: %d.", epoch)
+	log.Printf("Successfully published computors list for epoch [%d].", epoch)
 	return nil
 }
 
@@ -183,25 +187,23 @@ func (p *EpochComputorsProcessor) fetchArchiverComputorList(epoch uint32) (*doma
 
 }
 
-func computeComputorListSum(computors domain.EpochComputors) ([]byte, error) {
-
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-
-	// TODO I don't think we should add the tick number 0 to the hash. Either use a different object for the
-	//      message or create the hash from the relevant parts explicitly. See events consumer for an example
-	//      for hash generation.
-	computors.TickNumber = 0 // we do not want to take the tick number into consideration
-
-	err := enc.Encode(computors)
-	if err != nil {
-		return nil, fmt.Errorf("encoding computor list: %w", err)
+func calculateTickNumber(status *domain.Status, epoch uint32, isInitialListOfEpoch bool) (uint32, error) {
+	if isInitialListOfEpoch {
+		// initial list of epoch - return initial tick
+		tickIntervals, ok := status.TickIntervals[epoch]
+		if !ok || len(tickIntervals) == 0 {
+			return 0, fmt.Errorf("calculating initial tick of epoch [%d]", epoch)
+		}
+		return tickIntervals[0].FirstTick, nil
+	} else {
+		log.Printf("Computors list changed within epoch.")
+		if epoch != status.LastProcessedTick.Epoch {
+			// setting tick number for changes in old epochs is not supported
+			return 0, fmt.Errorf("unexpected list change in epoch [%d]", epoch)
+		}
+		// list changed within epoch. Return current tick.
+		return status.LastProcessedTick.TickNumber, nil
 	}
-
-	s := md5.New() // TODO shouldn't we take K12 as it is used everywhere else, too?
-	s.Write(buf.Bytes())
-	sum := s.Sum(nil)
-	return sum, nil
 }
 
 func computeComputorsChecksum(computors domain.EpochComputors) ([]byte, error) {

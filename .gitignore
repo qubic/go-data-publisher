@@ -20,14 +20,9 @@ http_ca.crt
 .env
 *local*
 
-# status service
+# ignore local pebble store files
 status-service/store
-
-# tick data publisher
 tick-data-publisher/store
-
-# transaction consumer
 transactions-consumer/store
-
-# transaction processor
 tx-processor-store/
+computors-publisher/store

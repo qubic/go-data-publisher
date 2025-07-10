@@ -36,6 +36,8 @@ func createRecord(computorList *domain.EpochComputors) (*kgo.Record, error) {
 	if err != nil {
 		return nil, fmt.Errorf("marshalling to json: %w", err)
 	}
+
+	// set epoch as key to make sure all lists for this epoch go to the same partition
 	key := make([]byte, 4)
 	binary.LittleEndian.PutUint32(key, computorList.Epoch)
 

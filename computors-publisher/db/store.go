@@ -66,7 +66,7 @@ func (ps *PebbleStore) GetLastProcessedEpoch() (uint32, error) {
 func (ps *PebbleStore) SetLastStoredComputorListSum(epoch uint32, sum []byte) error {
 
 	key := []byte{computorListSumKey}
-	binary.LittleEndian.AppendUint32(key, epoch)
+	key = binary.LittleEndian.AppendUint32(key, epoch)
 
 	err := ps.db.Set(key, sum, pebble.Sync)
 	if err != nil {
@@ -79,11 +79,10 @@ func (ps *PebbleStore) SetLastStoredComputorListSum(epoch uint32, sum []byte) er
 func (ps *PebbleStore) GetLastStoredComputorListSum(epoch uint32) ([]byte, error) {
 
 	key := []byte{computorListSumKey}
-	binary.LittleEndian.PutUint32(key, epoch)
+	key = binary.LittleEndian.AppendUint32(key, epoch)
 
 	value, closer, err := ps.db.Get(key)
 	if errors.Is(err, pebble.ErrNotFound) {
-		log.Printf("[WARN]: No last stored computor list sum has been found.")
 		return nil, ErrNotFound
 	}
 	if err != nil {
