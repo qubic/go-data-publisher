@@ -116,6 +116,7 @@ func run() error {
 		kgo.DefaultProduceTopic(cfg.Kafka.TxTopic),
 		kgo.SeedBrokers(cfg.Kafka.BootstrapServers...),
 		kgo.ProducerBatchCompression(kgo.ZstdCompression()),
+		kgo.WithLogger(kgo.BasicLogger(os.Stdout, kgo.LogLevelInfo, nil)),
 	)
 	if err != nil {
 		return errors.Wrap(err, "creating kafka client")

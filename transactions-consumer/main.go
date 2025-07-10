@@ -93,6 +93,7 @@ func run() error {
 		kgo.ConsumerGroup(cfg.Broker.ConsumerGroup),
 		kgo.BlockRebalanceOnPoll(),
 		kgo.DisableAutoCommit(),
+		kgo.WithLogger(kgo.BasicLogger(os.Stdout, kgo.LogLevelInfo, nil)),
 	)
 	if err != nil {
 		log.Fatal(err)

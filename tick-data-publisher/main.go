@@ -87,6 +87,7 @@ func run() error {
 		kgo.SeedBrokers(cfg.Broker.BootstrapServers...),
 		kgo.DefaultProduceTopic(cfg.Broker.ProduceTopic),
 		kgo.ProducerBatchCompression(kgo.ZstdCompression()),
+		kgo.WithLogger(kgo.BasicLogger(os.Stdout, kgo.LogLevelInfo, nil)),
 	)
 	if err != nil {
 		log.Fatal(err)
