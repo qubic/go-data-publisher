@@ -70,6 +70,9 @@ func (p *EpochComputorsProcessor) processEpochs() error {
 	if err != nil {
 		return fmt.Errorf("getting archive status: %w", err)
 	}
+	archiverEpoch := status.LastProcessedTick.Epoch
+	archiverTick := status.LastProcessedTick.TickNumber
+	p.processingMetrics.SetSourceTick(archiverEpoch, archiverTick)
 
 	lastProcessedEpoch, err := p.dataStore.GetLastProcessedEpoch()
 	if err != nil {
@@ -79,12 +82,11 @@ func (p *EpochComputorsProcessor) processEpochs() error {
 		lastProcessedEpoch = status.EpochList[0]
 	}
 
-	currentEpoch := status.EpochList[len(status.EpochList)-1]
-	if lastProcessedEpoch > currentEpoch {
-		return fmt.Errorf("last processed epoch [%d] is larger than current epoch [%d]: %w", lastProcessedEpoch, currentEpoch, err)
+	if lastProcessedEpoch > archiverEpoch {
+		return fmt.Errorf("last processed epoch [%d] is larger than current epoch [%d]: %w", lastProcessedEpoch, archiverEpoch, err)
 	}
 
-	epochsToProcess, err := p.findEpochsToPublish(status, currentEpoch, lastProcessedEpoch)
+	epochsToProcess, err := p.findEpochsToPublish(status, archiverEpoch, lastProcessedEpoch)
 	if err != nil {
 		return fmt.Errorf("finding epochs to publish: %w", err)
 	}
@@ -95,6 +97,7 @@ func (p *EpochComputorsProcessor) processEpochs() error {
 			return fmt.Errorf("processing epoch %d: %w", epoch, err)
 		}
 	}
+	p.processingMetrics.SetProcessedTick(archiverEpoch, archiverTick)
 	return nil
 }
 
@@ -141,6 +144,8 @@ func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status *domain.Stat
 	if err != nil {
 		return fmt.Errorf("producing epoch computor list record for epoch [%d]: %w", epoch, err)
 	}
+	p.processingMetrics.SetProcessedTick(epochComputorList.Epoch, epochComputorList.TickNumber)
+	p.processingMetrics.IncProcessedMessages()
 
 	err = p.dataStore.SetLastStoredComputorListSum(epoch, checksum)
 	if err != nil {
@@ -151,7 +156,6 @@ func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status *domain.Stat
 	if err != nil {
 		return fmt.Errorf("failed to store last processed epoch [%d]: %w", epoch, err)
 	}
-	p.processingMetrics.SetProcessedEpoch(epoch)
 
 	log.Printf("Successfully published computors list for epoch [%d].", epoch)
 	return nil
