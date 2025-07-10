@@ -5,8 +5,10 @@ go 1.24.0
 toolchain go1.24.2
 
 require (
+	github.com/ardanlabs/conf v1.5.0
 	github.com/ardanlabs/conf/v3 v3.8.0
 	github.com/elastic/go-elasticsearch/v8 v8.18.1
+	github.com/joho/godotenv v1.5.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.22.0
 	github.com/qubic/go-qubic v0.3.0

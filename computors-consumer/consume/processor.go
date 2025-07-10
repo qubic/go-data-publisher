@@ -23,6 +23,7 @@ type KafkaClient interface {
 
 type ElasticClient interface {
 	BulkIndex(ctx context.Context, data []*elastic.EsDocument) error
+	FindLatestComputorsListForEpoch(ctx context.Context, epoch uint32) (*elastic.ComputorsList, error)
 }
 
 type EpochProcessor struct {
@@ -41,7 +42,7 @@ func NewEpochProcessor(client KafkaClient, elasticClient ElasticClient, metrics 
 }
 
 func (p *EpochProcessor) Consume() error {
-	ticker := time.Tick(time.Millisecond * 100)
+	ticker := time.Tick(time.Second)
 	for range ticker {
 		count, err := p.consumeBatch(context.Background())
 		if err != nil {
@@ -49,7 +50,7 @@ func (p *EpochProcessor) Consume() error {
 			return fmt.Errorf("consuming batch: %w", err)
 		} else {
 			p.metrics.IncProcessedMessages(count)
-			log.Printf("Consumed [%d] messages.", count)
+			log.Printf("Consumed [%d] message(s).", count)
 		}
 	}
 	return nil
@@ -57,21 +58,50 @@ func (p *EpochProcessor) Consume() error {
 
 func (p *EpochProcessor) consumeBatch(ctx context.Context) (int, error) {
 	defer p.kafkaClient.AllowRebalance() // because of kgo.BlockRebalanceOnPoll()
-	epochComputorList, err := p.kafkaClient.PollMessages(ctx)
+	messages, err := p.kafkaClient.PollMessages(ctx)
 	if err != nil {
 		return -1, fmt.Errorf("polling kafka messages: %w", err)
 	}
 
-	err = p.sendToElastic(ctx, epochComputorList)
+	// duplicate check only works if there is enough time between bulk insert and querying
+	filteredMessages, err := p.filterDuplicateComputorLists(ctx, messages)
 	if err != nil {
-		return -1, fmt.Errorf("sending epoch computor batch to elastic: %w", err)
+		return -1, fmt.Errorf("filter duplicate computor lists: %w", err)
+	}
+
+	if len(filteredMessages) > 0 {
+		err = p.sendToElastic(ctx, filteredMessages)
+		if err != nil {
+			return -1, fmt.Errorf("sending epoch computor batch to elastic: %w", err)
+		}
+	} else {
+		log.Printf("No messages to send to elastic.")
 	}
 
 	err = p.kafkaClient.Commit(ctx) // because of kgo.DisableAutoCommit()
 	if err != nil {
 		return -1, fmt.Errorf("commiting kafka batch: %w", err)
 	}
-	return len(epochComputorList), nil
+	return len(messages), nil
+}
+
+func (p *EpochProcessor) filterDuplicateComputorLists(ctx context.Context, messages []*domain.EpochComputors) ([]*domain.EpochComputors, error) {
+	filteredList := make([]*domain.EpochComputors, 0, len(messages))
+	for _, computorsList := range messages {
+		latestList, latestErr := p.elasticClient.FindLatestComputorsListForEpoch(ctx, computorsList.Epoch)
+		if latestErr != nil {
+			return nil, fmt.Errorf("checking latest computors list for epoch %d: %w", computorsList.Epoch, latestErr)
+		}
+		if latestList == nil || latestList.Signature != computorsList.Signature {
+			log.Printf("Ingest computors list for epoch [%d] and tick [%d].",
+				computorsList.Epoch, computorsList.TickNumber)
+			filteredList = append(filteredList, computorsList)
+		} else {
+			log.Printf("Ignore duplicate computors list. Epoch [%d], tick [%d], signature [%s].",
+				computorsList.Epoch, computorsList.TickNumber, computorsList.Signature)
+		}
+	}
+	return filteredList, nil
 }
 
 func (p *EpochProcessor) sendToElastic(ctx context.Context, epochComputorsList []*domain.EpochComputors) error {
@@ -118,11 +148,10 @@ func calculateUniqueId(event *domain.EpochComputors) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("writing epoch to buffer: %w", err)
 	}
-	// TODO check if tick number is part of the id
-	//err = binary.Write(&buff, binary.LittleEndian, event.TickNumber)
-	//if err != nil {
-	//	return "", fmt.Errorf("writing tick to buffer: %w", err)
-	//}
+	err = binary.Write(&buff, binary.LittleEndian, event.TickNumber)
+	if err != nil {
+		return "", fmt.Errorf("writing tick to buffer: %w", err)
+	}
 	for _, identity := range event.Identities {
 		_, err = buff.Write([]byte(identity))
 		if err != nil {

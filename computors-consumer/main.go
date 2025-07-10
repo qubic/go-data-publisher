@@ -51,7 +51,6 @@ func run() error {
 		Sync struct {
 			MetricsPort      int    `conf:"default:9999"`
 			MetricsNamespace string `conf:"default:qubic-kafka"`
-			Enabled          bool   `conf:"default:true"` // only for testing
 		}
 	}
 
@@ -78,6 +77,7 @@ func run() error {
 		kgo.SeedBrokers(cfg.Broker.BootstrapServers...),
 		kgo.ConsumeTopics(cfg.Broker.ConsumeTopic),
 		kgo.ConsumerGroup(cfg.Broker.ConsumerGroup),
+		kgo.WithLogger(kgo.BasicLogger(os.Stdout, kgo.LogLevelInfo, nil)),
 		kgo.BlockRebalanceOnPoll(),
 		kgo.DisableAutoCommit(),
 	)
@@ -130,7 +130,7 @@ func run() error {
 			log.Println("main: Received shutdown signal, shutting down...")
 			return nil
 		case err := <-procError:
-			return fmt.Errorf("[ERROR] processing error: %v", err)
+			return fmt.Errorf("[ERROR] processing: %v", err)
 		case err := <-serverError:
 			return fmt.Errorf("[ERROR] starting server: %v", err)
 		}

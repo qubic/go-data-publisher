@@ -36,8 +36,13 @@ func (f *FakeKafkaClient) AllowRebalance() {
 
 type FakeElasticClient struct {
 	lastDocuments  []*elastic.EsDocument
+	duplicate      *elastic.ComputorsList
 	err            error
 	bulkIndexCount int
+}
+
+func (f *FakeElasticClient) FindLatestComputorsListForEpoch(ctx context.Context, epoch uint32) (*elastic.ComputorsList, error) {
+	return f.duplicate, f.err
 }
 
 func (f *FakeElasticClient) BulkIndex(_ context.Context, documents []*elastic.EsDocument) error {
@@ -77,6 +82,35 @@ func TestProcessor_ConsumeBatch(t *testing.T) {
 
 }
 
+func TestProcessor_ConsumeBatch_GivenDuplicate_IgnoreDuplicate(t *testing.T) {
+	computorsList := []*domain.EpochComputors{
+		{Epoch: 1, TickNumber: 100, Identities: []string{"A", "B", "C"}, Signature: "signature-1"},
+		{Epoch: 2, TickNumber: 200, Identities: []string{"A", "B", "D"}, Signature: "signature-2"},
+	}
+
+	kafkaClient := &FakeKafkaClient{
+		computorsList: computorsList,
+	}
+	elasticClient := &FakeElasticClient{
+		duplicate: &elastic.ComputorsList{
+			Epoch:      2,
+			TickNumber: 200,
+			Signature:  "signature-2",
+		},
+	}
+	processor := NewEpochProcessor(kafkaClient, elasticClient, m)
+
+	count, err := processor.consumeBatch(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
+	require.Equal(t, 1, elasticClient.bulkIndexCount)
+	require.Len(t, elasticClient.lastDocuments, 1)
+
+	doc1, err := convertToDocument(computorsList[0])
+	require.NoError(t, err)
+	assert.Equal(t, doc1, elasticClient.lastDocuments[0])
+}
+
 func TestProcessor_CalculateId(t *testing.T) {
 	content, err := os.ReadFile("example-computors-list.json")
 	var computors *domain.EpochComputors
@@ -85,7 +119,7 @@ func TestProcessor_CalculateId(t *testing.T) {
 
 	id, err := calculateUniqueId(computors)
 	require.NoError(t, err)
-	require.Equal(t, "8a80bedea01b4a8f6f3166364832ad079926b7d8b7ca2e3a8f84fbde2e680458", id)
+	require.Equal(t, "0311802cd338e16653c563c94934de9673bc42561c9b5ee6d5784293cc68de50", id)
 }
 
 func TestProcessor_ConvertToDocument(t *testing.T) {
@@ -99,6 +133,6 @@ func TestProcessor_ConvertToDocument(t *testing.T) {
 
 	document, err := convertToDocument(computors)
 	require.NoError(t, err)
-	require.Equal(t, "8a80bedea01b4a8f6f3166364832ad079926b7d8b7ca2e3a8f84fbde2e680458", document.Id)
+	require.Equal(t, "0311802cd338e16653c563c94934de9673bc42561c9b5ee6d5784293cc68de50", document.Id)
 	require.Equal(t, marshalled, document.Payload)
 }
