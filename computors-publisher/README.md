@@ -32,7 +32,8 @@ OPTIONS
       --sync-internal-store-folder  <string>              (default: store)            
       --sync-metrics-namespace      <string>              (default: qubic-kafka)      
       --sync-metrics-port           <int>                 (default: 9999)             
-      --sync-server-port            <int>                 (default: 8000)             
+      --sync-server-port            <int>                 (default: 8000)
+      --sync-start-epoch            <uint32>              (default: 0)             
 
 ENVIRONMENT
   QUBIC_COMPUTORS_PUBLISHER_BROKER_BOOTSTRAP_SERVERS    <string>,[string...]  (default: localhost:9092)   
@@ -41,7 +42,8 @@ ENVIRONMENT
   QUBIC_COMPUTORS_PUBLISHER_SYNC_INTERNAL_STORE_FOLDER  <string>              (default: store)            
   QUBIC_COMPUTORS_PUBLISHER_SYNC_METRICS_NAMESPACE      <string>              (default: qubic-kafka)      
   QUBIC_COMPUTORS_PUBLISHER_SYNC_METRICS_PORT           <int>                 (default: 9999)             
-  QUBIC_COMPUTORS_PUBLISHER_SYNC_SERVER_PORT            <int>                 (default: 8000)             
+  QUBIC_COMPUTORS_PUBLISHER_SYNC_SERVER_PORT            <int>                 (default: 8000)
+  QUBIC_COMPUTORS_PUBLISHER_SYNC_START_EPOCH            <uint32>              (default: 0)                
 
 
 ```
