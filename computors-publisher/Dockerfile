@@ -10,7 +10,7 @@ RUN go build
 
 FROM alpine:latest
 
-COPY --from=builder /src/computors-publisher /app/computors-publisher
+COPY --from=builder /src/computors-publisher/computors-publisher /app/computors-publisher
 
 RUN chmod +x /app/computors-publisher
 
