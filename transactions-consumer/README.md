@@ -1,6 +1,6 @@
 # go-transactions-consumer
 
-Service for consuming qubic transaction messages from a message broker.
+Service for consuming qubic transaction messages from a kafka message broker.
 
 ## Build
 
