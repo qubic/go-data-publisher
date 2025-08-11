@@ -47,7 +47,10 @@ func run() error {
 			MetricsNamespace    string   `conf:"default:qubic-kafka"`
 			NumWorkers          int      `conf:"default:16"` // maximum number of workers for parallel processing
 			PublishCustomTicks  []uint32 `conf:"optional"`
-			StartTick           uint32   `conf:"optional"`     // overrides last processed tick
+			StartTick           uint32   `conf:"optional"` // overrides last processed tick
+			RangeStart          uint32   `conf:"optional"`
+			RangeEnd            uint32   `conf:"optional"`
+			RangeEpoch          uint32   `conf:"optional"`
 			Enabled             bool     `conf:"default:true"` // only for testing
 		}
 	}
@@ -123,6 +126,11 @@ func run() error {
 	processor := sync.NewTickDataProcessor(store, cl, producer, cfg.Sync.NumWorkers, procMetrics)
 	if !cfg.Sync.Enabled {
 		log.Println("[WARN] main: Message consuming disabled")
+	} else if cfg.Sync.RangeStart > 0 && cfg.Sync.RangeEnd > 0 && cfg.Sync.RangeEpoch > 0 {
+		log.Printf("main: Processing range from [%d] to [%d] in epoch [%d].", cfg.Sync.RangeStart, cfg.Sync.RangeEnd, cfg.Sync.RangeEpoch)
+		go func() {
+			procErr <- processor.ProcessTickRange(cfg.Sync.RangeStart, cfg.Sync.RangeEnd, cfg.Sync.RangeEpoch)
+		}()
 	} else if len(cfg.Sync.PublishCustomTicks) > 0 {
 		go func() { procErr <- processor.PublishCustomTicks(cfg.Sync.PublishCustomTicks) }()
 	} else {
