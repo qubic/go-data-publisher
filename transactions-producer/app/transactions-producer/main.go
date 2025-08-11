@@ -59,9 +59,10 @@ func run() error {
 		MetricsNamespace string `conf:"default:qubic-kafka"`
 		MetricsPort      int    `conf:"default:9999"`
 		Sync             struct {
-			RangeStart uint32 `conf:"optional"`
-			RangeEnd   uint32 `conf:"optional"`
-			RangeEpoch uint32 `conf:"optional"`
+			RangeStart   uint32 `conf:"optional"`
+			RangeEnd     uint32 `conf:"optional"`
+			RangeEpoch   uint32 `conf:"optional"`
+			VoidTxStatus bool   `conf:"false"`
 		}
 	}
 
@@ -129,7 +130,7 @@ func run() error {
 
 	kafkaClient := kafka.NewClient(kcl)
 
-	archiverClient, err := archiver.NewClient(cfg.ArchiverGrpcHost)
+	archiverClient, err := archiver.NewClient(cfg.ArchiverGrpcHost, cfg.Sync.VoidTxStatus)
 	if err != nil {
 		return fmt.Errorf("creating archiver client: %v", err)
 	}

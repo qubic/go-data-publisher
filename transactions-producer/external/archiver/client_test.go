@@ -55,7 +55,7 @@ func TestArchiverClient_ArchiveTxToEntityTx(t *testing.T) {
 	for _, testRun := range testData {
 		t.Run(testRun.name, func(t *testing.T) {
 
-			got, err := archiveTxsToEntitiesTx(testRun.archiverTransactions)
+			got, err := archiveTxsToEntitiesTx(testRun.archiverTransactions, false)
 			require.NoError(t, err)
 
 			if diff := cmp.Diff(testRun.expected, got); diff != "" {

@@ -12,7 +12,7 @@ import (
 const url = "localhost:8010"
 
 func TestArchiverClient_getTickTransactions(t *testing.T) {
-	client, err := NewClient(url)
+	client, err := NewClient(url, false)
 	require.NoError(t, err)
 	transactions, err := client.GetTickTransactions(context.Background(), 26903327)
 	require.NoError(t, err)
@@ -20,7 +20,7 @@ func TestArchiverClient_getTickTransactions(t *testing.T) {
 }
 
 func TestArchiverClient_getTickTransactions_emptyTick(t *testing.T) {
-	client, err := NewClient(url)
+	client, err := NewClient(url, false)
 	require.NoError(t, err)
 	transactions, err := client.GetTickTransactions(context.Background(), 26903328)
 	require.NoError(t, err)
@@ -28,7 +28,7 @@ func TestArchiverClient_getTickTransactions_emptyTick(t *testing.T) {
 }
 
 func TestArchiverClient_getTickTransactions_invalidTick(t *testing.T) {
-	client, err := NewClient(url)
+	client, err := NewClient(url, false)
 	require.NoError(t, err)
 	_, err = client.GetTickTransactions(context.Background(), 666)
 	require.Error(t, err)
