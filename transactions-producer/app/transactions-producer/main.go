@@ -148,7 +148,7 @@ func run() error {
 	if cfg.Sync.RangeStart > 0 && cfg.Sync.RangeEnd > 0 && cfg.Sync.RangeEpoch > 0 {
 		log.Printf("main: Processing range from [%d] to [%d] in epoch [%d].", cfg.Sync.RangeStart, cfg.Sync.RangeEnd, cfg.Sync.RangeEpoch)
 		go func() {
-			procErrors <- proc.ProcessTickRange(cfg.Sync.RangeStart, cfg.Sync.RangeEnd, cfg.Sync.RangeEpoch)
+			procErrors <- proc.ProcessTickRange(cfg.Sync.RangeEpoch, cfg.Sync.RangeStart, cfg.Sync.RangeEnd)
 		}()
 
 	} else if len(cfg.PublishCustomTicks) > 0 {

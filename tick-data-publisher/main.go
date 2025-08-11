@@ -129,7 +129,7 @@ func run() error {
 	} else if cfg.Sync.RangeStart > 0 && cfg.Sync.RangeEnd > 0 && cfg.Sync.RangeEpoch > 0 {
 		log.Printf("main: Processing range from [%d] to [%d] in epoch [%d].", cfg.Sync.RangeStart, cfg.Sync.RangeEnd, cfg.Sync.RangeEpoch)
 		go func() {
-			procErr <- processor.ProcessTickRange(cfg.Sync.RangeStart, cfg.Sync.RangeEnd, cfg.Sync.RangeEpoch)
+			procErr <- processor.ProcessTickRange(cfg.Sync.RangeEpoch, cfg.Sync.RangeStart, cfg.Sync.RangeEnd)
 		}()
 	} else if len(cfg.Sync.PublishCustomTicks) > 0 {
 		go func() { procErr <- processor.PublishCustomTicks(cfg.Sync.PublishCustomTicks) }()
