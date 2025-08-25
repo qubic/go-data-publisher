@@ -30,13 +30,6 @@ func (c *Client) GetStatus(ctx context.Context) (*protobuff.GetStatusResponse, e
 	if err != nil {
 		return nil, errors.Wrap(err, "calling GetStatus api")
 	}
-	for idx, intervals := range s.ProcessedTickIntervalsPerEpoch {
-		if intervals.Epoch != 172 {
-			continue
-		}
-
-		s.ProcessedTickIntervalsPerEpoch[idx].Intervals[0].LastProcessedTick = 30897146
-	}
 
 	return s, nil
 }
