@@ -108,6 +108,10 @@ func createArchiverStatusResponse(sp StatusProvider, tickIntervals *protobuf.Get
 		Epoch: 0,
 	}
 	for index, interval := range tickIntervals.GetIntervals() {
+		if interval.Epoch == 172 {
+			interval.LastTick = 30897146
+		}
+
 		if interval.Epoch > tickIntervalsPerEpoch.Epoch { // create new epoch
 			tickIntervalsPerEpoch = &protobuf.ProcessedTickIntervalsPerEpoch{
 				Epoch:     interval.Epoch,
@@ -197,6 +201,10 @@ func createTickIntervalResponse(sp StatusProvider) (*protobuf.GetTickIntervalsRe
 	intervalsCount := len(sourceStatus.TickIntervals)
 	intervals := make([]*protobuf.TickInterval, 0, intervalsCount)
 	for _, interval := range sourceStatus.TickIntervals {
+		if interval.Epoch == 172 {
+			interval.To = 30897146
+		}
+
 		if lastProcessedTick >= interval.From && lastProcessedTick <= interval.To {
 			intervals = append(intervals, &protobuf.TickInterval{
 				Epoch:     interval.Epoch,

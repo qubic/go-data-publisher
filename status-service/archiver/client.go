@@ -30,6 +30,7 @@ func (c *Client) GetStatus(ctx context.Context) (*protobuff.GetStatusResponse, e
 	if err != nil {
 		return nil, errors.Wrap(err, "calling GetStatus api")
 	}
+
 	return s, nil
 }
 
