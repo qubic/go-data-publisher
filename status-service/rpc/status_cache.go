@@ -108,6 +108,7 @@ func createArchiverStatusResponse(sp StatusProvider, tickIntervals *protobuf.Get
 		Epoch: 0,
 	}
 	for index, interval := range tickIntervals.GetIntervals() {
+		// override last tick for epoch 172. data is not in archiver but in backend only.
 		if interval.Epoch == 172 {
 			interval.LastTick = 30897146
 		}
@@ -201,6 +202,7 @@ func createTickIntervalResponse(sp StatusProvider) (*protobuf.GetTickIntervalsRe
 	intervalsCount := len(sourceStatus.TickIntervals)
 	intervals := make([]*protobuf.TickInterval, 0, intervalsCount)
 	for _, interval := range sourceStatus.TickIntervals {
+		// override last tick for epoch 172. data is not in archiver but in backend only.
 		if interval.Epoch == 172 {
 			interval.To = 30897146
 		}
