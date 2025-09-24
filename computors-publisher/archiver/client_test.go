@@ -45,7 +45,7 @@ func TestArchiveClient_convertComputorList(t *testing.T) {
 
 func TestArchiveClient_convertStatusResponse(t *testing.T) {
 
-	content, err := os.ReadFile("example-status-response.json")
+	content, err := os.ReadFile("testdata/example-status-response.json")
 	require.NoError(t, err)
 
 	var statusResponse protobuff.GetStatusResponse
@@ -66,5 +66,8 @@ func TestArchiveClient_convertStatusResponse(t *testing.T) {
 	assert.Equal(t, 28375232, int(status.TickIntervals[168][0].LastTick))
 	assert.Equal(t, 28376000, int(status.TickIntervals[168][1].FirstTick))
 	assert.Equal(t, 28961006, int(status.TickIntervals[168][1].LastTick))
+
+	// check epoch list
+	assert.Subset(t, status.EpochList, []uint32{160, 161, 162, 163, 164, 165, 166, 167, 168})
 
 }

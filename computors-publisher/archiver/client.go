@@ -35,15 +35,13 @@ func (c *Client) GetStatus(ctx context.Context) (*domain.Status, error) {
 }
 
 func convertStatus(status *protobuff.GetStatusResponse) *domain.Status {
-	var epochs []uint32
-	for epoch := range status.LastProcessedTicksPerEpoch {
-		epochs = append(epochs, epoch)
-	}
-	slices.Sort(epochs) // make sure epochs are not out of order
+	epochCount := len(status.ProcessedTickIntervalsPerEpoch)
+	var epochs = make([]uint32, 0, epochCount)
 
-	var tickIntervals = make(map[uint32][]*domain.TickInterval, len(epochs))
+	var tickIntervals = make(map[uint32][]*domain.TickInterval, epochCount)
 	for _, epochTickInterval := range status.ProcessedTickIntervalsPerEpoch {
 		epoch := epochTickInterval.Epoch
+		epochs = append(epochs, epoch)
 		intervals := make([]*domain.TickInterval, 0, len(epochTickInterval.Intervals))
 		for _, tickInterval := range epochTickInterval.Intervals {
 			intervals = append(intervals, &domain.TickInterval{
@@ -54,6 +52,7 @@ func convertStatus(status *protobuff.GetStatusResponse) *domain.Status {
 		tickIntervals[epoch] = intervals
 	}
 
+	slices.Sort(epochs) // make sure epochs are not out of order
 	return &domain.Status{
 		LastProcessedTick: domain.ProcessedTick{
 			TickNumber: status.LastProcessedTick.TickNumber,
