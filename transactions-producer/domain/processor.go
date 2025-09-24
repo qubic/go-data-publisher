@@ -117,6 +117,10 @@ func (p *Processor) process() error {
 	return nil
 }
 
+func (p *Processor) ProcessTickRange(epoch, from, to uint32) error {
+	return p.processTickRange(epoch, from, to)
+}
+
 func (p *Processor) processTickRange(epoch, from, to uint32) error {
 	p.logger.Infow("Processing ticks", "epoch", epoch, "from", from, "to", to)
 	var nextTicks []uint32

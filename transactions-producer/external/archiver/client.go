@@ -13,15 +13,19 @@ import (
 
 type Client struct {
 	archiverClient protobuff.ArchiveServiceClient
+	voidTxStatus   bool
 }
 
-func NewClient(host string) (*Client, error) {
+func NewClient(host string, voidTxStatus bool) (*Client, error) {
 	archiverConn, err := grpc.NewClient(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("creating grpc connection: %v", err)
 	}
 
-	return &Client{archiverClient: protobuff.NewArchiveServiceClient(archiverConn)}, nil
+	return &Client{
+		archiverClient: protobuff.NewArchiveServiceClient(archiverConn),
+		voidTxStatus:   voidTxStatus,
+	}, nil
 }
 
 func (c *Client) GetTickTransactions(ctx context.Context, tick uint32) ([]entities.Tx, error) {
@@ -30,7 +34,7 @@ func (c *Client) GetTickTransactions(ctx context.Context, tick uint32) ([]entiti
 		return nil, fmt.Errorf("calling grpc method: %v", err)
 	}
 
-	entitiesTx, err := archiveTxsToEntitiesTx(resp.Transactions)
+	entitiesTx, err := archiveTxsToEntitiesTx(resp.Transactions, c.voidTxStatus)
 	if err != nil {
 		return nil, fmt.Errorf("converting archive tx to entities tx: %v", err)
 	}
@@ -47,7 +51,7 @@ func (c *Client) GetProcessedTickIntervalsPerEpoch(ctx context.Context) ([]entit
 	return archiveStatusToEntitiesProcessedTickIntervals(resp.ProcessedTickIntervalsPerEpoch), nil
 }
 
-func archiveTxsToEntitiesTx(archiveTxs []*protobuff.TransactionData) ([]entities.Tx, error) {
+func archiveTxsToEntitiesTx(archiveTxs []*protobuff.TransactionData, voidTxStatus bool) ([]entities.Tx, error) {
 	entitiesTx := make([]entities.Tx, 0, len(archiveTxs))
 
 	for _, archiveTx := range archiveTxs {
@@ -60,7 +64,7 @@ func archiveTxsToEntitiesTx(archiveTxs []*protobuff.TransactionData) ([]entities
 			return nil, fmt.Errorf("decoding signature hex: %v", err)
 		}
 
-		entitiesTx = append(entitiesTx, entities.Tx{
+		tx := entities.Tx{
 			TxID:       archiveTx.Transaction.TxId,
 			SourceID:   archiveTx.Transaction.SourceId,
 			DestID:     archiveTx.Transaction.DestId,
@@ -72,7 +76,11 @@ func archiveTxsToEntitiesTx(archiveTxs []*protobuff.TransactionData) ([]entities
 			Signature:  base64.StdEncoding.EncodeToString(sigBytes),
 			Timestamp:  archiveTx.Timestamp,
 			MoneyFlew:  archiveTx.MoneyFlew,
-		})
+		}
+		if voidTxStatus == true {
+			tx.MoneyFlew = false
+		}
+		entitiesTx = append(entitiesTx, tx)
 	}
 
 	return entitiesTx, nil

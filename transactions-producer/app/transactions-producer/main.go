@@ -58,6 +58,12 @@ func run() error {
 		}
 		MetricsNamespace string `conf:"default:qubic-kafka"`
 		MetricsPort      int    `conf:"default:9999"`
+		Sync             struct {
+			RangeStart   uint32 `conf:"optional"`
+			RangeEnd     uint32 `conf:"optional"`
+			RangeEpoch   uint32 `conf:"optional"`
+			VoidTxStatus bool   `conf:"false"`
+		}
 	}
 
 	if err := conf.Parse(os.Args[1:], prefix, &cfg); err != nil {
@@ -124,7 +130,7 @@ func run() error {
 
 	kafkaClient := kafka.NewClient(kcl)
 
-	archiverClient, err := archiver.NewClient(cfg.ArchiverGrpcHost)
+	archiverClient, err := archiver.NewClient(cfg.ArchiverGrpcHost, cfg.Sync.VoidTxStatus)
 	if err != nil {
 		return fmt.Errorf("creating archiver client: %v", err)
 	}
@@ -139,7 +145,13 @@ func run() error {
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
 	procErrors := make(chan error, 1)
-	if len(cfg.PublishCustomTicks) > 0 {
+	if cfg.Sync.RangeStart > 0 && cfg.Sync.RangeEnd > 0 && cfg.Sync.RangeEpoch > 0 {
+		log.Printf("main: Processing range from [%d] to [%d] in epoch [%d].", cfg.Sync.RangeStart, cfg.Sync.RangeEnd, cfg.Sync.RangeEpoch)
+		go func() {
+			procErrors <- proc.ProcessTickRange(cfg.Sync.RangeEpoch, cfg.Sync.RangeStart, cfg.Sync.RangeEnd)
+		}()
+
+	} else if len(cfg.PublishCustomTicks) > 0 {
 		log.Printf("main: publishing custom ticks: %v", cfg.PublishCustomTicks)
 		go func() {
 			procErrors <- proc.PublishSingleTicks(cfg.PublishCustomTicks)

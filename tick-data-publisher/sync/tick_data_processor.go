@@ -102,6 +102,10 @@ func (p *TickDataProcessor) process() error {
 	return nil
 }
 
+func (p *TickDataProcessor) ProcessTickRange(epoch, from, to uint32) error {
+	return p.processTickRange(context.Background(), epoch, from, to)
+}
+
 func (p *TickDataProcessor) processTickRange(ctx context.Context, epoch, from, to uint32) error {
 	var nextTicks []uint32
 	for tick := from; tick <= to; tick++ {
