@@ -3,59 +3,6 @@
     "tickNumber": 28961006,
     "epoch": 168
   },
-  "lastProcessedTicksPerEpoch": {
-    "160": 25574364,
-    "161": 26028353,
-    "162": 26411628,
-    "163": 26851117,
-    "164": 27236952,
-    "165": 27630991,
-    "166": 27994036,
-    "167": 28361693,
-    "168": 28961006
-  },
-  "skippedTicks": [
-    {
-      "startTick": 25190741,
-      "endTick": 25199999
-    },
-    {
-      "startTick": 25574365,
-      "endTick": 25619999
-    },
-    {
-      "startTick": 26028354,
-      "endTick": 26028354
-    },
-    {
-      "startTick": 26411629,
-      "endTick": 26440999
-    },
-    {
-      "startTick": 26851118,
-      "endTick": 26851118
-    },
-    {
-      "startTick": 27236953,
-      "endTick": 27249999
-    },
-    {
-      "startTick": 27630992,
-      "endTick": 27630992
-    },
-    {
-      "startTick": 27994037,
-      "endTick": 28024999
-    },
-    {
-      "startTick": 28361694,
-      "endTick": 28374999
-    },
-    {
-      "startTick": 28375233,
-      "endTick": 28375999
-    }
-  ],
   "processedTickIntervalsPerEpoch": [
     {
       "epoch": 160,
@@ -142,8 +89,5 @@
         }
       ]
     }
-  ],
-  "emptyTicksPerEpoch": {
-    "168": 4600
-  }
+  ]
 }
