@@ -16,7 +16,7 @@ type StatusProvider interface {
 }
 
 type StatusCache struct {
-	statusProvider      StatusProvider
+	database            StatusProvider
 	archiverStatusCache *ttlcache.Cache[string, *protobuf.GetArchiverStatusResponse]
 	archiverStatusLock  sync.Mutex
 	tickIntervalsCache  *ttlcache.Cache[string, *protobuf.GetTickIntervalsResponse]
@@ -27,22 +27,22 @@ func NewStatusCache(statusProvider StatusProvider, archiverStatusCache *ttlcache
 	tickIntervalsCache *ttlcache.Cache[string, *protobuf.GetTickIntervalsResponse]) *StatusCache {
 
 	return &StatusCache{
-		statusProvider:      statusProvider,
+		database:            statusProvider,
 		archiverStatusCache: archiverStatusCache,
 		tickIntervalsCache:  tickIntervalsCache,
 	}
 }
 
 func (s *StatusCache) GetLastProcessedTick() (tick uint32, err error) {
-	return s.statusProvider.GetLastProcessedTick()
+	return s.database.GetLastProcessedTick()
 }
 
 func (s *StatusCache) GetSkippedTicks() ([]uint32, error) {
-	return s.statusProvider.GetSkippedTicks()
+	return s.database.GetSkippedTicks()
 }
 
 func (s *StatusCache) GetSourceStatus() (*domain.Status, error) {
-	return s.statusProvider.GetSourceStatus()
+	return s.database.GetSourceStatus()
 }
 
 func (s *StatusCache) GetTickIntervals() (*protobuf.GetTickIntervalsResponse, error) {
@@ -51,7 +51,7 @@ func (s *StatusCache) GetTickIntervals() (*protobuf.GetTickIntervalsResponse, er
 
 	item := s.tickIntervalsCache.Get(tickIntervalsKey)
 	if item == nil {
-		response, err := createTickIntervalResponse(s.statusProvider)
+		response, err := s.createTickIntervalResponse()
 		if err != nil {
 			return nil, errors.Wrap(err, "creating tick intervals")
 		}
@@ -72,7 +72,7 @@ func (s *StatusCache) GetArchiverStatus() (*protobuf.GetArchiverStatusResponse, 
 		if err != nil {
 			return nil, errors.Wrap(err, "getting tick intervals")
 		}
-		response, err := createArchiverStatusResponse(s.statusProvider, tickIntervals)
+		response, err := createArchiverStatusResponse(s.database, tickIntervals)
 		if err != nil {
 			return nil, errors.Wrap(err, "creating archiver status")
 		}
@@ -144,6 +144,46 @@ func createArchiverStatusResponse(sp StatusProvider, tickIntervals *protobuf.Get
 	return status, nil
 }
 
+func (s *StatusCache) createTickIntervalResponse() (*protobuf.GetTickIntervalsResponse, error) {
+	sourceStatus, err := s.database.GetSourceStatus()
+	if err != nil {
+		return nil, errors.Wrap(err, "getting source status")
+	}
+
+	lastProcessedTick, err := s.database.GetLastProcessedTick()
+	if err != nil {
+		return nil, errors.Wrap(err, "getting last processed tick")
+	}
+
+	// we don't show the last interval as the to tick might not be up to date
+	// we take the initial tick from the last interval as there might be multiple intervals in the last epoch
+	intervalsCount := len(sourceStatus.TickIntervals)
+	intervals := make([]*protobuf.TickInterval, 0, intervalsCount)
+	for _, interval := range sourceStatus.TickIntervals {
+		// override last tick for epoch 172. data is not in archiver but in backend only.
+		if interval.Epoch == 172 {
+			interval.To = 30897146
+		}
+
+		if lastProcessedTick >= interval.From && lastProcessedTick <= interval.To {
+			intervals = append(intervals, &protobuf.TickInterval{
+				Epoch:     interval.Epoch,
+				FirstTick: interval.From,
+				LastTick:  lastProcessedTick, // fix last interval
+			})
+		} else if lastProcessedTick > interval.To {
+			intervals = append(intervals, &protobuf.TickInterval{
+				Epoch:     interval.Epoch,
+				FirstTick: interval.From,
+				LastTick:  interval.To,
+			})
+		} // else skip
+	}
+	return &protobuf.GetTickIntervalsResponse{
+		Intervals: intervals,
+	}, nil
+}
+
 func removeFutureEmptyTicks(epoch uint32, emptyTicks map[uint32]uint32) map[uint32]uint32 {
 	for key := range emptyTicks {
 		if key > epoch {
@@ -184,44 +224,4 @@ func findEpoch(allEpochsIntervals []*protobuf.ProcessedTickIntervalsPerEpoch, ti
 		}
 	}
 	return epoch
-}
-
-func createTickIntervalResponse(sp StatusProvider) (*protobuf.GetTickIntervalsResponse, error) {
-	sourceStatus, err := sp.GetSourceStatus()
-	if err != nil {
-		return nil, errors.Wrap(err, "getting source status")
-	}
-
-	lastProcessedTick, err := sp.GetLastProcessedTick()
-	if err != nil {
-		return nil, errors.Wrap(err, "getting last processed tick")
-	}
-
-	// we don't show the last interval as the to tick might not be up to date
-	// we take the initial tick from the last interval as there might be multiple intervals in the last epoch
-	intervalsCount := len(sourceStatus.TickIntervals)
-	intervals := make([]*protobuf.TickInterval, 0, intervalsCount)
-	for _, interval := range sourceStatus.TickIntervals {
-		// override last tick for epoch 172. data is not in archiver but in backend only.
-		if interval.Epoch == 172 {
-			interval.To = 30897146
-		}
-
-		if lastProcessedTick >= interval.From && lastProcessedTick <= interval.To {
-			intervals = append(intervals, &protobuf.TickInterval{
-				Epoch:     interval.Epoch,
-				FirstTick: interval.From,
-				LastTick:  lastProcessedTick, // fix last interval
-			})
-		} else if lastProcessedTick > interval.To {
-			intervals = append(intervals, &protobuf.TickInterval{
-				Epoch:     interval.Epoch,
-				FirstTick: interval.From,
-				LastTick:  interval.To,
-			})
-		} // else skip
-	}
-	return &protobuf.GetTickIntervalsResponse{
-		Intervals: intervals,
-	}, nil
 }
