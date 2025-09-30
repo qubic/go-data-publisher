@@ -1,12 +1,9 @@
 package db
 
 import (
-	archproto "github.com/qubic/go-archiver/protobuff"
 	"github.com/qubic/go-data-publisher/status-service/domain"
-	"github.com/qubic/go-data-publisher/status-service/protobuf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 	"os"
 	"testing"
 )
@@ -146,76 +143,4 @@ func TestStore_GetProcessingStatus_GivenNone_thenError(t *testing.T) {
 
 	_, err = store.GetSourceStatus()
 	require.Error(t, err)
-}
-
-func TestStore_SetAndGetArchiverStatus(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "processor_store_test")
-	require.NoError(t, err)
-	defer os.RemoveAll(tempDir)
-
-	store, err := NewPebbleStore(tempDir)
-	require.NoError(t, err)
-	defer store.Close()
-
-	// source format from archiver
-	archiverStatus := &archproto.GetStatusResponse{
-		LastProcessedTick: &archproto.ProcessedTick{
-			TickNumber: 12345,
-			Epoch:      123,
-		},
-		ProcessedTickIntervalsPerEpoch: []*archproto.ProcessedTickIntervalsPerEpoch{
-			{
-				Epoch: 100,
-				Intervals: []*archproto.ProcessedTickInterval{
-					{
-						InitialProcessedTick: 1,
-						LastProcessedTick:    1000,
-					},
-				},
-			},
-			{
-				Epoch: 123,
-				Intervals: []*archproto.ProcessedTickInterval{
-					{
-						InitialProcessedTick: 10000,
-						LastProcessedTick:    123456,
-					},
-				},
-			},
-		},
-	}
-
-	// target format from status service (compatible)
-	expectedStatus := &protobuf.GetArchiverStatusResponse{
-		LastProcessedTick: &protobuf.ProcessedTick{
-			TickNumber: 12345,
-			Epoch:      123,
-		},
-		ProcessedTickIntervalsPerEpoch: []*protobuf.ProcessedTickIntervalsPerEpoch{
-			{
-				Epoch: 100,
-				Intervals: []*protobuf.ProcessedTickInterval{
-					{
-						InitialProcessedTick: 1,
-						LastProcessedTick:    1000,
-					},
-				},
-			},
-			{
-				Epoch: 123,
-				Intervals: []*protobuf.ProcessedTickInterval{
-					{
-						InitialProcessedTick: 10000,
-						LastProcessedTick:    123456,
-					},
-				},
-			},
-		},
-	}
-
-	err = store.SetArchiverStatus(archiverStatus)
-	require.NoError(t, err)
-	retrievedStatus, err := store.GetArchiverStatus()
-	require.NoError(t, err)
-	assert.True(t, proto.Equal(expectedStatus, retrievedStatus))
 }

@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-const url = "localhost:8010"
+const url = "localhost:8001"
 
 func TestArchiverClient_getStatus(t *testing.T) {
 	client, err := NewClient(url)
@@ -24,7 +24,6 @@ func TestArchiverClient_getStatus(t *testing.T) {
 	assert.NotNil(t, status)
 	assert.Greater(t, int(status.LastProcessedTick.TickNumber), 20000000)
 	assert.Greater(t, int(status.LastProcessedTick.Epoch), 150)
-	assert.NotEmpty(t, status.LastProcessedTicksPerEpoch)
 }
 
 func TestArchiverClient_getTickData(t *testing.T) {

@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"github.com/cockroachdb/pebble"
 	"github.com/pkg/errors"
-	archiverproto "github.com/qubic/go-archiver/protobuff"
 	"github.com/qubic/go-data-publisher/status-service/domain"
-	"github.com/qubic/go-data-publisher/status-service/protobuf"
 	"github.com/qubic/go-data-publisher/status-service/util"
 	"google.golang.org/protobuf/proto"
 	"log"
@@ -23,7 +21,6 @@ var ErrNotFound = errors.New("store resource not found")
 const lastProcessedTickKey = "lpt"
 const skippedTicksKey = "skipped"
 const processingStatusKey = "status"
-const archiverStatusKey = "archiverStatus"
 
 type PebbleStore struct {
 	db *pebble.DB
@@ -57,19 +54,6 @@ func (ps *PebbleStore) GetSourceStatus() (*domain.Status, error) {
 		return nil, errors.Wrap(err, "loading processing status")
 	}
 	return target, nil
-}
-
-func (ps *PebbleStore) SetArchiverStatus(status *archiverproto.GetStatusResponse) error {
-	return ps.saveProto(archiverStatusKey, status)
-}
-
-func (ps *PebbleStore) GetArchiverStatus() (*protobuf.GetArchiverStatusResponse, error) {
-	var target protobuf.GetArchiverStatusResponse // ATTENTION: other data type than the saved one
-	err := ps.loadProto(archiverStatusKey, &target)
-	if err != nil {
-		return nil, errors.Wrap(err, "loading archiver status")
-	}
-	return &target, nil
 }
 
 func (ps *PebbleStore) AddSkippedTick(tick uint32) error {
