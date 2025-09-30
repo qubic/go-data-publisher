@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/pkg/errors"
-	archproto "github.com/qubic/go-archiver/protobuff"
+	archproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/elastic"
 	"github.com/qubic/go-data-publisher/status-service/metrics"
@@ -30,7 +30,6 @@ type DataStore interface {
 	GetLastProcessedTick() (tick uint32, err error)
 	SetLastProcessedTick(tick uint32) error
 	SetSourceStatus(status *domain.Status) error
-	SetArchiverStatus(status *archproto.GetStatusResponse) error
 	AddSkippedTick(tick uint32) error
 }
 
@@ -88,11 +87,6 @@ func (p *TickProcessor) sync() error {
 	archiverStatus, err := p.archiveClient.GetStatus(ctx)
 	if err != nil {
 		return errors.Wrap(err, "get archive status")
-	}
-
-	err = p.dataStore.SetArchiverStatus(archiverStatus) // store for rpc clients
-	if err != nil {
-		return errors.Wrapf(err, "setting archiver status: %v", archiverStatus)
 	}
 
 	status, err := domain.ConvertFromArchiverStatus(archiverStatus)

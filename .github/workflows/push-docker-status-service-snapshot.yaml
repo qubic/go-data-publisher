@@ -3,7 +3,7 @@ name: Create custom status service snapshot image
 on:
   push:
     branches:
-      - 'bugfix/handle-invalid-empty-ticks'
+      - 'feature/archiver-v2-compat'
 
 jobs:
   docker-publish:

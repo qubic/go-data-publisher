@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
-	"github.com/qubic/go-archiver/protobuff"
+	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/elastic"
 	"github.com/qubic/go-data-publisher/status-service/metrics"
@@ -57,7 +57,7 @@ type FakeArchiveClient struct {
 	emptyTickNumber  uint32
 }
 
-func (f *FakeArchiveClient) GetTickData(_ context.Context, tickNumber uint32) (*protobuff.TickData, error) {
+func (f *FakeArchiveClient) GetTickData(_ context.Context, tickNumber uint32) (*archiverproto.TickData, error) {
 	if tickNumber == f.emptyTickNumber {
 		return nil, nil
 	}
@@ -73,23 +73,23 @@ func (f *FakeArchiveClient) GetTickData(_ context.Context, tickNumber uint32) (*
 		hashes = append(hashes, "hash-only-in-archiver")
 		signature = hex.EncodeToString([]byte("faulty"))
 	}
-	return &protobuff.TickData{
+	return &archiverproto.TickData{
 		TickNumber:     tickNumber,
 		TransactionIds: hashes,
 		SignatureHex:   signature,
 	}, nil
 }
 
-func (f *FakeArchiveClient) GetStatus(context.Context) (*protobuff.GetStatusResponse, error) {
-	status := &protobuff.GetStatusResponse{
-		LastProcessedTick: &protobuff.ProcessedTick{
+func (f *FakeArchiveClient) GetStatus(context.Context) (*archiverproto.GetStatusResponse, error) {
+	status := &archiverproto.GetStatusResponse{
+		LastProcessedTick: &archiverproto.ProcessedTick{
 			TickNumber: 12345,
 			Epoch:      123,
 		},
-		ProcessedTickIntervalsPerEpoch: []*protobuff.ProcessedTickIntervalsPerEpoch{
+		ProcessedTickIntervalsPerEpoch: []*archiverproto.ProcessedTickIntervalsPerEpoch{
 			{
 				Epoch: 100,
-				Intervals: []*protobuff.ProcessedTickInterval{
+				Intervals: []*archiverproto.ProcessedTickInterval{
 					{
 						InitialProcessedTick: 1,
 						LastProcessedTick:    1000,
@@ -98,7 +98,7 @@ func (f *FakeArchiveClient) GetStatus(context.Context) (*protobuff.GetStatusResp
 			},
 			{
 				Epoch: 123,
-				Intervals: []*protobuff.ProcessedTickInterval{
+				Intervals: []*archiverproto.ProcessedTickInterval{
 					{
 						InitialProcessedTick: 10000,
 						LastProcessedTick:    123456,
@@ -111,15 +111,9 @@ func (f *FakeArchiveClient) GetStatus(context.Context) (*protobuff.GetStatusResp
 }
 
 type FakeDataStore struct {
-	tick           uint32
-	skippedTick    uint32
-	status         *domain.Status
-	archiverStatus *protobuff.GetStatusResponse
-}
-
-func (f *FakeDataStore) SetArchiverStatus(status *protobuff.GetStatusResponse) error {
-	f.archiverStatus = status
-	return nil
+	tick        uint32
+	skippedTick uint32
+	status      *domain.Status
 }
 
 func (f *FakeDataStore) SetSourceStatus(status *domain.Status) error {
@@ -458,23 +452,4 @@ func TestProcessor_Sync_GivenNewEpoch_ThenSetStatus(t *testing.T) {
 	assert.Equal(t, 1000, int(dataStore.tick))
 
 	assert.Equal(t, domainStatus, dataStore.status) // status stored
-}
-
-func TestProcessor_Sync_GivenNewEpoch_ThenSetArchiverStatus(t *testing.T) {
-	archiveClient := &FakeArchiveClient{}
-	elasticClient := &FakeElasticClient{}
-	dataStore := &FakeDataStore{}
-	processor := NewTickProcessor(archiveClient, elasticClient, dataStore, m, Config{
-		SyncTickData:  true,
-		NumMaxWorkers: 1,
-	})
-
-	archiverStatus, err := archiveClient.GetStatus(nil)
-	require.NoError(t, err)
-
-	err = processor.sync()
-	require.NoError(t, err)
-	assert.Equal(t, 1000, int(dataStore.tick))
-
-	assert.Equal(t, archiverStatus, dataStore.archiverStatus) // status stored
 }
