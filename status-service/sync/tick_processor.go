@@ -13,6 +13,7 @@ import (
 	"github.com/qubic/go-data-publisher/status-service/util"
 	"golang.org/x/sync/errgroup"
 	"log"
+	"slices"
 	"time"
 )
 
@@ -234,8 +235,11 @@ func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, archive
 		if dErr != nil {
 			return false, errors.Wrap(err, "decoding signature hex")
 		}
-		match = elasticTd.Epoch == archiveTd.Epoch &&
+		match = elasticTd.ComputorIndex == archiveTd.ComputorIndex &&
+			elasticTd.Epoch == archiveTd.Epoch &&
 			elasticTd.TickNumber == archiveTd.TickNumber &&
+			len(elasticTd.TransactionHashes) == len(archiveTd.TransactionIds) &&
+			slices.Compare(elasticTd.TransactionHashes, archiveTd.TransactionIds) == 0 &&
 			elasticTd.Signature == base64.StdEncoding.EncodeToString(bytes)
 	}
 

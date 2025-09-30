@@ -28,9 +28,20 @@ func (f *FakeElasticClient) GetTickData(_ context.Context, tickNumber uint32) (*
 		signature = base64.StdEncoding.EncodeToString([]byte("faulty"))
 	}
 
+	hashes := []string{
+		"hash-1",
+		"hash-2",
+		"hash-3",
+		"hash-4",
+		"hash-5",
+	}
+
 	return &elastic.TickData{
-		TickNumber: tickNumber,
-		Signature:  signature,
+		ComputorIndex:     123,
+		Epoch:             42,
+		TickNumber:        tickNumber,
+		Signature:         signature,
+		TransactionHashes: hashes,
 	}, nil
 
 }
@@ -74,6 +85,8 @@ func (f *FakeArchiveClient) GetTickData(_ context.Context, tickNumber uint32) (*
 		signature = hex.EncodeToString([]byte("faulty"))
 	}
 	return &archiverproto.TickData{
+		ComputorIndex:  123,
+		Epoch:          42,
 		TickNumber:     tickNumber,
 		TransactionIds: hashes,
 		SignatureHex:   signature,
