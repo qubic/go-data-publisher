@@ -2,7 +2,7 @@ package archiver
 
 import (
 	"github.com/qubic/computors-publisher/domain"
-	"github.com/qubic/go-archiver/protobuff"
+	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -11,8 +11,9 @@ import (
 )
 
 func TestArchiveClient_convertComputorList(t *testing.T) {
-	computorList := &protobuff.Computors{
-		Epoch: 150,
+	computorList := &archiverproto.Computors{
+		Epoch:      150,
+		TickNumber: 123,
 		Identities: []string{
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -28,7 +29,8 @@ func TestArchiveClient_convertComputorList(t *testing.T) {
 	assert.NotNil(t, data)
 	assert.NotEmpty(t, data)
 	assert.Equal(t, &domain.EpochComputors{
-		Epoch: 150,
+		Epoch:      150,
+		TickNumber: 123,
 		Identities: []string{
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
 			"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
@@ -48,7 +50,7 @@ func TestArchiveClient_convertStatusResponse(t *testing.T) {
 	content, err := os.ReadFile("testdata/example-status-response.json")
 	require.NoError(t, err)
 
-	var statusResponse protobuff.GetStatusResponse
+	var statusResponse archiverproto.GetStatusResponse
 	err = protojson.Unmarshal(content, &statusResponse)
 	require.NoError(t, err)
 

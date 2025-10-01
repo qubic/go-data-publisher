@@ -7,14 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/qubic/computors-publisher/domain"
-	"github.com/qubic/go-archiver/protobuff"
+	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"slices"
 )
 
 type Client struct {
-	api protobuff.ArchiveServiceClient
+	api archiverproto.ArchiveServiceClient
 }
 
 func NewClient(host string) (*Client, error) {
@@ -23,7 +23,7 @@ func NewClient(host string) (*Client, error) {
 		return nil, fmt.Errorf("creating archiver client: %w", err)
 	}
 
-	return &Client{api: protobuff.NewArchiveServiceClient(archiverConnection)}, nil
+	return &Client{api: archiverproto.NewArchiveServiceClient(archiverConnection)}, nil
 }
 
 func (c *Client) GetStatus(ctx context.Context) (*domain.Status, error) {
@@ -34,7 +34,7 @@ func (c *Client) GetStatus(ctx context.Context) (*domain.Status, error) {
 	return convertStatus(status), nil
 }
 
-func convertStatus(status *protobuff.GetStatusResponse) *domain.Status {
+func convertStatus(status *archiverproto.GetStatusResponse) *domain.Status {
 	epochCount := len(status.ProcessedTickIntervalsPerEpoch)
 	var epochs = make([]uint32, 0, epochCount)
 
@@ -64,7 +64,7 @@ func convertStatus(status *protobuff.GetStatusResponse) *domain.Status {
 }
 
 func (c *Client) GetEpochComputors(ctx context.Context, epoch uint32) (*domain.EpochComputors, error) {
-	request := protobuff.GetComputorsRequest{
+	request := archiverproto.GetComputorsRequest{
 		Epoch: epoch,
 	}
 	response, err := c.api.GetComputors(ctx, &request)
@@ -85,7 +85,7 @@ func (c *Client) GetEpochComputors(ctx context.Context, epoch uint32) (*domain.E
 	return computorList, nil
 }
 
-func convertComputorList(computors *protobuff.Computors) (*domain.EpochComputors, error) {
+func convertComputorList(computors *archiverproto.Computors) (*domain.EpochComputors, error) {
 	sigBytes, err := hex.DecodeString(computors.SignatureHex)
 	if err != nil {
 		return nil, fmt.Errorf("decoding computor list signature [%s]: %w", computors.SignatureHex, err)
@@ -93,6 +93,7 @@ func convertComputorList(computors *protobuff.Computors) (*domain.EpochComputors
 
 	return &domain.EpochComputors{
 		Epoch:      computors.Epoch,
+		TickNumber: computors.TickNumber,
 		Identities: computors.Identities,
 		Signature:  base64.StdEncoding.EncodeToString(sigBytes),
 	}, nil
