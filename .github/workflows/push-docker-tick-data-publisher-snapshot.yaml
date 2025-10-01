@@ -1,4 +1,4 @@
-name: Create tick data publisher image
+name: Create tick data publisher snapshot image
 
 on:
   push:
