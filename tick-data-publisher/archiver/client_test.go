@@ -1,14 +1,14 @@
 package archiver
 
 import (
-	"github.com/qubic/go-archiver/protobuff"
+	"github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/tick-data-publisher/domain"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestArchiverClient_convertTickData(t *testing.T) {
-	td := &protobuff.TickData{}
+	td := &protobuf.TickData{}
 	data, err := convertTickData(td)
 	assert.NoError(t, err)
 	assert.NotNil(t, data)

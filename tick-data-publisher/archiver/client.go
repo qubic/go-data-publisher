@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/qubic/go-archiver/protobuff"
+	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/tick-data-publisher/domain"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -14,7 +14,7 @@ import (
 )
 
 type Client struct {
-	api protobuff.ArchiveServiceClient
+	api archiverproto.ArchiveServiceClient
 }
 
 func NewClient(host string) (*Client, error) {
@@ -23,7 +23,7 @@ func NewClient(host string) (*Client, error) {
 		return nil, fmt.Errorf("creating archiver api connection: %v", err)
 	}
 	cl := Client{
-		api: protobuff.NewArchiveServiceClient(archiverConn),
+		api: archiverproto.NewArchiveServiceClient(archiverConn),
 	}
 	return &cl, nil
 }
@@ -54,7 +54,7 @@ func (c *Client) GetStatus(ctx context.Context) (*domain.Status, error) {
 }
 
 func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*domain.TickData, error) {
-	request := protobuff.GetTickDataRequest{
+	request := archiverproto.GetTickDataRequest{
 		TickNumber: tickNumber,
 	}
 	response, err := c.api.GetTickData(ctx, &request)
@@ -75,7 +75,7 @@ func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*domain.Ti
 	return tickData, nil
 }
 
-func convertTickData(td *protobuff.TickData) (*domain.TickData, error) {
+func convertTickData(td *archiverproto.TickData) (*domain.TickData, error) {
 	sigBytes, err := hex.DecodeString(td.SignatureHex)
 	if err != nil {
 		return nil, errors.Wrapf(err, "decoding signature hex [%s]", td.SignatureHex)

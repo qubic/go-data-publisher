@@ -3,7 +3,7 @@ package db
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/cockroachdb/pebble"
+	"github.com/cockroachdb/pebble/v2"
 	"github.com/pkg/errors"
 	"io"
 	"log"
