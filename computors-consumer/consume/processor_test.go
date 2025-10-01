@@ -112,7 +112,7 @@ func TestProcessor_ConsumeBatch_GivenDuplicate_IgnoreDuplicate(t *testing.T) {
 }
 
 func TestProcessor_CalculateId(t *testing.T) {
-	content, err := os.ReadFile("example-computors-list.json")
+	content, err := os.ReadFile("testdata/example-computors-list.json")
 	var computors *domain.EpochComputors
 	err = json.Unmarshal(content, &computors)
 	require.NoError(t, err)
@@ -123,7 +123,7 @@ func TestProcessor_CalculateId(t *testing.T) {
 }
 
 func TestProcessor_ConvertToDocument(t *testing.T) {
-	content, err := os.ReadFile("example-computors-list.json")
+	content, err := os.ReadFile("testdata/example-computors-list.json")
 	var computors *domain.EpochComputors
 	err = json.Unmarshal(content, &computors)
 	require.NoError(t, err)
