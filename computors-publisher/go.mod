@@ -6,7 +6,6 @@ require (
 	github.com/ardanlabs/conf/v3 v3.9.0
 	github.com/cockroachdb/pebble v1.1.5
 	github.com/prometheus/client_golang v1.23.2
-	github.com/qubic/go-archiver v0.12.4
 	github.com/qubic/go-archiver-v2 v0.0.8
 	github.com/qubic/go-qubic v0.3.0
 	github.com/stretchr/testify v1.11.1
