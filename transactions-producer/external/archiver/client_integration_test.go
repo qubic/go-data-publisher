@@ -9,12 +9,12 @@ import (
 	"testing"
 )
 
-const url = "localhost:8010"
+const url = "localhost:8001"
 
 func TestArchiverClient_getTickTransactions(t *testing.T) {
 	client, err := NewClient(url)
 	require.NoError(t, err)
-	transactions, err := client.GetTickTransactions(context.Background(), 26903327)
+	transactions, err := client.GetTickTransactions(context.Background(), 33717826)
 	require.NoError(t, err)
 	require.NotEmpty(t, transactions)
 }
@@ -22,7 +22,7 @@ func TestArchiverClient_getTickTransactions(t *testing.T) {
 func TestArchiverClient_getTickTransactions_emptyTick(t *testing.T) {
 	client, err := NewClient(url)
 	require.NoError(t, err)
-	transactions, err := client.GetTickTransactions(context.Background(), 26903328)
+	transactions, err := client.GetTickTransactions(context.Background(), 33717827)
 	require.NoError(t, err)
 	require.Empty(t, transactions)
 }
