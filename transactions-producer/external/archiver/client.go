@@ -5,14 +5,14 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/qubic/go-archiver/protobuff"
+	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/transactions-producer/entities"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Client struct {
-	archiverClient protobuff.ArchiveServiceClient
+	archiverClient archiverproto.ArchiveServiceClient
 }
 
 func NewClient(host string) (*Client, error) {
@@ -21,11 +21,11 @@ func NewClient(host string) (*Client, error) {
 		return nil, fmt.Errorf("creating grpc connection: %v", err)
 	}
 
-	return &Client{archiverClient: protobuff.NewArchiveServiceClient(archiverConn)}, nil
+	return &Client{archiverClient: archiverproto.NewArchiveServiceClient(archiverConn)}, nil
 }
 
 func (c *Client) GetTickTransactions(ctx context.Context, tick uint32) ([]entities.Tx, error) {
-	resp, err := c.archiverClient.GetTickTransactionsV2(ctx, &protobuff.GetTickTransactionsRequestV2{TickNumber: tick})
+	resp, err := c.archiverClient.GetTickTransactionsV2(ctx, &archiverproto.GetTickTransactionsRequestV2{TickNumber: tick})
 	if err != nil {
 		return nil, fmt.Errorf("calling grpc method: %v", err)
 	}
@@ -47,7 +47,7 @@ func (c *Client) GetProcessedTickIntervalsPerEpoch(ctx context.Context) ([]entit
 	return archiveStatusToEntitiesProcessedTickIntervals(resp.ProcessedTickIntervalsPerEpoch), nil
 }
 
-func archiveTxsToEntitiesTx(archiveTxs []*protobuff.TransactionData) ([]entities.Tx, error) {
+func archiveTxsToEntitiesTx(archiveTxs []*archiverproto.TransactionData) ([]entities.Tx, error) {
 	entitiesTx := make([]entities.Tx, 0, len(archiveTxs))
 
 	for _, archiveTx := range archiveTxs {
@@ -78,7 +78,7 @@ func archiveTxsToEntitiesTx(archiveTxs []*protobuff.TransactionData) ([]entities
 	return entitiesTx, nil
 }
 
-func archiveStatusToEntitiesProcessedTickIntervals(ptipe []*protobuff.ProcessedTickIntervalsPerEpoch) []entities.ProcessedTickIntervalsPerEpoch {
+func archiveStatusToEntitiesProcessedTickIntervals(ptipe []*archiverproto.ProcessedTickIntervalsPerEpoch) []entities.ProcessedTickIntervalsPerEpoch {
 	startingTicksForEpochs := make([]entities.ProcessedTickIntervalsPerEpoch, 0, len(ptipe))
 	for _, epochIntervals := range ptipe {
 		intervals := archiveEpochIntervalsToEntitiesEpochIntervals(epochIntervals)
@@ -88,7 +88,7 @@ func archiveStatusToEntitiesProcessedTickIntervals(ptipe []*protobuff.ProcessedT
 	return startingTicksForEpochs
 }
 
-func archiveEpochIntervalsToEntitiesEpochIntervals(archiveEpochIntervals *protobuff.ProcessedTickIntervalsPerEpoch) entities.ProcessedTickIntervalsPerEpoch {
+func archiveEpochIntervalsToEntitiesEpochIntervals(archiveEpochIntervals *archiverproto.ProcessedTickIntervalsPerEpoch) entities.ProcessedTickIntervalsPerEpoch {
 	intervals := make([]entities.ProcessedTickInterval, 0, len(archiveEpochIntervals.Intervals))
 	for _, interval := range archiveEpochIntervals.Intervals {
 		intervals = append(intervals, entities.ProcessedTickInterval{
