@@ -25,6 +25,7 @@ type ArchiveClient interface {
 type SearchClient interface {
 	GetTransactionHashes(ctx context.Context, tickNumber uint32) ([]string, error)
 	GetTickData(_ context.Context, tickNumber uint32) (*elastic.TickData, error)
+	GetMinimalTickData(_ context.Context, tickNumber uint32) (*elastic.TickData, error)
 }
 
 type DataStore interface {
@@ -42,17 +43,19 @@ type TickProcessor struct {
 	syncTransactions   bool
 	syncTickData       bool
 	skipErroneousTicks bool
+	verifyFullTickData bool
 	maxWorkers         int
 	elasticQueryDelay  time.Duration // time to delay checking elastic
 	errorsCount        uint
 }
 
 type Config struct {
-	SyncTransactions  bool
-	SyncTickData      bool
-	SkipTicks         bool
-	NumMaxWorkers     int
-	ElasticQueryDelay time.Duration
+	SyncTransactions   bool
+	SyncTickData       bool
+	SkipTicks          bool
+	VerifyFullTickData bool
+	NumMaxWorkers      int
+	ElasticQueryDelay  time.Duration
 }
 
 func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, dataStore DataStore, m *metrics.Metrics, config Config) *TickProcessor {
@@ -64,6 +67,7 @@ func NewTickProcessor(archiveClient ArchiveClient, elasticClient SearchClient, d
 		syncTransactions:   config.SyncTransactions,
 		syncTickData:       config.SyncTickData,
 		skipErroneousTicks: config.SkipTicks,
+		verifyFullTickData: config.VerifyFullTickData,
 		maxWorkers:         max(1, config.NumMaxWorkers), // one worker minimum
 		elasticQueryDelay:  config.ElasticQueryDelay,
 	}
@@ -224,23 +228,25 @@ func (p *TickProcessor) handleTickMismatch(tick uint32) error {
 }
 
 func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, archiveTd *archproto.TickData) (bool, error) {
-	elasticTd, err := p.searchClient.GetTickData(ctx, tick)
-	if err != nil {
-		return false, errors.Wrap(err, "get elastic tick data")
-	}
 
-	match := archiveTd == nil && elasticTd == nil
-	if archiveTd != nil && elasticTd != nil {
-		bytes, dErr := hex.DecodeString(archiveTd.GetSignatureHex())
-		if dErr != nil {
-			return false, errors.Wrap(err, "decoding signature hex")
+	var match bool
+	var err error
+	var elasticTd *elastic.TickData
+	if p.verifyFullTickData {
+		elasticTd, err = p.searchClient.GetTickData(ctx, tick)
+		if err != nil {
+			return false, fmt.Errorf("get minimal elastic tick data: %w", err)
 		}
-		match = elasticTd.ComputorIndex == archiveTd.ComputorIndex &&
-			elasticTd.Epoch == archiveTd.Epoch &&
-			elasticTd.TickNumber == archiveTd.TickNumber &&
-			len(elasticTd.TransactionHashes) == len(archiveTd.TransactionIds) &&
-			slices.Compare(elasticTd.TransactionHashes, archiveTd.TransactionIds) == 0 &&
-			elasticTd.Signature == base64.StdEncoding.EncodeToString(bytes)
+		match, err = p.matchFullTickData(ctx, tick, archiveTd)
+	} else {
+		elasticTd, err = p.searchClient.GetMinimalTickData(ctx, tick)
+		if err != nil {
+			return false, fmt.Errorf("get full elastic tick data: %w", err)
+		}
+		match, err = p.matchMinimalTickData(ctx, tick, archiveTd)
+	}
+	if err != nil {
+		return false, fmt.Errorf("matching tick data: %w", err)
 	}
 
 	if !match {
@@ -254,6 +260,49 @@ func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, archive
 		}
 	}
 
+	return match, nil
+}
+
+func (p *TickProcessor) matchMinimalTickData(ctx context.Context, tick uint32, archiveTd *archproto.TickData) (bool, error) {
+	elasticTd, err := p.searchClient.GetMinimalTickData(ctx, tick)
+	if err != nil {
+		return false, fmt.Errorf("get elastic tick data: %w", err)
+	}
+	match := archiveTd == nil && elasticTd == nil
+	if archiveTd != nil && elasticTd != nil {
+		bytes, dErr := hex.DecodeString(archiveTd.GetSignatureHex())
+		if dErr != nil {
+			return false, fmt.Errorf("decoding signature hex: %w", err)
+		}
+
+		match = elasticTd.Epoch == archiveTd.Epoch &&
+			elasticTd.TickNumber == archiveTd.TickNumber &&
+			elasticTd.Signature == base64.StdEncoding.EncodeToString(bytes)
+	}
+	return match, nil
+}
+
+func (p *TickProcessor) matchFullTickData(ctx context.Context, tick uint32, archiveTd *archproto.TickData) (bool, error) {
+	elasticTd, err := p.searchClient.GetTickData(ctx, tick)
+	if err != nil {
+		return false, fmt.Errorf("get elastic tick data: %w", err)
+	}
+	match := archiveTd == nil && elasticTd == nil
+	if archiveTd != nil && elasticTd != nil {
+		bytes, dErr := hex.DecodeString(archiveTd.GetSignatureHex())
+		if dErr != nil {
+			return false, fmt.Errorf("decoding signature hex: %w", err)
+		}
+
+		match = elasticTd.ComputorIndex == archiveTd.ComputorIndex &&
+			elasticTd.Epoch == archiveTd.Epoch &&
+			elasticTd.TickNumber == archiveTd.TickNumber &&
+			elasticTd.Timestamp == archiveTd.Timestamp &&
+			elasticTd.TimeLock == base64.StdEncoding.EncodeToString(archiveTd.TimeLock) &&
+			slices.Compare(elasticTd.TransactionHashes, archiveTd.TransactionIds) == 0 &&
+			slices.Compare(elasticTd.ContractFees, archiveTd.ContractFees) == 0 &&
+			elasticTd.Signature == base64.StdEncoding.EncodeToString(bytes)
+	}
 	return match, nil
 }
 
