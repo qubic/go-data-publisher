@@ -59,6 +59,7 @@ func run() error {
 			StartTick           uint32 `conf:"optional"`
 			Transactions        bool   `conf:"default:true"`
 			TickData            bool   `conf:"default:true"`
+			VerifyFullTickData  bool   `conf:"default:false"`
 		}
 	}
 
@@ -122,11 +123,12 @@ func run() error {
 
 	m := metrics.NewMetrics(cfg.Sync.MetricsNamespace)
 	processor := sync.NewTickProcessor(cl, elasticClient, store, m, sync.Config{
-		SyncTransactions:  cfg.Sync.Transactions,
-		SyncTickData:      cfg.Sync.TickData,
-		SkipTicks:         cfg.Sync.SkipTicks,
-		NumMaxWorkers:     cfg.Sync.NumMaxWorkers,
-		ElasticQueryDelay: cfg.Elastic.Delay,
+		SyncTransactions:   cfg.Sync.Transactions,
+		SyncTickData:       cfg.Sync.TickData,
+		SkipTicks:          cfg.Sync.SkipTicks,
+		NumMaxWorkers:      cfg.Sync.NumMaxWorkers,
+		ElasticQueryDelay:  cfg.Elastic.Delay,
+		VerifyFullTickData: cfg.Sync.VerifyFullTickData,
 	})
 	if cfg.Sync.Transactions || cfg.Sync.TickData {
 		go processor.Synchronize()
