@@ -53,6 +53,28 @@ func TestElasticClient_getTickData(t *testing.T) {
 	log.Printf("Tick data: %+v", tickData)
 	assert.Equal(t, 24333026, int(tickData.TickNumber))
 	assert.Equal(t, 158, int(tickData.Epoch))
+	assert.NotZero(t, tickData.Timestamp)
+	assert.NotEmpty(t, tickData.TransactionHashes)
+	assert.NotZero(t, tickData.ComputorIndex)
+	assert.NotEmpty(t, tickData.TimeLock)
+	assert.Empty(t, tickData.ContractFees) // nil if not present
+	assert.NotEmpty(t, tickData.Signature)
+
+}
+
+func TestElasticClient_getMinimalTickData(t *testing.T) {
+	tickData, err := elasticClient.GetMinimalTickData(nil, 24333026)
+	require.NoError(t, err)
+	require.NotNil(t, tickData)
+	log.Printf("Tick data: %+v", tickData)
+	assert.Equal(t, 24333026, int(tickData.TickNumber))
+	assert.Equal(t, 158, int(tickData.Epoch))
+	assert.NotEmpty(t, tickData.Signature)
+	assert.Zero(t, tickData.Timestamp)
+	assert.Zero(t, tickData.ComputorIndex)
+	assert.Empty(t, tickData.TransactionHashes)
+	assert.Empty(t, tickData.TimeLock)
+	assert.Empty(t, tickData.ContractFees)
 }
 
 func TestElasticClient_getTickData_givenUnknownTickNumber_thenReturnNil(t *testing.T) {

@@ -128,8 +128,7 @@ func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status *domain.Stat
 		hex.EncodeToString(checksum), epoch,
 		hex.EncodeToString(lastStoredChecksum))
 
-	if epochComputorList.TickNumber == 0 {
-		// in the future the tick number should come from archiver (currently only one list per epoch is supported there).
+	if epochComputorList.TickNumber == 0 { // archiver might return '0' for initial list it collected in one epoch
 		epochComputorList.TickNumber, err = calculateTickNumber(status, epoch, len(lastStoredChecksum) == 0)
 		if err != nil {
 			return fmt.Errorf("calculating tick number: %w", err)

@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"github.com/qubic/go-archiver/protobuff"
+	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -9,15 +9,15 @@ import (
 
 func TestDomain_ConvertArchiverStatus(t *testing.T) {
 
-	archiverStatus := &protobuff.GetStatusResponse{
-		LastProcessedTick: &protobuff.ProcessedTick{
+	archiverStatus := &archiverproto.GetStatusResponse{
+		LastProcessedTick: &archiverproto.ProcessedTick{
 			TickNumber: 12345,
 			Epoch:      123,
 		},
-		ProcessedTickIntervalsPerEpoch: []*protobuff.ProcessedTickIntervalsPerEpoch{
+		ProcessedTickIntervalsPerEpoch: []*archiverproto.ProcessedTickIntervalsPerEpoch{
 			{
 				Epoch: 100,
-				Intervals: []*protobuff.ProcessedTickInterval{
+				Intervals: []*archiverproto.ProcessedTickInterval{
 					{
 						InitialProcessedTick: 1,
 						LastProcessedTick:    1000,
@@ -26,7 +26,7 @@ func TestDomain_ConvertArchiverStatus(t *testing.T) {
 			},
 			{
 				Epoch: 123,
-				Intervals: []*protobuff.ProcessedTickInterval{
+				Intervals: []*archiverproto.ProcessedTickInterval{
 					{
 						InitialProcessedTick: 10000,
 						LastProcessedTick:    123456,

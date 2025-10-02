@@ -1,8 +1,6 @@
 module github.com/qubic/go-data-publisher/status-service
 
-go 1.24.0
-
-toolchain go1.24.2
+go 1.25.0
 
 require (
 	github.com/ardanlabs/conf v1.5.0
@@ -13,7 +11,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
-	github.com/qubic/go-archiver v0.12.4
+	github.com/qubic/go-archiver-v2 v0.0.7
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sync v0.17.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20250929231259-57b25ae835d4

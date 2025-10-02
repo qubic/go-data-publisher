@@ -2,7 +2,7 @@ package domain
 
 import (
 	"github.com/pkg/errors"
-	"github.com/qubic/go-archiver/protobuff"
+	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 )
 
 type Status struct {
@@ -18,7 +18,7 @@ type TickInterval struct {
 	To    uint32
 }
 
-func ConvertFromArchiverStatus(archiverStatus *protobuff.GetStatusResponse) (*Status, error) {
+func ConvertFromArchiverStatus(archiverStatus *archiverproto.GetStatusResponse) (*Status, error) {
 	var intervals []*TickInterval
 	epochs := archiverStatus.GetProcessedTickIntervalsPerEpoch()
 	for _, epochIntervals := range epochs {
@@ -45,7 +45,7 @@ func ConvertFromArchiverStatus(archiverStatus *protobuff.GetStatusResponse) (*St
 	return &status, nil
 }
 
-func calculateInitialTickOfCurrentEpoch(epochs []*protobuff.ProcessedTickIntervalsPerEpoch) (uint32, error) {
+func calculateInitialTickOfCurrentEpoch(epochs []*archiverproto.ProcessedTickIntervalsPerEpoch) (uint32, error) {
 	numberOfEpochs := len(epochs)
 	if numberOfEpochs > 0 {
 		latestEpoch := epochs[numberOfEpochs-1]

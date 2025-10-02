@@ -116,6 +116,16 @@ func TestStatusCache_GetArchiverStatus(t *testing.T) {
 	assert.Equal(t, 10000, int(status.ProcessedTickIntervalsPerEpoch[1].Intervals[0].InitialProcessedTick))
 	assert.Equal(t, 12345, int(status.ProcessedTickIntervalsPerEpoch[1].Intervals[0].LastProcessedTick)) // update tick here
 
+	assert.Len(t, status.LastProcessedTicksPerEpoch, 2)
+	assert.Equal(t, 1000, int(status.LastProcessedTicksPerEpoch[100]))
+	assert.Equal(t, 12345, int(status.LastProcessedTicksPerEpoch[123]))
+
+	assert.Len(t, status.GetSkippedTicks(), 1) // first interval starts at 1 therefore no skipped interval before
+	assert.Equal(t, 1001, int(status.SkippedTicks[0].StartTick))
+	assert.Equal(t, 9999, int(status.SkippedTicks[0].EndTick))
+
+	assert.Empty(t, status.EmptyTicksPerEpoch)
+
 }
 
 func TestStatusCache_GetTickIntervals_givenLastTickInFirstInterval_thenReturnOnlyFirstInterval(t *testing.T) {

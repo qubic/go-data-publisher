@@ -1,4 +1,4 @@
-name: Create custom status service snapshot image
+name: Create computors publisher snapshot image
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./status-service
-          file: ./status-service/Dockerfile
+          context: ./computors-publisher
+          file: ./computors-publisher/Dockerfile
           push: true
-          tags: ghcr.io/qubic/status-service:snapshot
+          tags: ghcr.io/qubic/computors-publisher:snapshot

@@ -1,9 +1,9 @@
-name: Release transactions-producer
+name: Release transactions producer snapshot image
 
 on:
   push:
     branches:
-      - feature/refactor-transaction-publishing
+      - feature/archiver-v2-compat
 
 jobs:
   docker-publish:

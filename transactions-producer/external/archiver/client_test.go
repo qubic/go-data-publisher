@@ -2,7 +2,7 @@ package archiver
 
 import (
 	"github.com/google/go-cmp/cmp"
-	"github.com/qubic/go-archiver/protobuff"
+	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/transactions-producer/entities"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -12,14 +12,14 @@ func TestArchiverClient_ArchiveTxToEntityTx(t *testing.T) {
 
 	testData := []struct {
 		name                 string
-		archiverTransactions []*protobuff.TransactionData
+		archiverTransactions []*archiverproto.TransactionData
 		expected             []entities.Tx
 	}{
 		{
 			name: "TestArchiverToEntityFormat_1",
-			archiverTransactions: []*protobuff.TransactionData{
+			archiverTransactions: []*archiverproto.TransactionData{
 				{
-					Transaction: &protobuff.Transaction{
+					Transaction: &archiverproto.Transaction{
 						SourceId:     "FZTXBUWQTOWAHBODSZKVMUQRRPDDASKDOQLSDGLIUCVWDSYWIBAKAXRBKEJJ",
 						DestId:       "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFXIB",
 						Amount:       0,
@@ -71,15 +71,15 @@ func TestArchiverClient_ArchiveStatusToEntitiesProcessedTickIntervals(t *testing
 
 	testData := []struct {
 		name                           string
-		processedTickIntervalsPerEpoch []*protobuff.ProcessedTickIntervalsPerEpoch
+		processedTickIntervalsPerEpoch []*archiverproto.ProcessedTickIntervalsPerEpoch
 		expected                       []entities.ProcessedTickIntervalsPerEpoch
 	}{
 		{
 			name: "TestArchiverToEntityFormat_1",
-			processedTickIntervalsPerEpoch: []*protobuff.ProcessedTickIntervalsPerEpoch{
+			processedTickIntervalsPerEpoch: []*archiverproto.ProcessedTickIntervalsPerEpoch{
 				{
 					Epoch: 100,
-					Intervals: []*protobuff.ProcessedTickInterval{
+					Intervals: []*archiverproto.ProcessedTickInterval{
 						{
 							InitialProcessedTick: 10000000,
 							LastProcessedTick:    19999999,
@@ -88,7 +88,7 @@ func TestArchiverClient_ArchiveStatusToEntitiesProcessedTickIntervals(t *testing
 				},
 				{
 					Epoch: 101,
-					Intervals: []*protobuff.ProcessedTickInterval{
+					Intervals: []*archiverproto.ProcessedTickInterval{
 						{
 							InitialProcessedTick: 20000000,
 							LastProcessedTick:    29999999,
@@ -97,7 +97,7 @@ func TestArchiverClient_ArchiveStatusToEntitiesProcessedTickIntervals(t *testing
 				},
 				{
 					Epoch: 102,
-					Intervals: []*protobuff.ProcessedTickInterval{
+					Intervals: []*archiverproto.ProcessedTickInterval{
 						{
 							InitialProcessedTick: 30000000,
 							LastProcessedTick:    39999999,
@@ -106,7 +106,7 @@ func TestArchiverClient_ArchiveStatusToEntitiesProcessedTickIntervals(t *testing
 				},
 				{
 					Epoch: 103,
-					Intervals: []*protobuff.ProcessedTickInterval{
+					Intervals: []*archiverproto.ProcessedTickInterval{
 						{
 							InitialProcessedTick: 40000000,
 							LastProcessedTick:    49999999,
@@ -181,14 +181,14 @@ func TestArchiverClient_ArchiveEpochIntervalsToEntitiesEpochIntervals(t *testing
 
 	testData := []struct {
 		name                           string
-		processedTickIntervalsPerEpoch *protobuff.ProcessedTickIntervalsPerEpoch
+		processedTickIntervalsPerEpoch *archiverproto.ProcessedTickIntervalsPerEpoch
 		expected                       entities.ProcessedTickIntervalsPerEpoch
 	}{
 		{
 			name: "TestArchiverToEntityFormat_1",
-			processedTickIntervalsPerEpoch: &protobuff.ProcessedTickIntervalsPerEpoch{
+			processedTickIntervalsPerEpoch: &archiverproto.ProcessedTickIntervalsPerEpoch{
 				Epoch: 100,
-				Intervals: []*protobuff.ProcessedTickInterval{
+				Intervals: []*archiverproto.ProcessedTickInterval{
 					{
 						InitialProcessedTick: 10000000,
 						LastProcessedTick:    19999999,
@@ -207,9 +207,9 @@ func TestArchiverClient_ArchiveEpochIntervalsToEntitiesEpochIntervals(t *testing
 		},
 		{
 			name: "TestArchiverToEntityFormat_2",
-			processedTickIntervalsPerEpoch: &protobuff.ProcessedTickIntervalsPerEpoch{
+			processedTickIntervalsPerEpoch: &archiverproto.ProcessedTickIntervalsPerEpoch{
 				Epoch: 103,
-				Intervals: []*protobuff.ProcessedTickInterval{
+				Intervals: []*archiverproto.ProcessedTickInterval{
 					{
 						InitialProcessedTick: 40000000,
 						LastProcessedTick:    49999999,

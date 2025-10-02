@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/pkg/errors"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -29,9 +31,14 @@ func NewClient(esClient *elasticsearch.Client, transactionsIndex, tickDataIndex 
 }
 
 type TickData struct {
-	Epoch      uint32 `json:"epoch"`
-	TickNumber uint32 `json:"tickNumber"`
-	Signature  string `json:"signature"`
+	Epoch             uint32   `json:"epoch"`
+	TickNumber        uint32   `json:"tickNumber"`
+	ComputorIndex     uint32   `json:"computorIndex"`
+	Timestamp         uint64   `json:"timestamp"`
+	TimeLock          string   `json:"timeLock"`
+	TransactionHashes []string `json:"transactionHashes"`
+	ContractFees      []int64  `json:"contractFees"`
+	Signature         string   `json:"signature"`
 }
 
 type elasticHits struct {
@@ -55,16 +62,40 @@ type elasticDocument struct {
 }
 
 func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*TickData, error) {
+	return queryTickData(c.fullTickDataCall, ctx, tickNumber)
+}
 
-	res, err := c.esClient.Get(
+func (c *Client) GetMinimalTickData(ctx context.Context, tickNumber uint32) (*TickData, error) {
+	return queryTickData(c.minimalTickDataCall, ctx, tickNumber)
+}
+
+func (c *Client) minimalTickDataCall(ctx context.Context, tickNumber uint32) (*esapi.Response, error) {
+	return c.esClient.Get(
 		c.tickDataIndex,
-		strconv.Itoa(int(tickNumber)),
+		strconv.FormatUint(uint64(tickNumber), 10),
 		c.esClient.Get.WithContext(ctx),
 		c.esClient.Get.WithSource("epoch", "tickNumber", "signature"))
+}
+
+func (c *Client) fullTickDataCall(ctx context.Context, tickNumber uint32) (*esapi.Response, error) {
+	return c.esClient.Get(
+		c.tickDataIndex,
+		strconv.FormatUint(uint64(tickNumber), 10),
+		c.esClient.Get.WithContext(ctx),
+	)
+}
+
+func queryTickData(call func(c context.Context, tn uint32) (*esapi.Response, error), ctx context.Context, tickNumber uint32) (*TickData, error) {
+	res, err := call(ctx, tickNumber)
 	if err != nil {
 		return nil, errors.Wrap(err, "calling elastic")
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("Error closing body: %v", err)
+		}
+	}(res.Body)
 
 	// return if there is no tick data (alternative would be to ignore status code and check found property)
 	if res.StatusCode == http.StatusNotFound {
@@ -106,7 +137,12 @@ func (c *Client) GetTransactionHashes(ctx context.Context, tickNumber uint32) ([
 	if err != nil {
 		return nil, errors.Wrap(err, "calling elastic")
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("Error closing body: %v", err)
+		}
+	}(res.Body)
 
 	if res.IsError() {
 		var e map[string]interface{}

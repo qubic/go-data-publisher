@@ -1,9 +1,9 @@
-name: Create custom status service snapshot image
+name: Create tick data publisher snapshot image
 
 on:
   push:
     branches:
-      - 'feature/archiver-v2-compat'
+      - feature/archiver-v2-compat
 
 jobs:
   docker-publish:
@@ -30,7 +30,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./status-service
-          file: ./status-service/Dockerfile
+          context: ./tick-data-publisher
+          file: ./tick-data-publisher/Dockerfile
           push: true
-          tags: ghcr.io/qubic/status-service:snapshot
+          tags: ghcr.io/qubic/tick-data-publisher:snapshot

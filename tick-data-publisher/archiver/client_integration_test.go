@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-const url = "localhost:8010"
+const url = "localhost:8001"
 
 func TestArchiverClient_getStatus(t *testing.T) {
 	client, err := NewClient(url)
@@ -26,38 +26,39 @@ func TestArchiverClient_getStatus(t *testing.T) {
 	assert.NotEmpty(t, status.TickIntervals)
 }
 
-func TestArchiverClient_getTransactions(t *testing.T) {
+func TestArchiverClient_getTickData(t *testing.T) {
 	client, err := NewClient(url)
 	assert.NoError(t, err)
 
-	tickData, err := client.GetTickData(context.Background(), 24889941)
+	tickData, err := client.GetTickData(context.Background(), 33717718)
 	assert.NoError(t, err)
 
 	log.Printf("Tick data: %+v", tickData)
 	assert.NotNil(t, tickData)
-	assert.Len(t, tickData.TransactionHashes, 10)
+	assert.Greater(t, len(tickData.TransactionHashes), 1)
 }
 
-func TestArchiverClient_getTransactions_givenEmptyTick(t *testing.T) {
+func TestArchiverClient_getTickData_givenEmptyTick(t *testing.T) {
 	client, err := NewClient(url)
 	assert.NoError(t, err)
 
-	tickData, err := client.GetTickData(context.Background(), 24800000)
+	tickData, err := client.GetTickData(context.Background(), 33717719)
 	assert.NoError(t, err)
 
 	log.Printf("Tick data: %+v", tickData)
 	assert.Nil(t, tickData)
 }
 
-func TestArchiverClient_getTransactions_givenEmptyTickWithoutTransactions(t *testing.T) {
-	client, err := NewClient(url)
-	assert.NoError(t, err)
-
-	tickData, err := client.GetTickData(context.Background(), 24800003)
-	assert.NoError(t, err)
-
-	log.Printf("Tick data: %+v", tickData)
-	assert.NotNil(t, tickData)
-	assert.Nil(t, tickData.TransactionHashes)
-	assert.Nil(t, tickData.ContractFees)
-}
+// not easy to find. tick that isn't empty but has no transactions.
+//func TestArchiverClient_getTransactions_givenTickWithoutTransactions(t *testing.T) {
+//	client, err := NewClient(url)
+//	assert.NoError(t, err)
+//
+//	tickData, err := client.GetTickData(context.Background(), 24800003)
+//	assert.NoError(t, err)
+//
+//	log.Printf("Tick data: %+v", tickData)
+//	assert.NotNil(t, tickData)
+//	assert.Nil(t, tickData.TransactionHashes)
+//	assert.Nil(t, tickData.ContractFees)
+//}
