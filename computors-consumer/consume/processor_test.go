@@ -42,7 +42,7 @@ type FakeElasticClient struct {
 	bulkIndexCount int
 }
 
-func (f *FakeElasticClient) FindLatestComputorsListForEpoch(ctx context.Context, epoch uint32) (*elastic.ComputorsList, error) {
+func (f *FakeElasticClient) FindLatestComputorsListForEpoch(context.Context, uint32) (*elastic.ComputorsList, error) {
 	return f.duplicate, f.err
 }
 
