@@ -7,12 +7,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/qubic/computors-consumer/domain"
 	"github.com/qubic/computors-consumer/elastic"
 	"github.com/qubic/computors-consumer/metrics"
 	"github.com/qubic/go-qubic/common"
-	"log"
-	"time"
 )
 
 type KafkaClient interface {

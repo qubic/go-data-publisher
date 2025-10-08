@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+
 	"github.com/qubic/computors-publisher/domain"
 	"github.com/twmb/franz-go/pkg/kgo"
 )

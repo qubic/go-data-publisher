@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+
 	"github.com/qubic/computors-consumer/domain"
 	"github.com/twmb/franz-go/pkg/kgo"
-	"log"
 )
 
 type Client struct {

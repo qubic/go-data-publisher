@@ -3,6 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"math/rand"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/ardanlabs/conf"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/pkg/errors"
@@ -15,13 +23,6 @@ import (
 	"github.com/qubic/tick-data-consumer/status"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/plugin/kprom"
-	"log"
-	"math/rand"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 const envPrefix = "QUBIC_TICK_DATA_CONSUMER"

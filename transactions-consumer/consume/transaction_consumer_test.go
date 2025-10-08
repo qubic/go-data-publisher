@@ -3,12 +3,13 @@ package consume
 import (
 	"context"
 	"errors"
+	"log"
+	"testing"
+
 	"github.com/qubic/transactions-consumer/extern"
 	"github.com/qubic/transactions-consumer/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/twmb/franz-go/pkg/kgo"
-	"log"
-	"testing"
 )
 
 var m = metrics.NewMetrics("foo")

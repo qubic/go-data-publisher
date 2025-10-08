@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+
 	"github.com/pkg/errors"
 	"github.com/qubic/tick-data-publisher/domain"
 	"github.com/twmb/franz-go/pkg/kgo"

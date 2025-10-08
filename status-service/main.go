@@ -2,6 +2,13 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/ardanlabs/conf"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jellydator/ttlcache/v3"
@@ -14,12 +21,6 @@ import (
 	"github.com/qubic/go-data-publisher/status-service/protobuf"
 	"github.com/qubic/go-data-publisher/status-service/rpc"
 	"github.com/qubic/go-data-publisher/status-service/sync"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 const envPrefix = "QUBIC_STATUS_SERVICE"

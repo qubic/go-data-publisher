@@ -1,11 +1,12 @@
 package db
 
 import (
+	"os"
+	"testing"
+
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"os"
-	"testing"
 )
 
 func TestStore_SetAndGetLastProcessedTick(t *testing.T) {

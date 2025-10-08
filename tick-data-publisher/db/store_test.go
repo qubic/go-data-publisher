@@ -1,9 +1,10 @@
 package db
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestStore_SetAndGetLastProcessedTick(t *testing.T) {

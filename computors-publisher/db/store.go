@@ -4,10 +4,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/cockroachdb/pebble/v2"
 	"io"
 	"log"
 	"path/filepath"
+
+	"github.com/cockroachdb/pebble/v2"
 )
 
 var ErrNotFound = errors.New("store resource not found")

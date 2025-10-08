@@ -2,12 +2,13 @@ package sync
 
 import (
 	"context"
+	"sync"
+	"testing"
+
 	"github.com/qubic/tick-data-publisher/domain"
 	"github.com/qubic/tick-data-publisher/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"sync"
-	"testing"
 )
 
 type FakeDataStore struct {

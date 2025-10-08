@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"testing"
+
 	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/elastic"
 	"github.com/qubic/go-data-publisher/status-service/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 type FakeElasticClient struct {

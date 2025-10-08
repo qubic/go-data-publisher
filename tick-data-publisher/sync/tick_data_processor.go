@@ -2,12 +2,13 @@ package sync
 
 import (
 	"context"
+	"log"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/qubic/tick-data-publisher/domain"
 	"github.com/qubic/tick-data-publisher/metrics"
 	"golang.org/x/sync/errgroup"
-	"log"
-	"time"
 )
 
 type ArchiveClient interface {

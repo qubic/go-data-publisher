@@ -7,12 +7,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
+	"time"
+
 	"github.com/qubic/computors-publisher/db"
 	"github.com/qubic/computors-publisher/domain"
 	"github.com/qubic/computors-publisher/metrics"
 	"github.com/qubic/go-qubic/common"
-	"log"
-	"time"
 )
 
 type ArchiveClient interface {

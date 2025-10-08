@@ -1,13 +1,14 @@
 package rpc
 
 import (
+	"testing"
+	"time"
+
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/protobuf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 type FakeStatusProvider struct {

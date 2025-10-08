@@ -3,10 +3,11 @@ package kafka
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/qubic/transactions-producer/entities"
 	"github.com/stretchr/testify/assert"
 	"github.com/twmb/franz-go/pkg/kgo"
-	"testing"
 )
 
 type MockKafkaClient struct {

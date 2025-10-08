@@ -3,12 +3,13 @@ package elastic
 import (
 	"bytes"
 	"context"
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/elastic/go-elasticsearch/v8/esutil"
-	"github.com/pkg/errors"
 	"log"
 	"runtime"
 	"time"
+
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esutil"
+	"github.com/pkg/errors"
 )
 
 type Client struct {

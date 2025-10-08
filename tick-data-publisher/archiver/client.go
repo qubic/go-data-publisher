@@ -5,12 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"log"
+
 	"github.com/pkg/errors"
 	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/tick-data-publisher/domain"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"log"
 )
 
 type Client struct {

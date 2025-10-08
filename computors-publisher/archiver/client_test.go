@@ -1,13 +1,14 @@
 package archiver
 
 import (
+	"os"
+	"testing"
+
 	"github.com/qubic/computors-publisher/domain"
 	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"
-	"os"
-	"testing"
 )
 
 func TestArchiveClient_convertComputorList(t *testing.T) {

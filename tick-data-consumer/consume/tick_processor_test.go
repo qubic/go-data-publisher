@@ -3,12 +3,13 @@ package consume
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/qubic/tick-data-consumer/domain"
 	"github.com/qubic/tick-data-consumer/elastic"
 	"github.com/qubic/tick-data-consumer/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 type FakeKafkaClient struct {

@@ -2,8 +2,9 @@ package consume
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // IMPORTANT: the marshalling needs to be similar to the consumer code and the elastic index, otherwise

@@ -1,11 +1,12 @@
 package archiver
 
 import (
+	"testing"
+
 	"github.com/google/go-cmp/cmp"
 	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/transactions-producer/entities"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestArchiverClient_ArchiveTxToEntityTx(t *testing.T) {

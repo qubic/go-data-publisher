@@ -2,11 +2,12 @@ package rpc
 
 import (
 	"fmt"
+	"sync"
+
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/pkg/errors"
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/protobuf"
-	"sync"
 )
 
 type StatusProvider interface {

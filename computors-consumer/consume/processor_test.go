@@ -3,13 +3,14 @@ package consume
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"testing"
+
 	"github.com/qubic/computors-consumer/domain"
 	"github.com/qubic/computors-consumer/elastic"
 	"github.com/qubic/computors-consumer/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"os"
-	"testing"
 )
 
 var m = metrics.NewMetrics("test")

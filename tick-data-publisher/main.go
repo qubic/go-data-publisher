@@ -2,6 +2,12 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/ardanlabs/conf"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,11 +20,6 @@ import (
 	"github.com/qubic/tick-data-publisher/sync"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/plugin/kprom"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 const envPrefix = "QUBIC_TICK_DATA_PUBLISHER"

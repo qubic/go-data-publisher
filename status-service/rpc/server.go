@@ -3,6 +3,10 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"log"
+	"net"
+	"net/http"
+
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/qubic/go-data-publisher/status-service/protobuf"
 	"google.golang.org/grpc"
@@ -12,9 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/emptypb"
-	"log"
-	"net"
-	"net/http"
 )
 
 var _ protobuf.StatusServiceServer = &StatusServiceServer{}

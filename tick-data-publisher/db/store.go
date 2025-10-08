@@ -3,11 +3,12 @@ package db
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/cockroachdb/pebble/v2"
-	"github.com/pkg/errors"
 	"io"
 	"log"
 	"path/filepath"
+
+	"github.com/cockroachdb/pebble/v2"
+	"github.com/pkg/errors"
 )
 
 var ErrNotFound = errors.New("store resource not found")

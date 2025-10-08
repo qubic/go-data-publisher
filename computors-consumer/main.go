@@ -2,6 +2,14 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"math/rand"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/ardanlabs/conf/v3"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/pkg/errors"
@@ -14,13 +22,6 @@ import (
 	"github.com/qubic/computors-consumer/status"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/plugin/kprom"
-	"log"
-	"math/rand"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 const envPrefix = "QUBIC_COMPUTORS_CONSUMER"

@@ -3,11 +3,12 @@ package archiver
 import (
 	"context"
 	"fmt"
+	"log"
+
 	"github.com/pkg/errors"
 	"github.com/qubic/go-archiver-v2/protobuf"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"log"
 )
 
 type Client struct {

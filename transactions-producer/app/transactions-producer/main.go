@@ -3,6 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/ardanlabs/conf"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,12 +23,6 @@ import (
 	"github.com/twmb/franz-go/plugin/kprom"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"log"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 const prefix = "QUBIC_TRANSACTIONS_PUBLISHER"

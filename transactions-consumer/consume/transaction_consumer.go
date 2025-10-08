@@ -3,12 +3,13 @@ package consume
 import (
 	"context"
 	"encoding/json"
+	"log"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/qubic/transactions-consumer/extern"
 	"github.com/qubic/transactions-consumer/metrics"
 	"github.com/twmb/franz-go/pkg/kgo"
-	"log"
-	"time"
 )
 
 type KafkaClient interface {

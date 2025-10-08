@@ -4,17 +4,18 @@ import (
 	cmp2 "cmp"
 	"context"
 	"errors"
+	"os"
+	"slices"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/qubic/transactions-producer/entities"
 	"github.com/qubic/transactions-producer/infrastructure/store/pebbledb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"os"
-	"slices"
-	"sync"
-	"testing"
-	"time"
 )
 
 var metrics = NewMetrics("test")

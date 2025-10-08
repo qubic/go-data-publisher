@@ -7,16 +7,17 @@ import (
 	"context"
 	"crypto/tls"
 	"flag"
-	"github.com/ardanlabs/conf"
-	"github.com/elastic/elastic-transport-go/v8/elastictransport"
-	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/joho/godotenv"
-	"github.com/stretchr/testify/require"
 	"log"
 	"net/http"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/ardanlabs/conf"
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/joho/godotenv"
+	"github.com/stretchr/testify/require"
 )
 
 var (

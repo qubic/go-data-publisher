@@ -1,9 +1,10 @@
 package db
 
 import (
-	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestPebbleStore_SetAndGetLastProcessedEpoch(t *testing.T) {

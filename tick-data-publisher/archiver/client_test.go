@@ -1,10 +1,11 @@
 package archiver
 
 import (
+	"testing"
+
 	"github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/tick-data-publisher/domain"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestArchiverClient_convertTickData(t *testing.T) {

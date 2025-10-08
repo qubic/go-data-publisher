@@ -5,6 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"log"
+	"slices"
+	"time"
+
 	"github.com/pkg/errors"
 	archproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/go-data-publisher/status-service/domain"
@@ -12,9 +16,6 @@ import (
 	"github.com/qubic/go-data-publisher/status-service/metrics"
 	"github.com/qubic/go-data-publisher/status-service/util"
 	"golang.org/x/sync/errgroup"
-	"log"
-	"slices"
-	"time"
 )
 
 type ArchiveClient interface {

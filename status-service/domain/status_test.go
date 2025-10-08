@@ -1,10 +1,11 @@
 package domain
 
 import (
+	"testing"
+
 	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestDomain_ConvertArchiverStatus(t *testing.T) {

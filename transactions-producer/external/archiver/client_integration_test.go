@@ -5,8 +5,9 @@ package archiver
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 const url = "localhost:8001"

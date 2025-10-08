@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/qubic/transactions-producer/entities"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"time"
 )
 
 type Fetcher interface {

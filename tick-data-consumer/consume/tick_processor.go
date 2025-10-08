@@ -3,13 +3,14 @@ package consume
 import (
 	"context"
 	"encoding/json"
+	"log"
+	"strconv"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/qubic/tick-data-consumer/domain"
 	"github.com/qubic/tick-data-consumer/elastic"
 	"github.com/qubic/tick-data-consumer/metrics"
-	"log"
-	"strconv"
-	"time"
 )
 
 type KafkaClient interface {

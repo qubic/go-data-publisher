@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+
 	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/transactions-producer/entities"
 	"google.golang.org/grpc"

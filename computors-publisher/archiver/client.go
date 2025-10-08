@@ -6,11 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
+
 	"github.com/qubic/computors-publisher/domain"
 	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"slices"
 )
 
 type Client struct {

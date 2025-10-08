@@ -4,9 +4,10 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"path/filepath"
+
 	"github.com/cockroachdb/pebble/v2"
 	"github.com/qubic/transactions-producer/entities"
-	"path/filepath"
 )
 
 const lastProcessedTickPerEpochKey = 0x00

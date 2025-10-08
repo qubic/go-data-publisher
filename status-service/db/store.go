@@ -5,15 +5,16 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
+	"log"
+	"path/filepath"
+	"sort"
+	"strconv"
+
 	"github.com/cockroachdb/pebble"
 	"github.com/pkg/errors"
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/util"
 	"google.golang.org/protobuf/proto"
-	"log"
-	"path/filepath"
-	"sort"
-	"strconv"
 )
 
 var ErrNotFound = errors.New("store resource not found")

@@ -3,11 +3,12 @@ package kafka
 import (
 	"context"
 	"encoding/json"
+	"log"
+
 	"github.com/pkg/errors"
 	"github.com/qubic/tick-data-consumer/domain"
 	"github.com/qubic/tick-data-consumer/metrics"
 	"github.com/twmb/franz-go/pkg/kgo"
-	"log"
 )
 
 type Client struct {

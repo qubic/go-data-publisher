@@ -2,9 +2,10 @@ package sync
 
 import (
 	"encoding/hex"
+	"testing"
+
 	"github.com/qubic/computors-publisher/domain"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestProcessor_computeComputorsChecksum(t *testing.T) {
