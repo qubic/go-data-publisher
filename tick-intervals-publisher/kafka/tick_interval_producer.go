@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/qubic/tick-interval-publisher/domain"
+	"github.com/qubic/tick-intervals-publisher/domain"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 

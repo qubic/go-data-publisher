@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
-	"github.com/qubic/tick-interval-publisher/domain"
+	"github.com/qubic/tick-intervals-publisher/domain"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
