@@ -20,7 +20,7 @@ type PebbleStore struct {
 }
 
 func NewPebbleStore(storeDir string) (*PebbleStore, error) {
-	db, err := pebble.Open(filepath.Join(storeDir, "tick-interval-publisher"), &pebble.Options{})
+	db, err := pebble.Open(filepath.Join(storeDir, "tick-intervals-publisher"), &pebble.Options{})
 	if err != nil {
 		return nil, fmt.Errorf("oppening pebble db: %w", err)
 	}

@@ -12,21 +12,21 @@ import (
 	"github.com/ardanlabs/conf"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/qubic/tick-interval-publisher/api"
-	"github.com/qubic/tick-interval-publisher/archiver"
-	"github.com/qubic/tick-interval-publisher/db"
-	"github.com/qubic/tick-interval-publisher/kafka"
-	"github.com/qubic/tick-interval-publisher/metrics"
-	"github.com/qubic/tick-interval-publisher/processing"
+	"github.com/qubic/tick-intervals-publisher/api"
+	"github.com/qubic/tick-intervals-publisher/archiver"
+	"github.com/qubic/tick-intervals-publisher/db"
+	"github.com/qubic/tick-intervals-publisher/kafka"
+	"github.com/qubic/tick-intervals-publisher/metrics"
+	"github.com/qubic/tick-intervals-publisher/processing"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/plugin/kprom"
 )
 
-const envPrefix = "QUBIC_TICK_INTERVAL_PUBLISHER"
+const envPrefix = "QUBIC_TICK_INTERVALS_PUBLISHER"
 
 func main() {
 	log.SetOutput(os.Stdout)
-	log.Println("Starting tick-interval-publisher")
+	log.Println("Starting tick-intervals-publisher")
 	if err := run(); err != nil {
 		log.Fatalf("main: exited with error: %s", err.Error())
 	}

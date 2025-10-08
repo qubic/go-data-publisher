@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/qubic/tick-interval-publisher/domain"
+	"github.com/qubic/tick-intervals-publisher/domain"
 	"github.com/stretchr/testify/require"
 )
 

@@ -1,4 +1,4 @@
-## tick-interval-publisher
+## tick-intervals-publisher
 
 Service for publishing tick intervals to a message broker.
 
@@ -16,7 +16,7 @@ The application needs kafka to be installed. The topics need to be created befor
 
 ## Configuration
 
-You can use command line properties or environment variables. Environment variables need to be prefixed with `QUBIC_TICK_INTERVAL_PUBLISHER_`.
+You can use command line properties or environment variables. Environment variables need to be prefixed with `QUBIC_TICK_INTERVALS_PUBLISHER_`.
 
 The following properties (with defaults) can be set:
 

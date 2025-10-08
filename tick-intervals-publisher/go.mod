@@ -1,4 +1,4 @@
-module github.com/qubic/tick-interval-publisher
+module github.com/qubic/tick-intervals-publisher
 
 go 1.25.0
 

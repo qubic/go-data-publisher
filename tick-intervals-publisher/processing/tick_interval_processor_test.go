@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/qubic/tick-interval-publisher/domain"
-	"github.com/qubic/tick-interval-publisher/metrics"
+	"github.com/qubic/tick-intervals-publisher/domain"
+	"github.com/qubic/tick-intervals-publisher/metrics"
 	"github.com/stretchr/testify/require"
 )
 
