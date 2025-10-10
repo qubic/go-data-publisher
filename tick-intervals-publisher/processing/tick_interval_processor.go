@@ -44,7 +44,8 @@ func NewTickIntervalProcessor(db DataStore, client ArchiveClient, producer Produ
 }
 
 func (p *TickIntervalProcessor) StartProcessing() {
-	ticker := time.Tick(1 * time.Minute)
+	log.Println("Start processing...")
+	ticker := time.Tick(5 * time.Second)
 	for range ticker {
 		err := p.process()
 		if err != nil {

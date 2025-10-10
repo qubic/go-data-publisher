@@ -40,7 +40,7 @@ func run() error {
 		}
 		Broker struct {
 			BootstrapServers []string `conf:"default:localhost:9092"`
-			ProduceTopic     string   `conf:"default:qubic-tick-data"`
+			ProduceTopic     string   `conf:"default:qubic-tick-intervals"`
 		}
 		Sync struct {
 			InternalStoreFolder string   `conf:"default:store"`
