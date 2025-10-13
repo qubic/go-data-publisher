@@ -40,12 +40,12 @@ func NewTickProcessor(kafkaClient KafkaClient, elasticClient ElasticClient, metr
 func (p *TickProcessor) Consume() error {
 	for {
 		count, err := p.consumeBatch(context.Background())
-		p.consumeMetrics.AddProcessedTicks(count)
 		if err != nil {
 			// if there is an error consuming we abort. We need to fix the error before trying again.
 			log.Printf("Error consuming batch: %v", err)
 			return errors.Wrap(err, "consuming batch")
 		} else {
+			p.consumeMetrics.AddProcessedTicks(count)
 			log.Printf("Processed [%d] ticks.", count)
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -57,19 +57,19 @@ func (p *TickProcessor) consumeBatch(ctx context.Context) (int, error) {
 	defer p.kafkaClient.AllowRebalance()
 	tickDataList, err := p.kafkaClient.PollMessages(ctx)
 	if err != nil {
-		return -1, errors.Wrap(err, "poll messages")
+		return 0, errors.Wrap(err, "poll messages")
 	}
 
 	// send to elastic
 	err = p.sendToElastic(ctx, tickDataList)
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 
 	// commit
 	err = p.kafkaClient.Commit(ctx)
 	if err != nil {
-		return -1, errors.Wrap(err, "committing batch")
+		return 0, errors.Wrap(err, "committing batch")
 	}
 	return len(tickDataList), nil
 }
