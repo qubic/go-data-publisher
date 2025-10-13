@@ -63,13 +63,6 @@ func run() error {
 			}
 			fmt.Println(usage)
 			return nil
-		case errors.Is(err, conf.ErrVersionWanted):
-			version, err := conf.VersionString(envPrefix, &cfg)
-			if err != nil {
-				return fmt.Errorf("generating config version: %w", err)
-			}
-			fmt.Println(version)
-			return nil
 		}
 		return fmt.Errorf("parsing config: %w", err)
 	}

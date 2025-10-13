@@ -26,3 +26,4 @@ tick-data-publisher/store
 transactions-consumer/store
 tx-processor-store/
 computors-publisher/store
+tick-intervals-publisher/store

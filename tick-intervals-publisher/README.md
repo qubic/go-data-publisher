@@ -1,4 +1,4 @@
-## tick-intervals-publisher
+## tick intervals publisher
 
 Service for publishing tick intervals to a message broker.
 
