@@ -1,0 +1,24 @@
+on:
+  push:
+    paths:
+      - 'tick-intervals-consumer/**'
+  pull_request:
+    paths:
+      - 'tick-intervals-consumer/**'
+
+name: Test tick intervals consumer
+jobs:
+  test-nocache:
+    strategy:
+      matrix:
+        go-version: [1.24.x]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: false
+      - run: go test -p 1 -tags ci ./...
+        working-directory: tick-intervals-consumer
