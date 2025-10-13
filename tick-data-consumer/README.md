@@ -1,4 +1,4 @@
-# go-tick-data-consumer
+# tick data consumer
 
 Service for consuming qubic tick data messages from a message broker.
 
@@ -16,13 +16,13 @@ The application needs kafka to be installed. The topics need to be created befor
 
 ## Configuration
 
-## Configuration options
+### Configuration options
 
 You can use command line properties or environment variables. Environment variables need to be prefixed with `QUBIC_TICK_DATA_CONSUMER_`.
 
 The following properties (with defaults) can be set:
 
-```bash
+```properties
 --elastic-addresses=[https://localhost:9200]
 --elastic-username=qubic-ingestion
 --elastic-password=

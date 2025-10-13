@@ -85,7 +85,7 @@ func TestTickProcessor_consumeBatch_givenEmptyTick_thenError(t *testing.T) {
 	elasticClient := &FakeElasticClient{}
 	processor := NewTickProcessor(kafkaClient, elasticClient, m)
 
-	_, err := processor.consumeBatch(context.Background())
+	err := processor.Consume()
 	require.Error(t, err)
 }
 
