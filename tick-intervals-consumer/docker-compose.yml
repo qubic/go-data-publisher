@@ -2,8 +2,6 @@ services:
   qubic-tick-intervals-consumer:
     image: ghcr.io/qubic/tick-intervals-consumer:latest # set correct version
     container_name: qubic-tick-intervals-consumer
-    ports:
-      - "127.0.0.1:9993:9999"
     environment:
       QUBIC_TICK_INTERVALS_CONSUMER_BROKER_BOOTSTRAP_SERVERS: "localhost:9092" # set kafka url here
       QUBIC_TICK_INTERVALS_CONSUMER_BROKER_CONSUME_TOPIC: "qubic-tick-intervals-topic" # set topic name
