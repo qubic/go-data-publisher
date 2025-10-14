@@ -134,19 +134,11 @@ func run() error {
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
-	// status and metrics endpoint
-	apiError := make(chan error, 1)
-	go func() {
-		mux := http.NewServeMux()
-		server := api.NewHandler()
-		mux.HandleFunc("/health", server.GetHealth)
-		log.Printf("main: Starting server on port [%d].", cfg.Sync.ServerPort)
-		apiError <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.Sync.ServerPort), mux)
-	}()
-
+	// health and metrics endpoint
 	metricsError := make(chan error, 1)
 	go func() {
 		log.Printf("main: Starting metrics server on port [%d].", cfg.Sync.MetricsPort)
+		http.HandleFunc("/health", api.Health)
 		http.Handle("/metrics", promhttp.Handler())
 		metricsError <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.Sync.MetricsPort), nil)
 	}()
@@ -166,8 +158,6 @@ func run() error {
 				return nil
 			}
 		case err := <-metricsError:
-			return fmt.Errorf("[ERROR] starting server: %v", err)
-		case err := <-apiError:
 			return fmt.Errorf("[ERROR] starting server: %v", err)
 		}
 	}

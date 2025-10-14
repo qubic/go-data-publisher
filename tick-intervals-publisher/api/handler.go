@@ -6,18 +6,11 @@ import (
 	"net/http"
 )
 
-type Handler struct {
-}
-
 type HealthResponse struct {
 	Status string `json:"status"`
 }
 
-func NewHandler() *Handler {
-	return &Handler{}
-}
-
-func (h *Handler) GetHealth(w http.ResponseWriter, _ *http.Request) {
+func Health(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(HealthResponse{
 		Status: "UP",
