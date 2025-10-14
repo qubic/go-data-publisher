@@ -24,7 +24,6 @@ The following properties (with defaults) can be set:
 --client-archiver-grpc-host=localhost:8010
 --broker-bootstrap-servers=localhost:9092
 --broker-produce-topic=qubic-tick-intervals
---sync-server-port=8000
 --sync-metrics-port=9999
 --sync-metrics-namespace=qubic-kafka
 --sync-start-epoch=0
@@ -49,16 +48,10 @@ Kafka bootstrap server urls.
 Name of the topic to send the messages to.
 
 `
---sync-server-port=
-`
-
-Port where to run the non-metrics endpoints (like health check).
-
-`
 --sync-metrics-port=
 `
 
-Port for exposing prometheus metrics. Access default with `curl localhost:9999/metrics` for example.
+Port for exposing prometheus metrics and health check. Access default with `curl localhost:9999/metrics` for example.
 
 `
 --sync-metrics-namespace=
