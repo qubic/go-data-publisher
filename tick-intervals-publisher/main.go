@@ -44,7 +44,6 @@ func run() error {
 		}
 		Sync struct {
 			InternalStoreFolder string   `conf:"default:store"`
-			ServerPort          int      `conf:"default:8000"`
 			MetricsPort         int      `conf:"default:9999"`
 			MetricsNamespace    string   `conf:"default:qubic-kafka"`
 			PublishCustomEpochs []uint32 `conf:"optional"`
@@ -135,12 +134,12 @@ func run() error {
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
 
 	// health and metrics endpoint
-	metricsError := make(chan error, 1)
+	apiError := make(chan error, 1)
 	go func() {
-		log.Printf("main: Starting metrics server on port [%d].", cfg.Sync.MetricsPort)
+		log.Printf("main: Starting http server on port [%d].", cfg.Sync.MetricsPort)
 		http.HandleFunc("/health", api.Health)
 		http.Handle("/metrics", promhttp.Handler())
-		metricsError <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.Sync.MetricsPort), nil)
+		apiError <- http.ListenAndServe(fmt.Sprintf(":%d", cfg.Sync.MetricsPort), nil)
 	}()
 
 	log.Println("main: Service started.")
@@ -157,8 +156,8 @@ func run() error {
 				log.Printf("main: Finished proessing.")
 				return nil
 			}
-		case err := <-metricsError:
-			return fmt.Errorf("[ERROR] starting server: %v", err)
+		case err := <-apiError:
+			return fmt.Errorf("[ERROR] starting http server: %v", err)
 		}
 	}
 
