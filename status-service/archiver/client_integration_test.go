@@ -31,19 +31,19 @@ func TestArchiverClient_getTickData(t *testing.T) {
 	client, err := NewClient(url)
 	assert.NoError(t, err)
 
-	tickData, err := client.GetTickData(context.Background(), 26028459)
+	tickData, err := client.GetTickData(context.Background(), 34837151)
 	require.NoError(t, err)
 
 	log.Printf("Tick data: %+v", tickData)
 	assert.NotNil(t, tickData)
-	assert.Len(t, tickData.GetTransactionIds(), 3)
+	assert.Len(t, tickData.GetTransactionIds(), 10)
 }
 
 func TestArchiverClient_getTickData_givenEmptyTick(t *testing.T) {
 	client, err := NewClient(url)
 	assert.NoError(t, err)
 
-	tickData, err := client.GetTickData(context.Background(), 26028355)
+	tickData, err := client.GetTickData(context.Background(), 34837175)
 	require.NoError(t, err)
 
 	log.Printf("Tick data: %+v", tickData)
@@ -51,11 +51,11 @@ func TestArchiverClient_getTickData_givenEmptyTick(t *testing.T) {
 	assert.Empty(t, tickData.GetTransactionIds())
 }
 
-func TestArchiverClient_getTickData_givenEmptyTickWithoutTransactions(t *testing.T) {
+func TestArchiverClient_getTickData_givenTickDataWithoutTransactions(t *testing.T) {
 	client, err := NewClient(url)
 	assert.NoError(t, err)
 
-	tickData, err := client.GetTickData(context.Background(), 26028357)
+	tickData, err := client.GetTickData(context.Background(), 34411948)
 	require.NoError(t, err)
 
 	log.Printf("Tick data: %+v", tickData)

@@ -20,6 +20,10 @@ type FakeElasticClient struct {
 	faultyDetailTickNumber uint32
 }
 
+func (f *FakeElasticClient) GetTickIntervals(_ context.Context, _ uint32) ([]*domain.TickInterval, error) {
+	panic("implement me")
+}
+
 func (f *FakeElasticClient) GetTickData(_ context.Context, tickNumber uint32) (*elastic.TickData, error) {
 	if tickNumber == f.emptyTickNumber {
 		return nil, nil

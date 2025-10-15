@@ -12,12 +12,6 @@ type Status struct {
 	TickIntervals []*TickInterval
 }
 
-type TickInterval struct {
-	Epoch uint32
-	From  uint32
-	To    uint32
-}
-
 func ConvertFromArchiverStatus(archiverStatus *archiverproto.GetStatusResponse) (*Status, error) {
 	var intervals []*TickInterval
 	epochs := archiverStatus.GetProcessedTickIntervalsPerEpoch()
