@@ -236,15 +236,15 @@ func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, archive
 	if p.verifyFullTickData {
 		elasticTd, err = p.searchClient.GetTickData(ctx, tick)
 		if err != nil {
-			return false, fmt.Errorf("get minimal elastic tick data: %w", err)
+			return false, fmt.Errorf("getting full elastic tick data: %w", err)
 		}
-		match, err = p.matchFullTickData(ctx, tick, archiveTd)
+		match, err = p.matchFullTickData(elasticTd, archiveTd)
 	} else {
 		elasticTd, err = p.searchClient.GetMinimalTickData(ctx, tick)
 		if err != nil {
-			return false, fmt.Errorf("get full elastic tick data: %w", err)
+			return false, fmt.Errorf("getting minimal elastic tick data: %w", err)
 		}
-		match, err = p.matchMinimalTickData(ctx, tick, archiveTd)
+		match, err = p.matchMinimalTickData(elasticTd, archiveTd)
 	}
 	if err != nil {
 		return false, fmt.Errorf("matching tick data: %w", err)
@@ -264,15 +264,11 @@ func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, archive
 	return match, nil
 }
 
-func (p *TickProcessor) matchMinimalTickData(ctx context.Context, tick uint32, archiveTd *archproto.TickData) (bool, error) {
-	elasticTd, err := p.searchClient.GetMinimalTickData(ctx, tick)
-	if err != nil {
-		return false, fmt.Errorf("get elastic tick data: %w", err)
-	}
+func (p *TickProcessor) matchMinimalTickData(elasticTd *elastic.TickData, archiveTd *archproto.TickData) (bool, error) {
 	match := archiveTd == nil && elasticTd == nil
 	if archiveTd != nil && elasticTd != nil {
-		bytes, dErr := hex.DecodeString(archiveTd.GetSignatureHex())
-		if dErr != nil {
+		bytes, err := hex.DecodeString(archiveTd.GetSignatureHex())
+		if err != nil {
 			return false, fmt.Errorf("decoding signature hex: %w", err)
 		}
 
@@ -283,15 +279,11 @@ func (p *TickProcessor) matchMinimalTickData(ctx context.Context, tick uint32, a
 	return match, nil
 }
 
-func (p *TickProcessor) matchFullTickData(ctx context.Context, tick uint32, archiveTd *archproto.TickData) (bool, error) {
-	elasticTd, err := p.searchClient.GetTickData(ctx, tick)
-	if err != nil {
-		return false, fmt.Errorf("get elastic tick data: %w", err)
-	}
+func (p *TickProcessor) matchFullTickData(elasticTd *elastic.TickData, archiveTd *archproto.TickData) (bool, error) {
 	match := archiveTd == nil && elasticTd == nil
 	if archiveTd != nil && elasticTd != nil {
-		bytes, dErr := hex.DecodeString(archiveTd.GetSignatureHex())
-		if dErr != nil {
+		bytes, err := hex.DecodeString(archiveTd.GetSignatureHex())
+		if err != nil {
 			return false, fmt.Errorf("decoding signature hex: %w", err)
 		}
 
