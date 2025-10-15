@@ -86,6 +86,7 @@ func (p *Processor) sendToElastic(ctx context.Context, intervals []*domain.TickI
 			interval.From == 0 || interval.To == 0 || interval.From > interval.To {
 			return fmt.Errorf("invalid tick interval: %+v", interval)
 		}
+		log.Printf("Indexing tick interval for epoch [%d]: [%d] - [%d].", interval.Epoch, interval.From, interval.To)
 		document, err := convertToDocument(interval)
 		if err != nil {
 			return err
