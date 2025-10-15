@@ -44,13 +44,14 @@ func run() error {
 			MetricsHttpHost string `conf:"default:0.0.0.0:9999"`
 		}
 		Elastic struct {
-			Addresses        []string      `conf:"default:https://localhost:9200"`
-			Username         string        `conf:"default:qubic-query"`
-			Password         string        `conf:"optional"`
-			TransactionIndex string        `conf:"default:qubic-transactions-alias"`
-			TickDataIndex    string        `conf:"default:qubic-tick-data-alias"`
-			CertificatePath  string        `conf:"default:http_ca.crt"`
-			Delay            time.Duration `conf:"default:800ms"`
+			Addresses          []string      `conf:"default:https://localhost:9200"`
+			Username           string        `conf:"default:qubic-query"`
+			Password           string        `conf:"optional"`
+			TransactionIndex   string        `conf:"default:qubic-transactions-alias"`
+			TickDataIndex      string        `conf:"default:qubic-tick-data-alias"`
+			TickIntervalsIndex string        `conf:"default:qubic-tick-intervals-alias"`
+			CertificatePath    string        `conf:"default:http_ca.crt"`
+			Delay              time.Duration `conf:"default:800ms"`
 		}
 		Sync struct {
 			MetricsNamespace    string `conf:"default:qubic_status_service"`
@@ -95,7 +96,12 @@ func run() error {
 	if err != nil {
 		return errors.Wrap(err, "creating db")
 	}
-	defer store.Close()
+	defer func(store *db.PebbleStore) {
+		err := store.Close()
+		if err != nil {
+			log.Printf("[ERROR] closing db: %v", err)
+		}
+	}(store)
 
 	// initialize last processed tick, if necessary
 	startTick, err := initializeLastProcessedTick(cfg.Sync.StartTick, store)
@@ -115,7 +121,7 @@ func run() error {
 		CACert:        cert,
 		RetryOnStatus: []int{502, 503, 504, 429},
 	})
-	elasticClient := elastic.NewClient(esClient, cfg.Elastic.TransactionIndex, cfg.Elastic.TickDataIndex)
+	elasticClient := elastic.NewClient(esClient, cfg.Elastic.TransactionIndex, cfg.Elastic.TickDataIndex, cfg.Elastic.TickIntervalsIndex)
 
 	cl, err := archiver.NewClient(cfg.Archiver.Host)
 	if err != nil {
