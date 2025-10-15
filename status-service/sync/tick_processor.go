@@ -24,6 +24,7 @@ type ArchiveClient interface {
 }
 
 type SearchClient interface {
+	GetTickIntervals(ctx context.Context, beforeEpoch uint32) ([]*domain.TickInterval, error)
 	GetTransactionHashes(ctx context.Context, tickNumber uint32) ([]string, error)
 	GetTickData(_ context.Context, tickNumber uint32) (*elastic.TickData, error)
 	GetMinimalTickData(_ context.Context, tickNumber uint32) (*elastic.TickData, error)

@@ -16,6 +16,7 @@ import (
 	"github.com/ardanlabs/conf"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/joho/godotenv"
+	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -23,6 +24,26 @@ import (
 var (
 	elasticClient *Client
 )
+
+func TestElasticClient_getTickIntervals(t *testing.T) {
+	intervals, err := elasticClient.GetTickIntervals(context.Background(), 180)
+	require.NoError(t, err)
+	require.Greater(t, len(intervals), 50)
+	require.Less(t, int(intervals[len(intervals)-1].Epoch), 180) // 180 exclusive
+	require.Greater(t, intervals[1].From, intervals[0].From)     // sorted
+	require.Greater(t, intervals[10].Epoch, intervals[0].Epoch)  // sorted
+}
+
+func TestElasticClient_GetTickIntervals_GiveBeforeSecondStoredEpoch_ThenReturnFirst(t *testing.T) {
+	intervals, err := elasticClient.GetTickIntervals(context.Background(), 105)
+	require.NoError(t, err)
+	require.Len(t, intervals, 1)
+	require.Equal(t, &domain.TickInterval{
+		Epoch: 104,
+		From:  13360000,
+		To:    13461047,
+	}, intervals[0])
+}
 
 func TestElasticClient_getTransactionHashes(t *testing.T) {
 	hashes, err := elasticClient.GetTransactionHashes(context.Background(), 24889941)
@@ -60,7 +81,6 @@ func TestElasticClient_getTickData(t *testing.T) {
 	assert.NotEmpty(t, tickData.TimeLock)
 	assert.Empty(t, tickData.ContractFees) // nil if not present
 	assert.NotEmpty(t, tickData.Signature)
-
 }
 
 func TestElasticClient_getMinimalTickData(t *testing.T) {
@@ -101,12 +121,13 @@ func setup() {
 	}
 	var cfg struct {
 		Elastic struct {
-			Addresses         []string `conf:"default:https://localhost:9200"`
-			Username          string   `conf:"default:qubic-query"`
-			Password          string   `conf:"optional"`
-			TransactionsIndex string   `conf:"default:qubic-transactions-alias"`
-			TickDataIndex     string   `conf:"default:qubic-tick-data-alias"`
-			Certificate       string   `conf:"default:../certs/elastic-dev/http_ca.crt"`
+			Addresses          []string `conf:"default:https://localhost:9200"`
+			Username           string   `conf:"default:qubic-query"`
+			Password           string   `conf:"optional"`
+			TransactionsIndex  string   `conf:"default:qubic-transactions-alias"`
+			TickDataIndex      string   `conf:"default:qubic-tick-data-alias"`
+			TIckIntervalsIndex string   `conf:"default:qubic-tick-intervals-alias"`
+			Certificate        string   `conf:"default:../certs/elastic-dev/http_ca.crt"`
 		}
 	}
 	err = conf.Parse(os.Args[1:], envPrefix, &cfg)
@@ -126,5 +147,5 @@ func setup() {
 	if err != nil {
 		log.Fatalf("error creating elastic client: %v", err)
 	}
-	elasticClient = NewClient(esClient, cfg.Elastic.TransactionsIndex, cfg.Elastic.TickDataIndex)
+	elasticClient = NewClient(esClient, cfg.Elastic.TransactionsIndex, cfg.Elastic.TickDataIndex, cfg.Elastic.TIckIntervalsIndex)
 }
