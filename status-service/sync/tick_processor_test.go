@@ -175,7 +175,7 @@ func (f *FakeDataStore) SetSourceStatus(status *domain.Status) error {
 	return nil
 }
 
-func (f *FakeDataStore) AddSkippedTick(tick uint32) error {
+func (f *FakeDataStore) AddSkippedErroneousTick(tick uint32) error {
 	f.skippedTick = tick
 	return nil
 }

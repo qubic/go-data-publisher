@@ -633,11 +633,11 @@ const file_status_proto_rawDesc = "" +
 	"start_tick\x18\x01 \x01(\rR\tstartTick\x12\x19\n" +
 	"\bend_tick\x18\x02 \x01(\rR\aendTick\"h\n" +
 	"\x18SkippedTicksIntervalList\x12L\n" +
-	"\rskipped_ticks\x18\x01 \x03(\v2'.status.service.pb.SkippedTicksIntervalR\fskippedTicks2\xb0\x04\n" +
+	"\rskipped_ticks\x18\x01 \x03(\v2'.status.service.pb.SkippedTicksIntervalR\fskippedTicks2\xb9\x04\n" +
 	"\rStatusService\x12r\n" +
 	"\x10GetTickIntervals\x12\x16.google.protobuf.Empty\x1a+.status.service.pb.GetTickIntervalsResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/tickIntervals\x12u\n" +
-	"\x11GetArchiverStatus\x12\x16.google.protobuf.Empty\x1a,.status.service.pb.GetArchiverStatusResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/archiverStatus\x12o\n" +
-	"\x0fGetSkippedTicks\x12\x16.google.protobuf.Empty\x1a*.status.service.pb.GetSkippedTicksResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/skippedTicks\x12]\n" +
+	"\x11GetArchiverStatus\x12\x16.google.protobuf.Empty\x1a,.status.service.pb.GetArchiverStatusResponse\"\x1a\x82\xd3\xe4\x93\x02\x14\x12\x12/v1/archiverStatus\x12x\n" +
+	"\x18GetErroneousSkippedTicks\x12\x16.google.protobuf.Empty\x1a*.status.service.pb.GetSkippedTicksResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/skippedTicks\x12]\n" +
 	"\tGetStatus\x12\x16.google.protobuf.Empty\x1a$.status.service.pb.GetStatusResponse\"\x12\x82\xd3\xe4\x93\x02\f\x12\n" +
 	"/v1/status\x12d\n" +
 	"\x0eGetHealthCheck\x12\x16.google.protobuf.Empty\x1a).status.service.pb.GetHealthCheckResponse\"\x0f\x82\xd3\xe4\x93\x02\t\x12\a/healthB=Z;github.com/qubic/go-data-publisher/status-service/protobuf/b\x06proto3"
@@ -682,12 +682,12 @@ var file_status_proto_depIdxs = []int32{
 	9,  // 7: status.service.pb.SkippedTicksIntervalList.skipped_ticks:type_name -> status.service.pb.SkippedTicksInterval
 	13, // 8: status.service.pb.StatusService.GetTickIntervals:input_type -> google.protobuf.Empty
 	13, // 9: status.service.pb.StatusService.GetArchiverStatus:input_type -> google.protobuf.Empty
-	13, // 10: status.service.pb.StatusService.GetSkippedTicks:input_type -> google.protobuf.Empty
+	13, // 10: status.service.pb.StatusService.GetErroneousSkippedTicks:input_type -> google.protobuf.Empty
 	13, // 11: status.service.pb.StatusService.GetStatus:input_type -> google.protobuf.Empty
 	13, // 12: status.service.pb.StatusService.GetHealthCheck:input_type -> google.protobuf.Empty
 	4,  // 13: status.service.pb.StatusService.GetTickIntervals:output_type -> status.service.pb.GetTickIntervalsResponse
 	5,  // 14: status.service.pb.StatusService.GetArchiverStatus:output_type -> status.service.pb.GetArchiverStatusResponse
-	2,  // 15: status.service.pb.StatusService.GetSkippedTicks:output_type -> status.service.pb.GetSkippedTicksResponse
+	2,  // 15: status.service.pb.StatusService.GetErroneousSkippedTicks:output_type -> status.service.pb.GetSkippedTicksResponse
 	0,  // 16: status.service.pb.StatusService.GetStatus:output_type -> status.service.pb.GetStatusResponse
 	1,  // 17: status.service.pb.StatusService.GetHealthCheck:output_type -> status.service.pb.GetHealthCheckResponse
 	13, // [13:18] is the sub-list for method output_type

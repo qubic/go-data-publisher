@@ -92,8 +92,8 @@ func TestStore_AddSkippedTick(t *testing.T) {
 	require.NoError(t, err)
 	defer store.Close()
 
-	assert.NoError(t, store.AddSkippedTick(12345))
-	assert.NoError(t, store.AddSkippedTick(123456))
+	assert.NoError(t, store.AddSkippedErroneousTick(12345))
+	assert.NoError(t, store.AddSkippedErroneousTick(123456))
 
 	skippedTicks, err := store.GetSkippedTicks()
 	assert.NoError(t, err)

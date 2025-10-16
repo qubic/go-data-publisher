@@ -20,11 +20,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	StatusService_GetTickIntervals_FullMethodName  = "/status.service.pb.StatusService/GetTickIntervals"
-	StatusService_GetArchiverStatus_FullMethodName = "/status.service.pb.StatusService/GetArchiverStatus"
-	StatusService_GetSkippedTicks_FullMethodName   = "/status.service.pb.StatusService/GetSkippedTicks"
-	StatusService_GetStatus_FullMethodName         = "/status.service.pb.StatusService/GetStatus"
-	StatusService_GetHealthCheck_FullMethodName    = "/status.service.pb.StatusService/GetHealthCheck"
+	StatusService_GetTickIntervals_FullMethodName         = "/status.service.pb.StatusService/GetTickIntervals"
+	StatusService_GetArchiverStatus_FullMethodName        = "/status.service.pb.StatusService/GetArchiverStatus"
+	StatusService_GetErroneousSkippedTicks_FullMethodName = "/status.service.pb.StatusService/GetErroneousSkippedTicks"
+	StatusService_GetStatus_FullMethodName                = "/status.service.pb.StatusService/GetStatus"
+	StatusService_GetHealthCheck_FullMethodName           = "/status.service.pb.StatusService/GetHealthCheck"
 )
 
 // StatusServiceClient is the client API for StatusService service.
@@ -33,7 +33,7 @@ const (
 type StatusServiceClient interface {
 	GetTickIntervals(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetTickIntervalsResponse, error)
 	GetArchiverStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetArchiverStatusResponse, error)
-	GetSkippedTicks(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetSkippedTicksResponse, error)
+	GetErroneousSkippedTicks(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetSkippedTicksResponse, error)
 	GetStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetStatusResponse, error)
 	// A method that is mainly used by the load-balancer to decide if the instance should be added to the balancing rotation based on if it's up-to-date with the network or not.
 	GetHealthCheck(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetHealthCheckResponse, error)
@@ -67,10 +67,10 @@ func (c *statusServiceClient) GetArchiverStatus(ctx context.Context, in *emptypb
 	return out, nil
 }
 
-func (c *statusServiceClient) GetSkippedTicks(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetSkippedTicksResponse, error) {
+func (c *statusServiceClient) GetErroneousSkippedTicks(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetSkippedTicksResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetSkippedTicksResponse)
-	err := c.cc.Invoke(ctx, StatusService_GetSkippedTicks_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, StatusService_GetErroneousSkippedTicks_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func (c *statusServiceClient) GetHealthCheck(ctx context.Context, in *emptypb.Em
 type StatusServiceServer interface {
 	GetTickIntervals(context.Context, *emptypb.Empty) (*GetTickIntervalsResponse, error)
 	GetArchiverStatus(context.Context, *emptypb.Empty) (*GetArchiverStatusResponse, error)
-	GetSkippedTicks(context.Context, *emptypb.Empty) (*GetSkippedTicksResponse, error)
+	GetErroneousSkippedTicks(context.Context, *emptypb.Empty) (*GetSkippedTicksResponse, error)
 	GetStatus(context.Context, *emptypb.Empty) (*GetStatusResponse, error)
 	// A method that is mainly used by the load-balancer to decide if the instance should be added to the balancing rotation based on if it's up-to-date with the network or not.
 	GetHealthCheck(context.Context, *emptypb.Empty) (*GetHealthCheckResponse, error)
@@ -123,8 +123,8 @@ func (UnimplementedStatusServiceServer) GetTickIntervals(context.Context, *empty
 func (UnimplementedStatusServiceServer) GetArchiverStatus(context.Context, *emptypb.Empty) (*GetArchiverStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetArchiverStatus not implemented")
 }
-func (UnimplementedStatusServiceServer) GetSkippedTicks(context.Context, *emptypb.Empty) (*GetSkippedTicksResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetSkippedTicks not implemented")
+func (UnimplementedStatusServiceServer) GetErroneousSkippedTicks(context.Context, *emptypb.Empty) (*GetSkippedTicksResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetErroneousSkippedTicks not implemented")
 }
 func (UnimplementedStatusServiceServer) GetStatus(context.Context, *emptypb.Empty) (*GetStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
@@ -189,20 +189,20 @@ func _StatusService_GetArchiverStatus_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _StatusService_GetSkippedTicks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _StatusService_GetErroneousSkippedTicks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(StatusServiceServer).GetSkippedTicks(ctx, in)
+		return srv.(StatusServiceServer).GetErroneousSkippedTicks(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: StatusService_GetSkippedTicks_FullMethodName,
+		FullMethod: StatusService_GetErroneousSkippedTicks_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(StatusServiceServer).GetSkippedTicks(ctx, req.(*emptypb.Empty))
+		return srv.(StatusServiceServer).GetErroneousSkippedTicks(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -259,8 +259,8 @@ var StatusService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _StatusService_GetArchiverStatus_Handler,
 		},
 		{
-			MethodName: "GetSkippedTicks",
-			Handler:    _StatusService_GetSkippedTicks_Handler,
+			MethodName: "GetErroneousSkippedTicks",
+			Handler:    _StatusService_GetErroneousSkippedTicks_Handler,
 		},
 		{
 			MethodName: "GetStatus",

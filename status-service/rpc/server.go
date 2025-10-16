@@ -49,7 +49,7 @@ func (s *StatusServiceServer) GetStatus(context.Context, *emptypb.Empty) (*proto
 }
 
 func (s *StatusServiceServer) GetArchiverStatus(context.Context, *emptypb.Empty) (*protobuf.GetArchiverStatusResponse, error) {
-	response, err := s.statusCache.GetArchiverStatus()
+	response, err := s.statusCache.GetArchiverStatusResponse()
 	if err != nil {
 		log.Printf("[ERROR] getting archiver status: %v", err)
 		return nil, status.Error(codes.Internal, "getting archiver status")
@@ -57,8 +57,8 @@ func (s *StatusServiceServer) GetArchiverStatus(context.Context, *emptypb.Empty)
 	return response, nil
 }
 
-func (s *StatusServiceServer) GetTickIntervals(context.Context, *emptypb.Empty) (*protobuf.GetTickIntervalsResponse, error) {
-	response, err := s.statusCache.GetTickIntervals()
+func (s *StatusServiceServer) GetTickIntervals(ctx context.Context, _ *emptypb.Empty) (*protobuf.GetTickIntervalsResponse, error) {
+	response, err := s.statusCache.GetTickIntervals(ctx)
 	if err != nil {
 		log.Printf("[ERROR] getting tick intervals: %v", err)
 		return nil, status.Error(codes.Internal, "getting tick intervals")
@@ -66,8 +66,8 @@ func (s *StatusServiceServer) GetTickIntervals(context.Context, *emptypb.Empty) 
 	return response, nil
 }
 
-func (s *StatusServiceServer) GetSkippedTicks(context.Context, *emptypb.Empty) (*protobuf.GetSkippedTicksResponse, error) {
-	ticks, err := s.statusCache.GetSkippedTicks()
+func (s *StatusServiceServer) GetErroneousSkippedTicks(context.Context, *emptypb.Empty) (*protobuf.GetSkippedTicksResponse, error) {
+	ticks, err := s.statusCache.GetErroneousSkippedTicks()
 	if err != nil {
 		log.Printf("[ERROR] getting skipped ticks: %v", err)
 		return nil, status.Error(codes.Internal, "getting skipped ticks")
