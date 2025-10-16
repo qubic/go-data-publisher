@@ -34,7 +34,7 @@ type DataStore interface {
 	GetLastProcessedTick() (tick uint32, err error)
 	SetLastProcessedTick(tick uint32) error
 	SetSourceStatus(status *domain.Status) error
-	AddSkippedTick(tick uint32) error
+	AddSkippedErroneousTick(tick uint32) error
 }
 
 type TickProcessor struct {
@@ -101,7 +101,7 @@ func (p *TickProcessor) sync() error {
 		return errors.Wrap(err, "convert archive status")
 	}
 
-	err = p.dataStore.SetSourceStatus(status) // store for rpc clients
+	err = p.dataStore.SetSourceStatus(removePreviousEpochs(status)) // store for rpc clients
 	if err != nil {
 		return errors.Wrapf(err, "setting status: %v", status)
 	}
@@ -136,6 +136,21 @@ func (p *TickProcessor) sync() error {
 	}
 
 	return nil
+}
+
+func removePreviousEpochs(status *domain.Status) *domain.Status {
+	var thisEpoch = make([]*domain.TickInterval, 0)
+	for _, interval := range status.TickIntervals {
+		if status.Epoch == interval.Epoch {
+			thisEpoch = append(thisEpoch, interval)
+		}
+	}
+	return &domain.Status{
+		Epoch:         status.Epoch,
+		Tick:          status.Tick,
+		InitialTick:   status.InitialTick,
+		TickIntervals: thisEpoch,
+	}
 }
 
 func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, to uint32) error {
@@ -219,7 +234,7 @@ func (p *TickProcessor) processTick(ctx context.Context, tick uint32) error {
 func (p *TickProcessor) handleTickMismatch(tick uint32) error {
 	if p.skipErroneousTicks {
 		log.Printf("[WARN] skipping tick [%d].", tick)
-		err := p.dataStore.AddSkippedTick(tick)
+		err := p.dataStore.AddSkippedErroneousTick(tick)
 		if err != nil {
 			return errors.Wrap(err, "trying to store skipped tick")
 		}

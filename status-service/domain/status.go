@@ -13,6 +13,8 @@ type Status struct {
 }
 
 func ConvertFromArchiverStatus(archiverStatus *archiverproto.GetStatusResponse) (*Status, error) {
+	lastTick := archiverStatus.GetLastProcessedTick()
+
 	var intervals []*TickInterval
 	epochs := archiverStatus.GetProcessedTickIntervalsPerEpoch()
 	for _, epochIntervals := range epochs {
@@ -31,8 +33,8 @@ func ConvertFromArchiverStatus(archiverStatus *archiverproto.GetStatusResponse) 
 	}
 
 	status := Status{
-		Tick:          archiverStatus.GetLastProcessedTick().GetTickNumber(),
-		Epoch:         archiverStatus.GetLastProcessedTick().GetEpoch(),
+		Tick:          lastTick.GetTickNumber(),
+		Epoch:         lastTick.GetEpoch(),
 		InitialTick:   initialTick,
 		TickIntervals: intervals,
 	}
@@ -44,7 +46,7 @@ func calculateInitialTickOfCurrentEpoch(epochs []*archiverproto.ProcessedTickInt
 	if numberOfEpochs > 0 {
 		latestEpoch := epochs[numberOfEpochs-1]
 		if len(latestEpoch.GetIntervals()) > 0 {
-			return latestEpoch.Intervals[0].InitialProcessedTick, nil
+			return latestEpoch.Intervals[len(latestEpoch.GetIntervals())-1].InitialProcessedTick, nil
 		}
 	}
 	return 0, errors.New("calculating initial tick")

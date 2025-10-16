@@ -68,20 +68,20 @@ func local_request_StatusService_GetArchiverStatus_0(ctx context.Context, marsha
 
 }
 
-func request_StatusService_GetSkippedTicks_0(ctx context.Context, marshaler runtime.Marshaler, client StatusServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_StatusService_GetErroneousSkippedTicks_0(ctx context.Context, marshaler runtime.Marshaler, client StatusServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var protoReq emptypb.Empty
 	var metadata runtime.ServerMetadata
 
-	msg, err := client.GetSkippedTicks(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.GetErroneousSkippedTicks(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 
 }
 
-func local_request_StatusService_GetSkippedTicks_0(ctx context.Context, marshaler runtime.Marshaler, server StatusServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_StatusService_GetErroneousSkippedTicks_0(ctx context.Context, marshaler runtime.Marshaler, server StatusServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var protoReq emptypb.Empty
 	var metadata runtime.ServerMetadata
 
-	msg, err := server.GetSkippedTicks(ctx, &protoReq)
+	msg, err := server.GetErroneousSkippedTicks(ctx, &protoReq)
 	return msg, metadata, err
 
 }
@@ -178,7 +178,7 @@ func RegisterStatusServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 
 	})
 
-	mux.Handle("GET", pattern_StatusService_GetSkippedTicks_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle("GET", pattern_StatusService_GetErroneousSkippedTicks_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
@@ -186,12 +186,12 @@ func RegisterStatusServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/status.service.pb.StatusService/GetSkippedTicks", runtime.WithHTTPPathPattern("/v1/skippedTicks"))
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/status.service.pb.StatusService/GetErroneousSkippedTicks", runtime.WithHTTPPathPattern("/v1/skippedTicks"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_StatusService_GetSkippedTicks_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_StatusService_GetErroneousSkippedTicks_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
@@ -199,7 +199,7 @@ func RegisterStatusServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 			return
 		}
 
-		forward_StatusService_GetSkippedTicks_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_StatusService_GetErroneousSkippedTicks_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 
 	})
 
@@ -338,25 +338,25 @@ func RegisterStatusServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 
 	})
 
-	mux.Handle("GET", pattern_StatusService_GetSkippedTicks_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle("GET", pattern_StatusService_GetErroneousSkippedTicks_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/status.service.pb.StatusService/GetSkippedTicks", runtime.WithHTTPPathPattern("/v1/skippedTicks"))
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/status.service.pb.StatusService/GetErroneousSkippedTicks", runtime.WithHTTPPathPattern("/v1/skippedTicks"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_StatusService_GetSkippedTicks_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_StatusService_GetErroneousSkippedTicks_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
 
-		forward_StatusService_GetSkippedTicks_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_StatusService_GetErroneousSkippedTicks_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 
 	})
 
@@ -412,7 +412,7 @@ var (
 
 	pattern_StatusService_GetArchiverStatus_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "archiverStatus"}, ""))
 
-	pattern_StatusService_GetSkippedTicks_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "skippedTicks"}, ""))
+	pattern_StatusService_GetErroneousSkippedTicks_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "skippedTicks"}, ""))
 
 	pattern_StatusService_GetStatus_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "status"}, ""))
 
@@ -424,7 +424,7 @@ var (
 
 	forward_StatusService_GetArchiverStatus_0 = runtime.ForwardResponseMessage
 
-	forward_StatusService_GetSkippedTicks_0 = runtime.ForwardResponseMessage
+	forward_StatusService_GetErroneousSkippedTicks_0 = runtime.ForwardResponseMessage
 
 	forward_StatusService_GetStatus_0 = runtime.ForwardResponseMessage
 
