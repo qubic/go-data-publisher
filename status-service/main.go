@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/go-data-publisher/status-service/archiver"
 	"github.com/qubic/go-data-publisher/status-service/db"
+	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/elastic"
 	"github.com/qubic/go-data-publisher/status-service/metrics"
 	"github.com/qubic/go-data-publisher/status-service/protobuf"
@@ -54,14 +55,15 @@ func run() error {
 			Delay              time.Duration `conf:"default:800ms"`
 		}
 		Sync struct {
-			MetricsNamespace    string `conf:"default:qubic-status-service"`
-			InternalStoreFolder string `conf:"default:store"`
-			NumMaxWorkers       int    `conf:"optional"`
-			SkipTicks           bool   `conf:"default:false"`
-			StartTick           uint32 `conf:"optional"`
-			Transactions        bool   `conf:"default:true"`
-			TickData            bool   `conf:"default:true"`
-			VerifyFullTickData  bool   `conf:"default:false"`
+			MetricsNamespace       string        `conf:"default:qubic-status-service"`
+			InternalStoreFolder    string        `conf:"default:store"`
+			NumMaxWorkers          int           `conf:"optional"`
+			SkipTicks              bool          `conf:"default:false"`
+			StartTick              uint32        `conf:"optional"`
+			Transactions           bool          `conf:"default:true"`
+			TickData               bool          `conf:"default:true"`
+			VerifyFullTickData     bool          `conf:"default:false"`
+			IntervalsCacheDuration time.Duration `conf:"default:1m"`
 		}
 	}
 
@@ -154,14 +156,14 @@ func run() error {
 	go archiverStatusCache.Start()
 	defer archiverStatusCache.Stop()
 
-	var tickIntervalsCache = ttlcache.New[string, *protobuf.GetTickIntervalsResponse](
-		ttlcache.WithTTL[string, *protobuf.GetTickIntervalsResponse](time.Second),
-		ttlcache.WithDisableTouchOnHit[string, *protobuf.GetTickIntervalsResponse](), // don't refresh ttl upon getting the item from cache
+	var tickIntervalsCache = ttlcache.New[string, []*domain.TickInterval](
+		ttlcache.WithTTL[string, []*domain.TickInterval](cfg.Sync.IntervalsCacheDuration),
+		ttlcache.WithDisableTouchOnHit[string, []*domain.TickInterval](), // don't refresh ttl upon getting the item from cache
 	)
 	go tickIntervalsCache.Start()
 	defer tickIntervalsCache.Stop()
 
-	statusCache := rpc.NewStatusCache(store, archiverStatusCache, tickIntervalsCache)
+	statusCache := rpc.NewStatusCache(store, elasticClient, archiverStatusCache, tickIntervalsCache)
 	server := rpc.NewStatusServiceServer(cfg.Server.GrpcHost, cfg.Server.HttpHost, statusCache)
 	serverError := make(chan error, 1)
 	err = server.Start(serverError)

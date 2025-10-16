@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
+	"io"
 	"log"
 	"path/filepath"
 	"sort"
@@ -14,7 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/util"
-	"google.golang.org/protobuf/proto"
 )
 
 var ErrNotFound = errors.New("store resource not found")
@@ -52,12 +52,12 @@ func (ps *PebbleStore) GetSourceStatus() (*domain.Status, error) {
 	var target *domain.Status
 	err := ps.load(processingStatusKey, &target)
 	if err != nil {
-		return nil, errors.Wrap(err, "loading processing status")
+		return nil, errors.Wrap(err, "loading source status")
 	}
 	return target, nil
 }
 
-func (ps *PebbleStore) AddSkippedTick(tick uint32) error {
+func (ps *PebbleStore) AddSkippedErroneousTick(tick uint32) error {
 	skippedTicks, err := ps.loadSkippedTicksSet()
 	if err != nil {
 		return errors.Wrap(err, "getting skipped ticks")
@@ -128,7 +128,12 @@ func (ps *PebbleStore) load(keyStr string, target any) error {
 	if err != nil {
 		return errors.Wrapf(err, "getting value for key [%s]", keyStr)
 	}
-	defer closer.Close()
+	defer func(closer io.Closer) {
+		err = closer.Close()
+		if err != nil {
+			log.Printf("[WARN] closing db get in load: %v", err)
+		}
+	}(closer)
 
 	// decode
 	buffer := bytes.NewBuffer(value)
@@ -136,37 +141,6 @@ func (ps *PebbleStore) load(keyStr string, target any) error {
 	err = decoder.Decode(target)
 	if err != nil {
 		return errors.Wrapf(err, "deserializing value for key [%s]", keyStr)
-	}
-	return nil
-}
-
-func (ps *PebbleStore) saveProto(keyStr string, source proto.Message) error {
-	marshalled, err := proto.Marshal(source)
-	if err != nil {
-		return errors.Wrap(err, "marshalling object")
-	}
-
-	// store
-	key := []byte(keyStr)
-	err = ps.db.Set(key, marshalled, pebble.Sync) // sync to prevent data loss. lower performance.
-	if err != nil {
-		return errors.Wrap(err, "saving object")
-	}
-	return nil
-}
-
-func (ps *PebbleStore) loadProto(keyStr string, target proto.Message) error {
-	key := []byte(keyStr)
-	value, closer, err := ps.db.Get(key)
-	if err != nil {
-		return errors.Wrapf(err, "getting value for key [%s]", keyStr)
-	}
-	defer closer.Close()
-
-	// decode
-	err = proto.Unmarshal(value, target)
-	if err != nil {
-		return errors.Wrapf(err, "unmarshalling value for key [%s]", keyStr)
 	}
 	return nil
 }
@@ -195,7 +169,12 @@ func (ps *PebbleStore) getUint32(keyStr string) (value uint32, err error) {
 	if err != nil {
 		return 0, errors.Wrapf(err, "getting value for key [%s]", keyStr)
 	}
-	defer closer.Close()
+	defer func(closer io.Closer) {
+		err = closer.Close()
+		if err != nil {
+			log.Printf("[WARN] closing db get in getUint32: %v", err)
+		}
+	}(closer)
 
 	value = binary.BigEndian.Uint32(binVal)
 	return value, nil
