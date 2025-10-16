@@ -544,5 +544,12 @@ func TestProcessor_Sync_GivenNewEpoch_ThenSetStatus(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1000, int(dataStore.tick))
 
-	assert.Equal(t, domainStatus, dataStore.status) // status stored
+	lastEpochStatus := &domain.Status{
+		Epoch:         123,
+		Tick:          12345,
+		InitialTick:   10000,
+		TickIntervals: domainStatus.TickIntervals[1:], // only last epoch is stored
+	}
+
+	assert.Equal(t, lastEpochStatus, dataStore.status) // status stored
 }
