@@ -28,7 +28,7 @@ The following properties (with defaults) can be set:
 --broker-produce-topic=qubic-tick-data
 --sync-server-port=8000
 --sync-metrics-port=9999
---sync-metrics-namespace=qubic-kafka
+--sync-metrics-namespace=qubic_kafka
 --sync-num-workers=16
 --sync-start-tick=0
 ```

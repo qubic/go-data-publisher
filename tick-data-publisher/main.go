@@ -45,7 +45,7 @@ func run() error {
 			InternalStoreFolder string   `conf:"default:store"`
 			ServerPort          int      `conf:"default:8000"`
 			MetricsPort         int      `conf:"default:9999"`
-			MetricsNamespace    string   `conf:"default:qubic-kafka"`
+			MetricsNamespace    string   `conf:"default:qubic_kafka"`
 			NumWorkers          int      `conf:"default:16"` // maximum number of workers for parallel processing
 			PublishCustomTicks  []uint32 `conf:"optional"`
 			StartTick           uint32   `conf:"optional"`     // overrides last processed tick

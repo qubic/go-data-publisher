@@ -33,7 +33,7 @@ The following properties (with defaults) can be set:
 --broker-consume-topic=qubic-tick-data
 --broker-consumer-group=qubic-elastic
 --sync-metrics-port=9999
---sync-metrics-namespace=qubic-kafka
+--sync-metrics-namespace=qubic_kafka
 ```
 
 `

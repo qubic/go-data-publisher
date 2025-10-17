@@ -53,7 +53,7 @@ func run() error {
 		}
 		Sync struct {
 			MetricsPort      int    `conf:"default:9999"`
-			MetricsNamespace string `conf:"default:qubic-kafka"`
+			MetricsNamespace string `conf:"default:qubic_kafka"`
 			Enabled          bool   `conf:"default:true"` // only for testing
 		}
 	}

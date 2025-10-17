@@ -57,7 +57,7 @@ func run() error {
 			BootstrapServers []string `conf:"default:localhost:9092"`
 			TxTopic          string   `conf:"default:qubic-transactions-local"`
 		}
-		MetricsNamespace string `conf:"default:qubic-kafka"`
+		MetricsNamespace string `conf:"default:qubic_kafka"`
 		MetricsPort      int    `conf:"default:9999"`
 	}
 

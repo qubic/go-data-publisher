@@ -53,7 +53,7 @@ func run() error {
 			Delay            time.Duration `conf:"default:800ms"`
 		}
 		Sync struct {
-			MetricsNamespace    string `conf:"default:qubic-status-service"`
+			MetricsNamespace    string `conf:"default:qubic_status_service"`
 			InternalStoreFolder string `conf:"default:store"`
 			NumMaxWorkers       int    `conf:"optional"`
 			SkipTicks           bool   `conf:"default:false"`

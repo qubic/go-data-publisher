@@ -48,7 +48,7 @@ func run() error {
 		Broker struct {
 			BootstrapServers []string `conf:"default:localhost:9092"`
 			MetricsPort      int      `conf:"default:9999"`
-			MetricsNamespace string   `conf:"default:qubic-kafka"`
+			MetricsNamespace string   `conf:"default:qubic_kafka"`
 			ConsumeTopic     string   `conf:"default:qubic-transactions"`
 			ConsumerGroup    string   `conf:"default:qubic-elastic"`
 		}

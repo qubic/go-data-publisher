@@ -38,7 +38,7 @@ OPTIONS
       --elastic-password          <string>                                                 
       --elastic-username          <string>              (default: qubic-ingestion)         
   -h, --help                                                                               display this help message
-      --sync-metrics-namespace    <string>              (default: qubic-kafka)             
+      --sync-metrics-namespace    <string>              (default: qubic_kafka)             
       --sync-metrics-port         <int>                 (default: 9999)                    
 
 ENVIRONMENT
@@ -51,7 +51,7 @@ ENVIRONMENT
   QUBIC_COMPUTORS_CONSUMER_ELASTIC_MAX_RETRIES       <int>                 (default: 15)                      
   QUBIC_COMPUTORS_CONSUMER_ELASTIC_PASSWORD          <string>                                                 
   QUBIC_COMPUTORS_CONSUMER_ELASTIC_USERNAME          <string>              (default: qubic-ingestion)         
-  QUBIC_COMPUTORS_CONSUMER_SYNC_METRICS_NAMESPACE    <string>              (default: qubic-kafka)             
+  QUBIC_COMPUTORS_CONSUMER_SYNC_METRICS_NAMESPACE    <string>              (default: qubic_kafka)             
   QUBIC_COMPUTORS_CONSUMER_SYNC_METRICS_PORT         <int>                 (default: 9999)                    
 
 

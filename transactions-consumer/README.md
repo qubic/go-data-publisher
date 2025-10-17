@@ -31,7 +31,7 @@ The following properties (with defaults) can be set:
 --elastic-max-retries=15
 --broker-bootstrap-servers=localhost:9092
 --broker-metrics-port=9999
---broker-metrics-namespace=qubic-kafka
+--broker-metrics-namespace=qubic_kafka
 --broker-consume-topic=qubic-transactions
 --broker-consumer-group=qubic-elastic
 ```
