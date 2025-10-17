@@ -102,6 +102,32 @@ func TestProcessor_consumeBatch(t *testing.T) {
 	require.Equal(t, 1, kafkaClient.allowRebalanceCount)
 }
 
+func TestProcessor_consumeBatch_GivenDuplicateThenFilter(t *testing.T) {
+	kafkaClient := &FakeKafkaClient{
+		tickIntervals: []*domain.TickInterval{
+			{
+				Epoch: 42,
+				From:  123,
+				To:    789,
+			},
+			{
+				Epoch: 42,
+				From:  123,
+				To:    456,
+			},
+		},
+	}
+	esClient := &FakeElasticClient{}
+	processor := NewProcessor(kafkaClient, esClient)
+	count, err := processor.consumeBatch(context.Background())
+	require.NoError(t, err)
+	require.Equal(t, 2, count)
+	require.Equal(t, 1, esClient.bulkIndexCount)
+	require.Equal(t, 1, kafkaClient.commitCount)
+	require.Equal(t, 1, kafkaClient.allowRebalanceCount)
+	require.JSONEq(t, `{ "epoch":42, "from":123, "to":789 }`, string(esClient.sentDocuments[0].Payload))
+}
+
 func TestProcessor_consumeBatch_GivenInvalidInterval_ThenErrorAndDoNotCommit(t *testing.T) {
 	kafkaClient := &FakeKafkaClient{
 		tickIntervals: []*domain.TickInterval{

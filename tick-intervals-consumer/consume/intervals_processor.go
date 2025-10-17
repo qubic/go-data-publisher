@@ -101,6 +101,10 @@ func (p *Processor) sendToElastic(ctx context.Context, intervals []*domain.TickI
 }
 
 func (p *Processor) filterDuplicates(ctx context.Context, intervals []*domain.TickInterval) ([]*domain.TickInterval, error) {
+
+	const key string = "%d-%d"
+	var temporaryIntervals = make(map[string]domain.TickInterval)
+
 	var filtered []*domain.TickInterval
 	for _, interval := range intervals {
 		stored, err := p.elasticClient.FindOverlappingInterval(ctx, interval.Epoch, interval.From, interval.To)
@@ -108,22 +112,39 @@ func (p *Processor) filterDuplicates(ctx context.Context, intervals []*domain.Ti
 			log.Printf("Error checking interval: %v", err)
 			return nil, err
 		}
-		if stored == nil {
-			// new interval
-			filtered = append(filtered, interval)
-		} else {
-			if interval.Epoch != stored.Epoch || interval.From != stored.From { // illegal state
-				// we assume that epoch and start tick always match (they are used as document id in elastic)
-				return nil, fmt.Errorf("new interval %v conflicts with stored data", interval)
-			} else if interval.To > stored.To {
-				// replace if the end tick is larger than in the current interval
-				// this can happen at epoch end if an instance doesn't catch the latest tick(s)
-				filtered = append(filtered, interval)
-			} else { // else ignore because they are equal or smaller
-				log.Printf("Ignoring new interval %v because of stored interval %v.", interval, stored)
+
+		// check if there is already a tick interval (same epoch, same start tick, higher end tick) to be
+		// ingested and replace, if the new one is larger or ignore the new one
+		intervalKey := fmt.Sprintf(key, interval.Epoch, interval.From)
+		previous, found := temporaryIntervals[intervalKey]
+		newIntervalIsLarger := !found || interval.To > previous.To
+
+		if newIntervalIsLarger {
+
+			if stored == nil {
+				temporaryIntervals[intervalKey] = *interval
+			} else {
+				if interval.Epoch != stored.Epoch || interval.From != stored.From { // illegal state
+					// we assume that epoch and start tick always match (they are used as document id in elastic)
+					return nil, fmt.Errorf("new interval %v conflicts with stored data", interval)
+				} else if interval.To > stored.To {
+					// replace if the end tick is larger than in the current interval
+					// this can happen at epoch end if an instance doesn't catch the latest tick(s)
+					temporaryIntervals[intervalKey] = *interval
+				} else { // else ignore because they are equal or smaller
+					log.Printf("Ignoring new interval %v because of stored interval %v.", interval, stored)
+				}
 			}
+
+		} else { // else ignore smaller interval
+			log.Printf("Ignoring interval %v because of other new interval %v.", interval, previous)
 		}
 	}
+
+	for _, v := range temporaryIntervals {
+		filtered = append(filtered, &v)
+	}
+
 	return filtered, nil
 }
 
