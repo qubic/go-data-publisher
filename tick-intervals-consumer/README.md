@@ -29,7 +29,7 @@ You can use command line properties or environment variables. Environment variab
 --broker-consume-topic=qubic-tick-intervals
 --broker-consumer-group=qubic-elastic
 --sync-metrics-port=9999
---sync-metrics-namespace=qubic-kafka
+--sync-metrics-namespace=qubic_kafka
 ```
 
 `

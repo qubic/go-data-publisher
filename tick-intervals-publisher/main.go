@@ -45,7 +45,7 @@ func run() error {
 		Sync struct {
 			InternalStoreFolder string   `conf:"default:store"`
 			MetricsPort         int      `conf:"default:9999"`
-			MetricsNamespace    string   `conf:"default:qubic-kafka"`
+			MetricsNamespace    string   `conf:"default:qubic_kafka"`
 			PublishCustomEpochs []uint32 `conf:"optional"`
 			StartEpoch          uint32   `conf:"optional"`     // overrides last processed tick
 			Enabled             bool     `conf:"default:true"` // only for testing

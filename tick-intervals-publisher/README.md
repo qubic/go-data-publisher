@@ -25,7 +25,7 @@ The following properties (with defaults) can be set:
 --broker-bootstrap-servers=localhost:9092
 --broker-produce-topic=qubic-tick-intervals
 --sync-metrics-port=9999
---sync-metrics-namespace=qubic-kafka
+--sync-metrics-namespace=qubic_kafka
 --sync-start-epoch=0
 ```
 
