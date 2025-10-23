@@ -24,10 +24,11 @@ const (
 )
 
 type GetStatusResponse struct {
-	state             protoimpl.MessageState `protogen:"open.v1"`
-	LastProcessedTick uint32                 `protobuf:"varint,1,opt,name=last_processed_tick,json=lastProcessedTick,proto3" json:"last_processed_tick,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	LastProcessedTick  uint32                 `protobuf:"varint,1,opt,name=last_processed_tick,json=lastProcessedTick,proto3" json:"last_processed_tick,omitempty"`
+	LastProcessedEpoch uint32                 `protobuf:"varint,2,opt,name=last_processed_epoch,json=lastProcessedEpoch,proto3" json:"last_processed_epoch,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *GetStatusResponse) Reset() {
@@ -63,6 +64,13 @@ func (*GetStatusResponse) Descriptor() ([]byte, []int) {
 func (x *GetStatusResponse) GetLastProcessedTick() uint32 {
 	if x != nil {
 		return x.LastProcessedTick
+	}
+	return 0
+}
+
+func (x *GetStatusResponse) GetLastProcessedEpoch() uint32 {
+	if x != nil {
+		return x.LastProcessedEpoch
 	}
 	return 0
 }
@@ -592,9 +600,10 @@ var File_status_proto protoreflect.FileDescriptor
 
 const file_status_proto_rawDesc = "" +
 	"\n" +
-	"\fstatus.proto\x12\x11status.service.pb\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\"C\n" +
+	"\fstatus.proto\x12\x11status.service.pb\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\"u\n" +
 	"\x11GetStatusResponse\x12.\n" +
-	"\x13last_processed_tick\x18\x01 \x01(\rR\x11lastProcessedTick\"0\n" +
+	"\x13last_processed_tick\x18\x01 \x01(\rR\x11lastProcessedTick\x120\n" +
+	"\x14last_processed_epoch\x18\x02 \x01(\rR\x12lastProcessedEpoch\"0\n" +
 	"\x16GetHealthCheckResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\">\n" +
 	"\x17GetSkippedTicksResponse\x12#\n" +

@@ -33,6 +33,7 @@ type SearchClient interface {
 type DataStore interface {
 	GetLastProcessedTick() (tick uint32, err error)
 	SetLastProcessedTick(tick uint32) error
+	SetLastProcessedEpoch(epoch uint32) error
 	SetSourceStatus(status *domain.Status) error
 	AddSkippedErroneousTick(tick uint32) error
 }
@@ -93,17 +94,17 @@ func (p *TickProcessor) sync() error {
 	ctx := context.Background()
 	archiverStatus, err := p.archiveClient.GetStatus(ctx)
 	if err != nil {
-		return errors.Wrap(err, "get archive status")
+		return fmt.Errorf("get archive status: %w", err)
 	}
 
 	status, err := domain.ConvertFromArchiverStatus(archiverStatus)
 	if err != nil {
-		return errors.Wrap(err, "convert archive status")
+		return fmt.Errorf("convert archive status: %w", err)
 	}
 
 	err = p.dataStore.SetSourceStatus(removePreviousEpochs(status)) // store for rpc clients
 	if err != nil {
-		return errors.Wrapf(err, "setting status: %v", status)
+		return fmt.Errorf("storing status: %w", err)
 	}
 
 	p.processingMetrics.SetSourceTick(status.Epoch, status.Tick)
@@ -113,12 +114,12 @@ func (p *TickProcessor) sync() error {
 
 	tick, err := p.dataStore.GetLastProcessedTick()
 	if err != nil {
-		return errors.Wrap(err, "get last processed tick")
+		return fmt.Errorf("get last processed tick: %w", err)
 	}
 
 	start, end, epoch, err := calculateNextTickRange(tick, status.TickIntervals)
 	if err != nil {
-		return errors.Wrap(err, "calculating tick range")
+		return fmt.Errorf("calculating tick range: %w", err)
 	}
 	end = min(status.Tick, end) // don't exceed lastest tick
 
@@ -131,7 +132,7 @@ func (p *TickProcessor) sync() error {
 		// if start == end then process one tick
 		err = p.processTickRange(ctx, epoch, start, end)
 		if err != nil {
-			return errors.Wrap(err, "processing tick range")
+			return fmt.Errorf("processing tick range: %w", err)
 		}
 	}
 
@@ -167,14 +168,18 @@ func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, to ui
 
 			err := p.processTicks(ctx, nextTicks)
 			if err != nil {
-				return errors.Wrapf(err, "processing ticks %v", nextTicks)
+				return fmt.Errorf("processing ticks %v: %w", nextTicks, err)
 			}
 			nextTicks = nil // reset
 
 			// update stats
 			err = p.dataStore.SetLastProcessedTick(tick)
 			if err != nil {
-				return errors.Wrapf(err, "storing last processed tick [%d]", tick)
+				return fmt.Errorf("storing last processed tick [%d]: %w", tick, err)
+			}
+			err = p.dataStore.SetLastProcessedEpoch(epoch)
+			if err != nil {
+				return fmt.Errorf("error setting last processed epoch [%d]: %v", epoch, err)
 			}
 			p.processingMetrics.SetProcessedTransactionsTick(epoch, tick)
 
@@ -200,7 +205,7 @@ func (p *TickProcessor) processTick(ctx context.Context, tick uint32) error {
 	// query archiver for transactions
 	tickData, err := p.archiveClient.GetTickData(ctx, tick)
 	if err != nil {
-		return errors.Wrap(err, "get archiver transactions")
+		return fmt.Errorf("get archiver transactions: %w", err)
 	}
 
 	// we have some invalid empty ticks in epoch 154. We can safely ignore them.
@@ -212,7 +217,7 @@ func (p *TickProcessor) processTick(ctx context.Context, tick uint32) error {
 	if p.syncTickData {
 		match, err := p.verifyTickData(ctx, tick, tickData)
 		if err != nil {
-			return errors.Wrap(err, "verifying tick data")
+			return fmt.Errorf("verifying tick data: %w", err)
 		}
 		if !match {
 			return p.handleTickMismatch(tick)
@@ -222,7 +227,7 @@ func (p *TickProcessor) processTick(ctx context.Context, tick uint32) error {
 	if p.syncTransactions {
 		match, err := p.verifyTickTransactions(ctx, tick, tickData)
 		if err != nil {
-			return errors.Wrap(err, "verifying transactions")
+			return fmt.Errorf("verifying transactions: %w", err)
 		}
 		if !match {
 			return p.handleTickMismatch(tick)
@@ -236,7 +241,7 @@ func (p *TickProcessor) handleTickMismatch(tick uint32) error {
 		log.Printf("[WARN] skipping tick [%d].", tick)
 		err := p.dataStore.AddSkippedErroneousTick(tick)
 		if err != nil {
-			return errors.Wrap(err, "trying to store skipped tick")
+			return fmt.Errorf("trying to store skipped tick: %w", err)
 		}
 		return nil
 	} else {
@@ -319,7 +324,7 @@ func (p *TickProcessor) verifyTickTransactions(ctx context.Context, tick uint32,
 	// query elastic for transactions
 	elasticTransactions, err := p.searchClient.GetTransactionHashes(ctx, tick)
 	if err != nil {
-		return false, errors.Wrap(err, "get elastic transactions")
+		return false, fmt.Errorf("get elastic transactions: %w", err)
 	}
 
 	archiverTransactions := tickData.GetTransactionIds() // tick data and transaction ids can be nil

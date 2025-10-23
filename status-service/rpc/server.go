@@ -27,10 +27,10 @@ type StatusServiceServer struct {
 	protobuf.UnimplementedStatusServiceServer
 	listenAddrGRPC string
 	listenAddrHTTP string
-	statusCache    *StatusCache
+	statusCache    *StatusService
 }
 
-func NewStatusServiceServer(listenAddrGRPC string, listenAddrHTTP string, statusCache *StatusCache) *StatusServiceServer {
+func NewStatusServiceServer(listenAddrGRPC string, listenAddrHTTP string, statusCache *StatusService) *StatusServiceServer {
 	return &StatusServiceServer{
 		listenAddrGRPC: listenAddrGRPC,
 		listenAddrHTTP: listenAddrHTTP,
@@ -44,8 +44,15 @@ func (s *StatusServiceServer) GetStatus(context.Context, *emptypb.Empty) (*proto
 		log.Printf("[ERROR] getting status (last processed tick): %v", err)
 		return nil, status.Error(codes.Internal, "getting status")
 	}
-
-	return &protobuf.GetStatusResponse{LastProcessedTick: lastProcessedTick}, nil
+	lastProcessedEpoch, err := s.statusCache.GetLastProcessedEpoch()
+	if err != nil {
+		log.Printf("[ERROR] getting status (last processed epoch): %v", err)
+		return nil, status.Error(codes.Internal, "getting status")
+	}
+	return &protobuf.GetStatusResponse{
+		LastProcessedTick:  lastProcessedTick,
+		LastProcessedEpoch: lastProcessedEpoch,
+	}, nil
 }
 
 func (s *StatusServiceServer) GetArchiverStatus(context.Context, *emptypb.Empty) (*protobuf.GetArchiverStatusResponse, error) {

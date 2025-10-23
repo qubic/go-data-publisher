@@ -13,12 +13,17 @@ import (
 )
 
 type FakeStatusProvider struct {
-	lastProcessedTick uint32
-	sourceStatus      *domain.Status
+	lastProcessedTick  uint32
+	lastProcessedEpoch uint32
+	sourceStatus       *domain.Status
 }
 
-func (f *FakeStatusProvider) GetLastProcessedTick() (tick uint32, err error) {
+func (f *FakeStatusProvider) GetLastProcessedTick() (uint32, error) {
 	return f.lastProcessedTick, nil
+}
+
+func (f *FakeStatusProvider) GetLastProcessedEpoch() (uint32, error) {
+	return f.lastProcessedEpoch, nil
 }
 
 func (f *FakeStatusProvider) GetSkippedTicks() ([]uint32, error) {
@@ -67,7 +72,35 @@ func (f *FakeElasticClient) GetTickIntervals(_ context.Context, _ uint32) ([]*do
 	return f.tickIntervals, nil
 }
 
-func TestStatusCache_GetTickIntervals(t *testing.T) {
+func TestStatusService_GetLastProcessedTick(t *testing.T) {
+	statusProvider := &FakeStatusProvider{
+		lastProcessedTick: 42,
+	}
+
+	statusService := &StatusService{
+		database: statusProvider,
+	}
+
+	tick, err := statusService.GetLastProcessedTick()
+	require.NoError(t, err)
+	assert.Equal(t, 42, int(tick))
+}
+
+func TestStatusService_GetLastProcessedEpoch(t *testing.T) {
+	statusProvider := &FakeStatusProvider{
+		lastProcessedEpoch: 42,
+	}
+
+	statusService := &StatusService{
+		database: statusProvider,
+	}
+
+	epoch, err := statusService.GetLastProcessedEpoch()
+	require.NoError(t, err)
+	assert.Equal(t, 42, int(epoch))
+}
+
+func TestStatusService_GetTickIntervals(t *testing.T) {
 	tickIntervalsCache := createTickIntervalsCache()
 	defer tickIntervalsCache.Stop()
 
@@ -102,8 +135,8 @@ func TestStatusCache_GetTickIntervals(t *testing.T) {
 		},
 	}
 
-	statusCache := NewStatusCache(statusProvider, elasticClient, nil, tickIntervalsCache)
-	status, err := statusCache.GetTickIntervals(context.Background())
+	statusService := NewStatusService(statusProvider, elasticClient, nil, tickIntervalsCache)
+	status, err := statusService.GetTickIntervals(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, status)
 	assert.Len(t, status.Intervals, 3)
@@ -115,7 +148,7 @@ func TestStatusCache_GetTickIntervals(t *testing.T) {
 	assert.Equal(t, 12345, int(status.Intervals[2].LastTick))
 }
 
-func TestStatusCache_GetArchiverStatus(t *testing.T) {
+func TestStatusService_GetArchiverStatus(t *testing.T) {
 	tickIntervalsCache := createTickIntervalsCache()
 	defer tickIntervalsCache.Stop()
 
@@ -148,8 +181,8 @@ func TestStatusCache_GetArchiverStatus(t *testing.T) {
 		},
 	}
 
-	statusCache := NewStatusCache(statusProvider, elasticClient, archiverStatusCache, tickIntervalsCache)
-	status, err := statusCache.GetArchiverStatusResponse()
+	statusService := NewStatusService(statusProvider, elasticClient, archiverStatusCache, tickIntervalsCache)
+	status, err := statusService.GetArchiverStatusResponse()
 	require.NoError(t, err)
 	require.NotNil(t, status)
 	assert.Equal(t, 12345, int(status.LastProcessedTick.TickNumber))
@@ -173,7 +206,7 @@ func TestStatusCache_GetArchiverStatus(t *testing.T) {
 
 }
 
-func TestStatusCache_GetTickIntervals_givenLastTickInFirstInterval_thenReturnOnlyFirstInterval(t *testing.T) {
+func TestStatusService_GetTickIntervals_givenLastTickInFirstInterval_thenReturnOnlyFirstInterval(t *testing.T) {
 	tickIntervalsCache := createTickIntervalsCache()
 	defer tickIntervalsCache.Stop()
 
@@ -203,8 +236,8 @@ func TestStatusCache_GetTickIntervals_givenLastTickInFirstInterval_thenReturnOnl
 		},
 	}
 
-	statusCache := NewStatusCache(statusProvider, elasticClient, nil, tickIntervalsCache)
-	status, err := statusCache.GetTickIntervals(context.Background())
+	statusService := NewStatusService(statusProvider, elasticClient, nil, tickIntervalsCache)
+	status, err := statusService.GetTickIntervals(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, status)
 
@@ -214,7 +247,7 @@ func TestStatusCache_GetTickIntervals_givenLastTickInFirstInterval_thenReturnOnl
 	assert.Equal(t, 666, int(status.Intervals[0].LastTick))
 }
 
-func TestStatusCache_GetArchiverStatus_givenLastTickInFirstInterval_thenReturnCorrectLatestTickEpoch(t *testing.T) {
+func TestStatusService_GetArchiverStatus_givenLastTickInFirstInterval_thenReturnCorrectLatestTickEpoch(t *testing.T) {
 	tickIntervalsCache := createTickIntervalsCache()
 	defer tickIntervalsCache.Stop()
 
@@ -247,8 +280,8 @@ func TestStatusCache_GetArchiverStatus_givenLastTickInFirstInterval_thenReturnCo
 		},
 	}
 
-	statusCache := NewStatusCache(statusProvider, elasticClient, archiverStatusCache, tickIntervalsCache)
-	status, err := statusCache.GetArchiverStatusResponse()
+	statusService := NewStatusService(statusProvider, elasticClient, archiverStatusCache, tickIntervalsCache)
+	status, err := statusService.GetArchiverStatusResponse()
 	require.NoError(t, err)
 	assert.Equal(t, 666, int(status.LastProcessedTick.TickNumber))
 	assert.Equal(t, 122, int(status.LastProcessedTick.Epoch))

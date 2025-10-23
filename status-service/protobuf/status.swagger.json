@@ -1,0 +1,315 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "status.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "StatusService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "A method that is mainly used by the load-balancer to decide if the instance should be added to the balancing rotation based on if it's up-to-date with the network or not.",
+        "operationId": "StatusService_GetHealthCheck",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbGetHealthCheckResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "StatusService"
+        ]
+      }
+    },
+    "/v1/archiverStatus": {
+      "get": {
+        "operationId": "StatusService_GetArchiverStatus",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbGetArchiverStatusResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "StatusService"
+        ]
+      }
+    },
+    "/v1/skippedTicks": {
+      "get": {
+        "operationId": "StatusService_GetErroneousSkippedTicks",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbGetSkippedTicksResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "StatusService"
+        ]
+      }
+    },
+    "/v1/status": {
+      "get": {
+        "operationId": "StatusService_GetStatus",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbGetStatusResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "StatusService"
+        ]
+      }
+    },
+    "/v1/tickIntervals": {
+      "get": {
+        "operationId": "StatusService_GetTickIntervals",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/pbGetTickIntervalsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "StatusService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "pbGetArchiverStatusResponse": {
+      "type": "object",
+      "properties": {
+        "lastProcessedTick": {
+          "$ref": "#/definitions/pbProcessedTick"
+        },
+        "lastProcessedTicksPerEpoch": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "skippedTicks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/pbSkippedTicksInterval"
+          }
+        },
+        "processedTickIntervalsPerEpoch": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/pbProcessedTickIntervalsPerEpoch"
+          }
+        },
+        "emptyTicksPerEpoch": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "title": "start of archiver compatible status response"
+    },
+    "pbGetHealthCheckResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "pbGetSkippedTicksResponse": {
+      "type": "object",
+      "properties": {
+        "skippedTicks": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      }
+    },
+    "pbGetStatusResponse": {
+      "type": "object",
+      "properties": {
+        "lastProcessedTick": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "lastProcessedEpoch": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "pbGetTickIntervalsResponse": {
+      "type": "object",
+      "properties": {
+        "intervals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/pbTickInterval"
+          }
+        }
+      }
+    },
+    "pbProcessedTick": {
+      "type": "object",
+      "properties": {
+        "tickNumber": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "epoch": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "pbProcessedTickInterval": {
+      "type": "object",
+      "properties": {
+        "initialProcessedTick": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "lastProcessedTick": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "pbProcessedTickIntervalsPerEpoch": {
+      "type": "object",
+      "properties": {
+        "epoch": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "intervals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/pbProcessedTickInterval"
+          }
+        }
+      }
+    },
+    "pbSkippedTicksInterval": {
+      "type": "object",
+      "properties": {
+        "startTick": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "endTick": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "pbTickInterval": {
+      "type": "object",
+      "properties": {
+        "epoch": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "firstTick": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "lastTick": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    }
+  }
+}

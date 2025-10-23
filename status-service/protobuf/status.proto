@@ -8,6 +8,7 @@ import "google/protobuf/empty.proto";
 
 message GetStatusResponse {
   uint32 last_processed_tick = 1;
+  uint32 last_processed_epoch =2;
 }
 
 message GetHealthCheckResponse {

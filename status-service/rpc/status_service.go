@@ -18,11 +18,12 @@ type ElasticClient interface {
 
 type StatusProvider interface {
 	GetLastProcessedTick() (tick uint32, err error)
+	GetLastProcessedEpoch() (tick uint32, err error)
 	GetSkippedTicks() ([]uint32, error)
 	GetSourceStatus() (*domain.Status, error)
 }
 
-type StatusCache struct {
+type StatusService struct {
 	database            StatusProvider
 	elastic             ElasticClient
 	archiverStatusCache *ttlcache.Cache[string, *protobuf.GetArchiverStatusResponse]
@@ -31,10 +32,10 @@ type StatusCache struct {
 	tickIntervalLock    sync.Mutex
 }
 
-func NewStatusCache(database StatusProvider, elastic ElasticClient, archiverStatusCache *ttlcache.Cache[string, *protobuf.GetArchiverStatusResponse],
-	tickIntervalsCache *ttlcache.Cache[string, []*domain.TickInterval]) *StatusCache {
+func NewStatusService(database StatusProvider, elastic ElasticClient, archiverStatusCache *ttlcache.Cache[string, *protobuf.GetArchiverStatusResponse],
+	tickIntervalsCache *ttlcache.Cache[string, []*domain.TickInterval]) *StatusService {
 
-	return &StatusCache{
+	return &StatusService{
 		database:            database,
 		elastic:             elastic,
 		archiverStatusCache: archiverStatusCache,
@@ -42,19 +43,23 @@ func NewStatusCache(database StatusProvider, elastic ElasticClient, archiverStat
 	}
 }
 
-func (s *StatusCache) GetLastProcessedTick() (tick uint32, err error) {
+func (s *StatusService) GetLastProcessedTick() (tick uint32, err error) {
 	return s.database.GetLastProcessedTick()
 }
 
-func (s *StatusCache) GetErroneousSkippedTicks() ([]uint32, error) {
+func (s *StatusService) GetLastProcessedEpoch() (tick uint32, err error) {
+	return s.database.GetLastProcessedEpoch()
+}
+
+func (s *StatusService) GetErroneousSkippedTicks() ([]uint32, error) {
 	return s.database.GetSkippedTicks()
 }
 
-func (s *StatusCache) GetSourceStatus() (*domain.Status, error) {
+func (s *StatusService) GetSourceStatus() (*domain.Status, error) {
 	return s.database.GetSourceStatus()
 }
 
-func (s *StatusCache) GetTickIntervals(ctx context.Context) (*protobuf.GetTickIntervalsResponse, error) {
+func (s *StatusService) GetTickIntervals(ctx context.Context) (*protobuf.GetTickIntervalsResponse, error) {
 
 	// get archiver status (last epoch only)
 	sourceStatus, err := s.database.GetSourceStatus() // load from db
@@ -104,7 +109,7 @@ func appendIfInRange(intervals []*protobuf.TickInterval, interval *domain.TickIn
 	}
 }
 
-func (s *StatusCache) GetArchiverStatusResponse() (*protobuf.GetArchiverStatusResponse, error) {
+func (s *StatusService) GetArchiverStatusResponse() (*protobuf.GetArchiverStatusResponse, error) {
 	s.archiverStatusLock.Lock() // lock so that we do not get multiple threads inside the `if`
 	defer s.archiverStatusLock.Unlock()
 
@@ -125,7 +130,7 @@ func (s *StatusCache) GetArchiverStatusResponse() (*protobuf.GetArchiverStatusRe
 	}
 }
 
-func (s *StatusCache) getElasticIntervals(ctx context.Context, beforeEpoch uint32) ([]*domain.TickInterval, error) {
+func (s *StatusService) getElasticIntervals(ctx context.Context, beforeEpoch uint32) ([]*domain.TickInterval, error) {
 	s.tickIntervalLock.Lock() // lock so that we do not get multiple threads inside the `if`
 	defer s.tickIntervalLock.Unlock()
 
@@ -144,7 +149,7 @@ func (s *StatusCache) getElasticIntervals(ctx context.Context, beforeEpoch uint3
 	}
 }
 
-func (s *StatusCache) createArchiverStatusResponse(tickIntervals *protobuf.GetTickIntervalsResponse) (*protobuf.GetArchiverStatusResponse, error) {
+func (s *StatusService) createArchiverStatusResponse(tickIntervals *protobuf.GetTickIntervalsResponse) (*protobuf.GetArchiverStatusResponse, error) {
 	tick, err := s.database.GetLastProcessedTick()
 	if err != nil {
 		return nil, fmt.Errorf("getting last processed tick: %w", err)
