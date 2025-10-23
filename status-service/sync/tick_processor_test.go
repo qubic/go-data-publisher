@@ -166,6 +166,7 @@ func (f *FakeArchiveClient) GetStatus(context.Context) (*archiverproto.GetStatus
 
 type FakeDataStore struct {
 	tick        uint32
+	epoch       uint32
 	skippedTick uint32
 	status      *domain.Status
 }
@@ -189,6 +190,11 @@ func (f *FakeDataStore) GetLastProcessedTick() (tick uint32, err error) {
 	return f.tick, nil
 }
 
+func (f *FakeDataStore) SetLastProcessedEpoch(epoch uint32) error {
+	f.epoch = epoch
+	return nil
+}
+
 var m = metrics.NewMetrics("test")
 
 func TestProcessor_SyncAll(t *testing.T) {
@@ -204,10 +210,12 @@ func TestProcessor_SyncAll(t *testing.T) {
 	err := processor.sync()
 	require.NoError(t, err)
 	assert.Equal(t, 1000, int(dataStore.tick))
+	assert.Equal(t, 100, int(dataStore.epoch))
 
 	err = processor.sync()
 	require.NoError(t, err)
 	assert.Equal(t, 12345, int(dataStore.tick))
+	assert.Equal(t, 123, int(dataStore.epoch))
 }
 
 func TestProcessor_SyncAll_GivenEmptyDoNotCrash(t *testing.T) {

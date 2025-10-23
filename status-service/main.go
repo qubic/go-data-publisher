@@ -163,7 +163,7 @@ func run() error {
 	go tickIntervalsCache.Start()
 	defer tickIntervalsCache.Stop()
 
-	statusCache := rpc.NewStatusCache(store, elasticClient, archiverStatusCache, tickIntervalsCache)
+	statusCache := rpc.NewStatusService(store, elasticClient, archiverStatusCache, tickIntervalsCache)
 	server := rpc.NewStatusServiceServer(cfg.Server.GrpcHost, cfg.Server.HttpHost, statusCache)
 	serverError := make(chan error, 1)
 	err = server.Start(serverError)
