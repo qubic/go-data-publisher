@@ -13,9 +13,14 @@ import (
 )
 
 type FakeStatusProvider struct {
-	lastProcessedTick  uint32
-	lastProcessedEpoch uint32
-	sourceStatus       *domain.Status
+	lastProcessedTick        uint32
+	lastProcessedEpoch       uint32
+	currentIntervalStartTick uint32
+	sourceStatus             *domain.Status
+}
+
+func (f *FakeStatusProvider) GetInitialTickOfCurrentTickRange() (uint32, error) {
+	return f.currentIntervalStartTick, nil
 }
 
 func (f *FakeStatusProvider) GetLastProcessedTick() (uint32, error) {

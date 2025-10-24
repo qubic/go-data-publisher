@@ -165,10 +165,20 @@ func (f *FakeArchiveClient) GetStatus(context.Context) (*archiverproto.GetStatus
 }
 
 type FakeDataStore struct {
-	tick        uint32
-	epoch       uint32
-	skippedTick uint32
-	status      *domain.Status
+	tick                     uint32
+	epoch                    uint32
+	skippedTick              uint32
+	status                   *domain.Status
+	currentIntervalStartTick uint32
+}
+
+func (f *FakeDataStore) GetInitialTickOfCurrentTickRange() (uint32, error) {
+	return f.currentIntervalStartTick, nil
+}
+
+func (f *FakeDataStore) SetInitialTickOfCurrentTickRange(tickNumber uint32) error {
+	f.currentIntervalStartTick = tickNumber
+	return nil
 }
 
 func (f *FakeDataStore) SetSourceStatus(status *domain.Status) error {

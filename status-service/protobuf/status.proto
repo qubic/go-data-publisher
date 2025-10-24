@@ -8,7 +8,8 @@ import "google/protobuf/empty.proto";
 
 message GetStatusResponse {
   uint32 last_processed_tick = 1;
-  uint32 last_processed_epoch =2;
+  uint32 last_processed_epoch = 2;
+  uint32 tick_range_initial_tick = 3;
 }
 
 message GetHealthCheckResponse {

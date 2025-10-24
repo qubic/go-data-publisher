@@ -34,6 +34,8 @@ type DataStore interface {
 	GetLastProcessedTick() (tick uint32, err error)
 	SetLastProcessedTick(tick uint32) error
 	SetLastProcessedEpoch(epoch uint32) error
+	SetInitialTickOfCurrentTickRange(tickNumber uint32) error
+	GetInitialTickOfCurrentTickRange() (uint32, error)
 	SetSourceStatus(status *domain.Status) error
 	AddSkippedErroneousTick(tick uint32) error
 }
@@ -102,7 +104,8 @@ func (p *TickProcessor) sync() error {
 		return fmt.Errorf("convert archive status: %w", err)
 	}
 
-	err = p.dataStore.SetSourceStatus(removePreviousEpochs(status)) // store for rpc clients
+	currentEpochStatus := removePreviousEpochs(status)
+	err = p.dataStore.SetSourceStatus(currentEpochStatus) // store for rpc clients
 	if err != nil {
 		return fmt.Errorf("storing status: %w", err)
 	}
@@ -130,7 +133,7 @@ func (p *TickProcessor) sync() error {
 			log.Printf("Processing ticks from [%d] to [%d] for epoch [%d].", start, end, epoch)
 		}
 		// if start == end then process one tick
-		err = p.processTickRange(ctx, epoch, start, end)
+		err = p.processTickRange(ctx, epoch, start, end, currentEpochStatus)
 		if err != nil {
 			return fmt.Errorf("processing tick range: %w", err)
 		}
@@ -154,7 +157,7 @@ func removePreviousEpochs(status *domain.Status) *domain.Status {
 	}
 }
 
-func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, to uint32) error {
+func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, to uint32, currentEpochStatus *domain.Status) error {
 
 	// work more in parallel, if tick range is larger
 	numWorkers := min((int(to-from)/10)+1, p.maxWorkers)
@@ -183,9 +186,27 @@ func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, to ui
 			}
 			p.processingMetrics.SetProcessedTransactionsTick(epoch, tick)
 
+			tickIntervalForLastProcessedTick := findTickIntervalForTickFromEpochStatus(currentEpochStatus, tick)
+			if tickIntervalForLastProcessedTick == nil {
+				return fmt.Errorf("cannot find the tick interval for the last processed tick [%d] in the current epoch interval list", tick)
+			}
+
+			err = p.dataStore.SetInitialTickOfCurrentTickRange(tickIntervalForLastProcessedTick.From)
+			if err != nil {
+				return fmt.Errorf("storing initial tick of current tick range: %w", err)
+			}
 		}
 	}
 
+	return nil
+}
+
+func findTickIntervalForTickFromEpochStatus(status *domain.Status, tickNumber uint32) *domain.TickInterval {
+	for _, interval := range status.TickIntervals {
+		if interval.From <= tickNumber && tickNumber <= interval.To {
+			return interval
+		}
+	}
 	return nil
 }
 

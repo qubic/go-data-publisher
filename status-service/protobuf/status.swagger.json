@@ -196,6 +196,10 @@
         "lastProcessedEpoch": {
           "type": "integer",
           "format": "int64"
+        },
+        "tickRangeInitialTick": {
+          "type": "integer",
+          "format": "int64"
         }
       }
     },
