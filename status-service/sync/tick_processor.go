@@ -188,7 +188,7 @@ func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, to ui
 
 			tickIntervalForLastProcessedTick := findTickIntervalForTickFromEpochStatus(status, tick, epoch)
 			if tickIntervalForLastProcessedTick == nil {
-				return fmt.Errorf("cannot find the tick interval for the last processed tick [%d] in the current epoch interval list", tick)
+				return fmt.Errorf("cannot find the tick interval for the last processed tick [%d] in status", tick)
 			}
 
 			err = p.dataStore.SetInitialTickOfCurrentTickRange(tickIntervalForLastProcessedTick.From)
