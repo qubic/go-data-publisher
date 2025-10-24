@@ -46,19 +46,19 @@ func (ps *PebbleStore) SetLastProcessedTick(tick uint32) error {
 	return ps.setUint32(lastProcessedTickKey, tick)
 }
 
-func (ps *PebbleStore) GetLastProcessedEpoch() (uint32, error) {
+func (ps *PebbleStore) GetProcessingEpoch() (uint32, error) {
 	return ps.getUint32(lastProcessedEpochKey)
 }
 
-func (ps *PebbleStore) SetLastProcessedEpoch(epoch uint32) error {
+func (ps *PebbleStore) SetProcessingEpoch(epoch uint32) error {
 	return ps.setUint32(lastProcessedEpochKey, epoch)
 }
 
-func (ps *PebbleStore) SetInitialTickOfCurrentTickRange(tickNumber uint32) error {
+func (ps *PebbleStore) SetCurrentIntervalInitialTick(tickNumber uint32) error {
 	return ps.setUint32(initialTickOfCurrentTickRangeKey, tickNumber)
 }
 
-func (ps *PebbleStore) GetInitialTickOfCurrentTickRange() (uint32, error) {
+func (ps *PebbleStore) GetCurrentIntervalInitialTick() (uint32, error) {
 	return ps.getUint32(initialTickOfCurrentTickRangeKey)
 }
 

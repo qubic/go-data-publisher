@@ -172,11 +172,11 @@ type FakeDataStore struct {
 	initialTick uint32
 }
 
-func (f *FakeDataStore) GetInitialTickOfCurrentTickRange() (uint32, error) {
+func (f *FakeDataStore) GetCurrentIntervalInitialTick() (uint32, error) {
 	return f.initialTick, nil
 }
 
-func (f *FakeDataStore) SetInitialTickOfCurrentTickRange(tickNumber uint32) error {
+func (f *FakeDataStore) SetCurrentIntervalInitialTick(tickNumber uint32) error {
 	f.initialTick = tickNumber
 	return nil
 }
@@ -200,7 +200,7 @@ func (f *FakeDataStore) GetLastProcessedTick() (tick uint32, err error) {
 	return f.tick, nil
 }
 
-func (f *FakeDataStore) SetLastProcessedEpoch(epoch uint32) error {
+func (f *FakeDataStore) SetProcessingEpoch(epoch uint32) error {
 	f.epoch = epoch
 	return nil
 }

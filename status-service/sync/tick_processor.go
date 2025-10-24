@@ -33,9 +33,9 @@ type SearchClient interface {
 type DataStore interface {
 	GetLastProcessedTick() (tick uint32, err error)
 	SetLastProcessedTick(tick uint32) error
-	SetLastProcessedEpoch(epoch uint32) error
-	SetInitialTickOfCurrentTickRange(tickNumber uint32) error
-	GetInitialTickOfCurrentTickRange() (uint32, error)
+	SetProcessingEpoch(epoch uint32) error
+	SetCurrentIntervalInitialTick(tickNumber uint32) error
+	GetCurrentIntervalInitialTick() (uint32, error)
 	SetSourceStatus(status *domain.Status) error
 	AddSkippedErroneousTick(tick uint32) error
 }
@@ -180,11 +180,11 @@ func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, to, i
 			if err != nil {
 				return fmt.Errorf("storing last processed tick [%d]: %w", tick, err)
 			}
-			err = p.dataStore.SetLastProcessedEpoch(epoch)
+			err = p.dataStore.SetProcessingEpoch(epoch)
 			if err != nil {
 				return fmt.Errorf("setting last processed epoch [%d]: %v", epoch, err)
 			}
-			err = p.dataStore.SetInitialTickOfCurrentTickRange(initial)
+			err = p.dataStore.SetCurrentIntervalInitialTick(initial)
 			if err != nil {
 				return fmt.Errorf("storing initial tick [%d]: %w", initial, err)
 			}

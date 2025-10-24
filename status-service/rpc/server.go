@@ -57,9 +57,9 @@ func (s *StatusServiceServer) GetStatus(context.Context, *emptypb.Empty) (*proto
 	}
 
 	return &protobuf.GetStatusResponse{
-		LastProcessedTick:    lastProcessedTick,
-		LastProcessedEpoch:   lastProcessedEpoch,
-		TickRangeInitialTick: initialTickOfCurrentTickRange,
+		LastProcessedTick:   lastProcessedTick,
+		ProcessingEpoch:     lastProcessedEpoch,
+		IntervalInitialTick: initialTickOfCurrentTickRange,
 	}, nil
 }
 
