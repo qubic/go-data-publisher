@@ -23,6 +23,7 @@ const lastProcessedTickKey = "lpt"
 const lastProcessedEpochKey = "lpe"
 const skippedTicksKey = "skipped"
 const processingStatusKey = "status"
+const initialTickOfCurrentTickRangeKey = "itoctrk"
 
 type PebbleStore struct {
 	db *pebble.DB
@@ -45,12 +46,20 @@ func (ps *PebbleStore) SetLastProcessedTick(tick uint32) error {
 	return ps.setUint32(lastProcessedTickKey, tick)
 }
 
-func (ps *PebbleStore) GetLastProcessedEpoch() (uint32, error) {
+func (ps *PebbleStore) GetProcessingEpoch() (uint32, error) {
 	return ps.getUint32(lastProcessedEpochKey)
 }
 
-func (ps *PebbleStore) SetLastProcessedEpoch(epoch uint32) error {
+func (ps *PebbleStore) SetProcessingEpoch(epoch uint32) error {
 	return ps.setUint32(lastProcessedEpochKey, epoch)
+}
+
+func (ps *PebbleStore) SetCurrentIntervalInitialTick(tickNumber uint32) error {
+	return ps.setUint32(initialTickOfCurrentTickRangeKey, tickNumber)
+}
+
+func (ps *PebbleStore) GetCurrentIntervalInitialTick() (uint32, error) {
+	return ps.getUint32(initialTickOfCurrentTickRangeKey)
 }
 
 func (ps *PebbleStore) SetSourceStatus(status *domain.Status) error {

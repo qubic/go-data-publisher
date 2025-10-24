@@ -13,17 +13,22 @@ import (
 )
 
 type FakeStatusProvider struct {
-	lastProcessedTick  uint32
-	lastProcessedEpoch uint32
-	sourceStatus       *domain.Status
+	lastProcessedTick   uint32
+	processingEpoch     uint32
+	intervalInitialTick uint32
+	sourceStatus        *domain.Status
+}
+
+func (f *FakeStatusProvider) GetCurrentIntervalInitialTick() (uint32, error) {
+	return f.intervalInitialTick, nil
 }
 
 func (f *FakeStatusProvider) GetLastProcessedTick() (uint32, error) {
 	return f.lastProcessedTick, nil
 }
 
-func (f *FakeStatusProvider) GetLastProcessedEpoch() (uint32, error) {
-	return f.lastProcessedEpoch, nil
+func (f *FakeStatusProvider) GetProcessingEpoch() (uint32, error) {
+	return f.processingEpoch, nil
 }
 
 func (f *FakeStatusProvider) GetSkippedTicks() ([]uint32, error) {
@@ -88,7 +93,7 @@ func TestStatusService_GetLastProcessedTick(t *testing.T) {
 
 func TestStatusService_GetLastProcessedEpoch(t *testing.T) {
 	statusProvider := &FakeStatusProvider{
-		lastProcessedEpoch: 42,
+		processingEpoch: 42,
 	}
 
 	statusService := &StatusService{

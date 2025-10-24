@@ -169,6 +169,16 @@ type FakeDataStore struct {
 	epoch       uint32
 	skippedTick uint32
 	status      *domain.Status
+	initialTick uint32
+}
+
+func (f *FakeDataStore) GetCurrentIntervalInitialTick() (uint32, error) {
+	return f.initialTick, nil
+}
+
+func (f *FakeDataStore) SetCurrentIntervalInitialTick(tickNumber uint32) error {
+	f.initialTick = tickNumber
+	return nil
 }
 
 func (f *FakeDataStore) SetSourceStatus(status *domain.Status) error {
@@ -190,7 +200,7 @@ func (f *FakeDataStore) GetLastProcessedTick() (tick uint32, err error) {
 	return f.tick, nil
 }
 
-func (f *FakeDataStore) SetLastProcessedEpoch(epoch uint32) error {
+func (f *FakeDataStore) SetProcessingEpoch(epoch uint32) error {
 	f.epoch = epoch
 	return nil
 }
@@ -211,11 +221,13 @@ func TestProcessor_SyncAll(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1000, int(dataStore.tick))
 	assert.Equal(t, 100, int(dataStore.epoch))
+	assert.Equal(t, 1, int(dataStore.initialTick))
 
 	err = processor.sync()
 	require.NoError(t, err)
 	assert.Equal(t, 12345, int(dataStore.tick))
 	assert.Equal(t, 123, int(dataStore.epoch))
+	assert.Equal(t, 10000, int(dataStore.initialTick))
 }
 
 func TestProcessor_SyncAll_GivenEmptyDoNotCrash(t *testing.T) {

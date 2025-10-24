@@ -18,7 +18,8 @@ type ElasticClient interface {
 
 type StatusProvider interface {
 	GetLastProcessedTick() (tick uint32, err error)
-	GetLastProcessedEpoch() (tick uint32, err error)
+	GetProcessingEpoch() (tick uint32, err error)
+	GetCurrentIntervalInitialTick() (tick uint32, err error)
 	GetSkippedTicks() ([]uint32, error)
 	GetSourceStatus() (*domain.Status, error)
 }
@@ -48,7 +49,11 @@ func (s *StatusService) GetLastProcessedTick() (tick uint32, err error) {
 }
 
 func (s *StatusService) GetLastProcessedEpoch() (tick uint32, err error) {
-	return s.database.GetLastProcessedEpoch()
+	return s.database.GetProcessingEpoch()
+}
+
+func (s *StatusService) GetInitialTickOfCurrentTickRange() (tick uint32, err error) {
+	return s.database.GetCurrentIntervalInitialTick()
 }
 
 func (s *StatusService) GetErroneousSkippedTicks() ([]uint32, error) {
