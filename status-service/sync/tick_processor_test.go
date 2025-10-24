@@ -165,19 +165,19 @@ func (f *FakeArchiveClient) GetStatus(context.Context) (*archiverproto.GetStatus
 }
 
 type FakeDataStore struct {
-	tick                     uint32
-	epoch                    uint32
-	skippedTick              uint32
-	status                   *domain.Status
-	currentIntervalStartTick uint32
+	tick        uint32
+	epoch       uint32
+	skippedTick uint32
+	status      *domain.Status
+	initialTick uint32
 }
 
 func (f *FakeDataStore) GetInitialTickOfCurrentTickRange() (uint32, error) {
-	return f.currentIntervalStartTick, nil
+	return f.initialTick, nil
 }
 
 func (f *FakeDataStore) SetInitialTickOfCurrentTickRange(tickNumber uint32) error {
-	f.currentIntervalStartTick = tickNumber
+	f.initialTick = tickNumber
 	return nil
 }
 
@@ -221,11 +221,13 @@ func TestProcessor_SyncAll(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1000, int(dataStore.tick))
 	assert.Equal(t, 100, int(dataStore.epoch))
+	assert.Equal(t, 1, int(dataStore.initialTick))
 
 	err = processor.sync()
 	require.NoError(t, err)
 	assert.Equal(t, 12345, int(dataStore.tick))
 	assert.Equal(t, 123, int(dataStore.epoch))
+	assert.Equal(t, 10000, int(dataStore.initialTick))
 }
 
 func TestProcessor_SyncAll_GivenEmptyDoNotCrash(t *testing.T) {

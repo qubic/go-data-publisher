@@ -119,7 +119,7 @@ func (p *TickProcessor) sync() error {
 		return fmt.Errorf("get last processed tick: %w", err)
 	}
 
-	start, end, epoch, err := calculateNextTickRange(tick, status.TickIntervals)
+	initial, start, end, epoch, err := calculateNextTickRange(tick, status.TickIntervals)
 	if err != nil {
 		return fmt.Errorf("calculating tick range: %w", err)
 	}
@@ -133,7 +133,7 @@ func (p *TickProcessor) sync() error {
 		}
 
 		// if start == end then process one tick
-		err = p.processTickRange(ctx, epoch, start, end, status)
+		err = p.processTickRange(ctx, epoch, start, end, initial)
 		if err != nil {
 			return fmt.Errorf("processing tick range: %w", err)
 		}
@@ -157,7 +157,7 @@ func removePreviousEpochs(status *domain.Status) *domain.Status {
 	}
 }
 
-func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, to uint32, status *domain.Status) error {
+func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, to, initial uint32) error {
 
 	// work more in parallel, if tick range is larger
 	numWorkers := min((int(to-from)/10)+1, p.maxWorkers)
@@ -182,31 +182,16 @@ func (p *TickProcessor) processTickRange(ctx context.Context, epoch, from, to ui
 			}
 			err = p.dataStore.SetLastProcessedEpoch(epoch)
 			if err != nil {
-				return fmt.Errorf("error setting last processed epoch [%d]: %v", epoch, err)
+				return fmt.Errorf("setting last processed epoch [%d]: %v", epoch, err)
+			}
+			err = p.dataStore.SetInitialTickOfCurrentTickRange(initial)
+			if err != nil {
+				return fmt.Errorf("storing initial tick [%d]: %w", initial, err)
 			}
 			p.processingMetrics.SetProcessedTransactionsTick(epoch, tick)
-
-			tickIntervalForLastProcessedTick := findTickIntervalForTickFromEpochStatus(status, tick, epoch)
-			if tickIntervalForLastProcessedTick == nil {
-				return fmt.Errorf("cannot find the tick interval for the last processed tick [%d] in status", tick)
-			}
-
-			err = p.dataStore.SetInitialTickOfCurrentTickRange(tickIntervalForLastProcessedTick.From)
-			if err != nil {
-				return fmt.Errorf("storing initial tick of current tick range: %w", err)
-			}
 		}
 	}
 
-	return nil
-}
-
-func findTickIntervalForTickFromEpochStatus(status *domain.Status, tickNumber uint32, epoch uint32) *domain.TickInterval {
-	for _, interval := range status.TickIntervals {
-		if interval.Epoch == epoch && interval.From <= tickNumber && tickNumber <= interval.To {
-			return interval
-		}
-	}
 	return nil
 }
 
@@ -365,21 +350,21 @@ func (p *TickProcessor) verifyTickTransactions(ctx context.Context, tick uint32,
 	return true, nil
 }
 
-func calculateNextTickRange(lastProcessedTick uint32, intervals []*domain.TickInterval) (uint32, uint32, uint32, error) {
+func calculateNextTickRange(lastProcessedTick uint32, intervals []*domain.TickInterval) (initial uint32, start uint32, end uint32, epoch uint32, err error) {
 	if len(intervals) == 0 {
-		return 0, 0, 0, errors.New("invalid argument: missing tick intervals")
+		return 0, 0, 0, 0, errors.New("invalid argument: missing tick intervals")
 	}
 
 	for _, interval := range intervals {
 		if interval.To > lastProcessedTick {
 			// found correct interval
 			startTick := max(interval.From, lastProcessedTick+1)
-			return startTick, interval.To, interval.Epoch, nil
+			return interval.From, startTick, interval.To, interval.Epoch, nil
 		}
 	}
 
 	// no delta found do not sync
-	return 0, 0, 0, nil
+	return 0, 0, 0, 0, nil
 }
 
 func elasticDebugString(td *elastic.TickData) string {
