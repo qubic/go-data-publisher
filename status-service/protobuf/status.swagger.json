@@ -193,7 +193,11 @@
           "type": "integer",
           "format": "int64"
         },
-        "lastProcessedEpoch": {
+        "processingEpoch": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "intervalInitialTick": {
           "type": "integer",
           "format": "int64"
         }
