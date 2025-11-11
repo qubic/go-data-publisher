@@ -14,12 +14,12 @@ import (
 	"github.com/jellydator/ttlcache/v3"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/qubic/go-data-publisher/status-service/archiver"
+	"github.com/qubic/go-data-publisher/status-service/archiverv1"
+	"github.com/qubic/go-data-publisher/status-service/archiverv2"
 	"github.com/qubic/go-data-publisher/status-service/db"
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/elastic"
 	"github.com/qubic/go-data-publisher/status-service/metrics"
-	"github.com/qubic/go-data-publisher/status-service/oldarchiver"
 	"github.com/qubic/go-data-publisher/status-service/protobuf"
 	"github.com/qubic/go-data-publisher/status-service/rpc"
 	"github.com/qubic/go-data-publisher/status-service/sync"
@@ -130,9 +130,9 @@ func run() error {
 	var cl sync.ArchiveClient
 	if cfg.Archiver.Legacy {
 		log.Printf("[WARN] legacy archiver client")
-		cl, err = oldarchiver.NewClient(cfg.Archiver.Host)
+		cl, err = archiverv1.NewClient(cfg.Archiver.Host)
 	} else {
-		cl, err = archiver.NewClient(cfg.Archiver.Host)
+		cl, err = archiverv2.NewClient(cfg.Archiver.Host)
 	}
 	if err != nil {
 		return errors.Wrap(err, "creating archiver client")
