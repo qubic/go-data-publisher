@@ -49,7 +49,7 @@ func run() error {
 		Elastic struct {
 			Addresses          []string      `conf:"default:https://localhost:9200"`
 			Username           string        `conf:"default:qubic-query"`
-			Password           string        `conf:"optional"`
+			Password           string        `conf:"optional,mask"`
 			TransactionIndex   string        `conf:"default:qubic-transactions-alias"`
 			TickDataIndex      string        `conf:"default:qubic-tick-data-alias"`
 			TickIntervalsIndex string        `conf:"default:qubic-tick-intervals-alias"`

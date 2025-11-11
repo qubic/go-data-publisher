@@ -50,7 +50,7 @@ func setup() {
 		Elastic struct {
 			Addresses   []string `conf:"default:https://localhost:9200"`
 			Username    string   `conf:"default:qubic-ingestion"`
-			Password    string   `conf:"optional"`
+			Password    string   `conf:"optional,mask"`
 			IndexName   string   `conf:"default:qubic-tick-intervals-alias"`
 			Certificate string   `conf:"default:http_ca.crt"`
 		}
