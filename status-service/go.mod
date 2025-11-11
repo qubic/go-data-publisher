@@ -11,6 +11,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.23.2
+	github.com/qubic/go-archiver v0.12.4
 	github.com/qubic/go-archiver-v2 v0.0.7
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/sync v0.17.0
