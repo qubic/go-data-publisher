@@ -1,4 +1,4 @@
-package oldarchiver
+package archiverv1
 
 import (
 	"context"
