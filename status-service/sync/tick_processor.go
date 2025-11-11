@@ -3,14 +3,12 @@ package sync
 import (
 	"context"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"slices"
 	"time"
 
 	"github.com/pkg/errors"
-	archproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/elastic"
 	"github.com/qubic/go-data-publisher/status-service/metrics"
@@ -19,8 +17,8 @@ import (
 )
 
 type ArchiveClient interface {
-	GetStatus(ctx context.Context) (*archproto.GetStatusResponse, error)
-	GetTickData(ctx context.Context, tickNumber uint32) (*archproto.TickData, error)
+	GetStatus(ctx context.Context) (*domain.Status, error)
+	GetTickData(ctx context.Context, tickNumber uint32) (*domain.TickData, error)
 }
 
 type SearchClient interface {
@@ -94,14 +92,9 @@ func (p *TickProcessor) Synchronize() {
 
 func (p *TickProcessor) sync() error {
 	ctx := context.Background()
-	archiverStatus, err := p.archiveClient.GetStatus(ctx)
+	status, err := p.archiveClient.GetStatus(ctx)
 	if err != nil {
-		return fmt.Errorf("get archive status: %w", err)
-	}
-
-	status, err := domain.ConvertFromArchiverStatus(archiverStatus)
-	if err != nil {
-		return fmt.Errorf("convert archive status: %w", err)
+		return fmt.Errorf("getting status from archiver: %w", err)
 	}
 
 	err = p.dataStore.SetSourceStatus(removePreviousEpochs(status)) // store for rpc clients
@@ -215,7 +208,7 @@ func (p *TickProcessor) processTick(ctx context.Context, tick uint32) error {
 	}
 
 	// we have some invalid empty ticks in epoch 154. We can safely ignore them.
-	if tickData != nil && tickData.GetEpoch() == 65535 && tick > 22175000 && tick < 22187500 {
+	if tickData != nil && tickData.Epoch == 65535 && tick > 22175000 && tick < 22187500 {
 		log.Printf("Correcting invalid empty tick data for tick [%d] to allow further processing.", tick)
 		tickData = nil
 	}
@@ -255,7 +248,7 @@ func (p *TickProcessor) handleTickMismatch(tick uint32) error {
 	}
 }
 
-func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, archiveTd *archproto.TickData) (bool, error) {
+func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, archiveTd *domain.TickData) (bool, error) {
 
 	var match bool
 	var err error
@@ -291,29 +284,19 @@ func (p *TickProcessor) verifyTickData(ctx context.Context, tick uint32, archive
 	return match, nil
 }
 
-func (p *TickProcessor) matchMinimalTickData(elasticTd *elastic.TickData, archiveTd *archproto.TickData) (bool, error) {
+func (p *TickProcessor) matchMinimalTickData(elasticTd *elastic.TickData, archiveTd *domain.TickData) (bool, error) {
 	match := archiveTd == nil && elasticTd == nil
 	if archiveTd != nil && elasticTd != nil {
-		bytes, err := hex.DecodeString(archiveTd.GetSignatureHex())
-		if err != nil {
-			return false, fmt.Errorf("decoding signature hex: %w", err)
-		}
-
 		match = elasticTd.Epoch == archiveTd.Epoch &&
 			elasticTd.TickNumber == archiveTd.TickNumber &&
-			elasticTd.Signature == base64.StdEncoding.EncodeToString(bytes)
+			elasticTd.Signature == archiveTd.Signature
 	}
 	return match, nil
 }
 
-func (p *TickProcessor) matchFullTickData(elasticTd *elastic.TickData, archiveTd *archproto.TickData) (bool, error) {
+func (p *TickProcessor) matchFullTickData(elasticTd *elastic.TickData, archiveTd *domain.TickData) (bool, error) {
 	match := archiveTd == nil && elasticTd == nil
 	if archiveTd != nil && elasticTd != nil {
-		bytes, err := hex.DecodeString(archiveTd.GetSignatureHex())
-		if err != nil {
-			return false, fmt.Errorf("decoding signature hex: %w", err)
-		}
-
 		match = elasticTd.ComputorIndex == archiveTd.ComputorIndex &&
 			elasticTd.Epoch == archiveTd.Epoch &&
 			elasticTd.TickNumber == archiveTd.TickNumber &&
@@ -321,12 +304,12 @@ func (p *TickProcessor) matchFullTickData(elasticTd *elastic.TickData, archiveTd
 			elasticTd.TimeLock == base64.StdEncoding.EncodeToString(archiveTd.TimeLock) &&
 			slices.Compare(elasticTd.TransactionHashes, archiveTd.TransactionIds) == 0 &&
 			slices.Compare(elasticTd.ContractFees, archiveTd.ContractFees) == 0 &&
-			elasticTd.Signature == base64.StdEncoding.EncodeToString(bytes)
+			elasticTd.Signature == archiveTd.Signature
 	}
 	return match, nil
 }
 
-func (p *TickProcessor) verifyTickTransactions(ctx context.Context, tick uint32, tickData *archproto.TickData) (bool, error) {
+func (p *TickProcessor) verifyTickTransactions(ctx context.Context, tick uint32, tickData *domain.TickData) (bool, error) {
 	// query elastic for transactions
 	elasticTransactions, err := p.searchClient.GetTransactionHashes(ctx, tick)
 	if err != nil {
@@ -371,8 +354,8 @@ func elasticDebugString(td *elastic.TickData) string {
 	return fmt.Sprintf("tick %d, epoch %d, signature %s", td.TickNumber, td.Epoch, td.Signature)
 }
 
-func archiveDebugString(td *archproto.TickData) string {
-	return fmt.Sprintf("tick %d, epoch %d, signature hex %s", td.TickNumber, td.Epoch, td.SignatureHex)
+func archiveDebugString(td *domain.TickData) string {
+	return fmt.Sprintf("tick %d, epoch %d, signature %s", td.TickNumber, td.Epoch, td.Signature)
 }
 
 func (p *TickProcessor) incrementErrorCount() {
