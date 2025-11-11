@@ -19,6 +19,7 @@ import (
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/elastic"
 	"github.com/qubic/go-data-publisher/status-service/metrics"
+	"github.com/qubic/go-data-publisher/status-service/oldarchiver"
 	"github.com/qubic/go-data-publisher/status-service/protobuf"
 	"github.com/qubic/go-data-publisher/status-service/rpc"
 	"github.com/qubic/go-data-publisher/status-service/sync"
@@ -37,7 +38,8 @@ func run() error {
 
 	var cfg struct {
 		Archiver struct {
-			Host string `conf:"default:localhost:8010"`
+			Host   string `conf:"default:localhost:8010"`
+			Legacy bool   `conf:"default:false"`
 		}
 		Server struct {
 			HttpHost        string `conf:"default:0.0.0.0:8000"`
@@ -125,7 +127,13 @@ func run() error {
 	})
 	elasticClient := elastic.NewClient(esClient, cfg.Elastic.TransactionIndex, cfg.Elastic.TickDataIndex, cfg.Elastic.TickIntervalsIndex)
 
-	cl, err := archiver.NewClient(cfg.Archiver.Host)
+	var cl sync.ArchiveClient
+	if cfg.Archiver.Legacy {
+		log.Printf("[WARN] legacy archiver client")
+		cl, err = oldarchiver.NewClient(cfg.Archiver.Host)
+	} else {
+		cl, err = archiver.NewClient(cfg.Archiver.Host)
+	}
 	if err != nil {
 		return errors.Wrap(err, "creating archiver client")
 	}
