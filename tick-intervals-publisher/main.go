@@ -13,7 +13,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/tick-intervals-publisher/api"
-	"github.com/qubic/tick-intervals-publisher/archiver"
+	"github.com/qubic/tick-intervals-publisher/archiverv1"
+	"github.com/qubic/tick-intervals-publisher/archiverv2"
 	"github.com/qubic/tick-intervals-publisher/db"
 	"github.com/qubic/tick-intervals-publisher/kafka"
 	"github.com/qubic/tick-intervals-publisher/metrics"
@@ -37,6 +38,7 @@ func run() error {
 	var cfg struct {
 		Client struct {
 			ArchiverGrpcHost string `conf:"default:localhost:8010"`
+			Legacy           bool   `conf:"default:false"`
 		}
 		Broker struct {
 			BootstrapServers []string `conf:"default:localhost:9092"`
@@ -112,7 +114,13 @@ func run() error {
 		}
 	}
 
-	cl, err := archiver.NewClient(cfg.Client.ArchiverGrpcHost)
+	var cl processing.ArchiveClient
+	if cfg.Client.Legacy {
+		log.Println("[INFO] Connecting to legacy archiver...")
+		cl, err = archiverv1.NewClient(cfg.Client.ArchiverGrpcHost)
+	} else {
+		cl, err = archiverv2.NewClient(cfg.Client.ArchiverGrpcHost)
+	}
 	if err != nil {
 		return fmt.Errorf("creating archiver client: %w", err)
 	}

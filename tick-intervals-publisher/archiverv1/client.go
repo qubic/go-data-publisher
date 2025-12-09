@@ -1,10 +1,10 @@
-package archiver
+package archiverv1
 
 import (
 	"context"
 	"fmt"
 
-	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
+	archiverproto "github.com/qubic/go-archiver/protobuff"
 	"github.com/qubic/tick-intervals-publisher/domain"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -15,12 +15,12 @@ type Client struct {
 }
 
 func NewClient(host string) (*Client, error) {
-	archiverConn, err := grpc.NewClient(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	clientConn, err := grpc.NewClient(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, fmt.Errorf("creating archiver api connection: %v", err)
+		return nil, fmt.Errorf("creating status service client connection: %v", err)
 	}
 	cl := Client{
-		api: archiverproto.NewArchiveServiceClient(archiverConn),
+		api: archiverproto.NewArchiveServiceClient(clientConn),
 	}
 	return &cl, nil
 }

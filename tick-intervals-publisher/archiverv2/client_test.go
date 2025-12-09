@@ -1,4 +1,4 @@
-package archiver
+package archiverv2
 
 import (
 	"testing"
