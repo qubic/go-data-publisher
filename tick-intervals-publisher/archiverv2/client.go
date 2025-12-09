@@ -17,7 +17,7 @@ type Client struct {
 func NewClient(host string) (*Client, error) {
 	archiverConn, err := grpc.NewClient(host, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, fmt.Errorf("creating archiver api connection: %v", err)
+		return nil, fmt.Errorf("creating archiver v2 client connection: %v", err)
 	}
 	cl := Client{
 		api: archiverproto.NewArchiveServiceClient(archiverConn),
