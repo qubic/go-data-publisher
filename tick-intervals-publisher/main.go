@@ -47,7 +47,7 @@ func run() error {
 			MetricsPort         int      `conf:"default:9999"`
 			MetricsNamespace    string   `conf:"default:qubic_kafka"`
 			PublishCustomEpochs []uint32 `conf:"optional"`
-			StartEpoch          uint32   `conf:"optional"`     // overrides last processed tick
+			StartEpoch          uint32   `conf:"optional"`     // overrides last processed epoch
 			Enabled             bool     `conf:"default:true"` // only for testing
 		}
 	}
