@@ -97,6 +97,7 @@ func (c *Client) FindOverlappingInterval(ctx context.Context, epoch, from, to ui
 func (c *Client) BulkIndex(ctx context.Context, data []*EsDocument) error {
 	start := time.Now().UnixMilli()
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
+		Refresh:    "wait_for",               // wait for refresh so that the consumer can check before the next update
 		Index:      c.indexName,              // The default index name
 		Client:     c.esClient,               // The Elasticsearch client
 		NumWorkers: min(runtime.NumCPU(), 8), // 8 parallel connections are enough
