@@ -3,7 +3,7 @@ name: Create custom tick intervals consumer snapshot image
 on:
   push:
     branches:
-      - feature/tick-intervals
+      - feature/refresh-on-update
 
 jobs:
   docker-publish:
