@@ -72,7 +72,7 @@ func (s *StatusService) GetTickIntervals(ctx context.Context) (*protobuf.GetTick
 		return nil, fmt.Errorf("getting source status: %w", err)
 	}
 
-	lastProcessedTick, err := s.database.GetLastProcessedTick() // could be lower than archiver status latest tick
+	lastProcessedTick, err := s.database.GetLastProcessedTick() // could be lower than the archiver status latest tick
 	if err != nil {
 		return nil, fmt.Errorf("getting last processed tick: %w", err)
 	}
@@ -109,9 +109,9 @@ func appendIfInRange(intervals []*protobuf.TickInterval, interval *domain.TickIn
 			FirstTick: interval.From,
 			LastTick:  interval.To,
 		})
-	} else { // else do nothing because not in range (endTick < interval.To)
-		return intervals
 	}
+	// else do nothing because not in range (endTick < interval.To)
+	return intervals
 }
 
 func (s *StatusService) GetArchiverStatusResponse() (*protobuf.GetArchiverStatusResponse, error) {
@@ -130,9 +130,9 @@ func (s *StatusService) GetArchiverStatusResponse() (*protobuf.GetArchiverStatus
 		}
 		s.archiverStatusCache.Set(archiverStatusKey, response, ttlcache.DefaultTTL)
 		return response, nil
-	} else {
-		return item.Value(), nil
 	}
+
+	return item.Value(), nil
 }
 
 func (s *StatusService) getElasticIntervals(ctx context.Context, beforeEpoch uint32) ([]*domain.TickInterval, error) {
@@ -149,22 +149,19 @@ func (s *StatusService) getElasticIntervals(ctx context.Context, beforeEpoch uin
 		s.tickIntervalsCache.Set(tickIntervalsKey, elasticIntervals, ttlcache.DefaultTTL)
 		log.Printf("Updated intervals cache. Took %d ms.", time.Since(start).Milliseconds())
 		return elasticIntervals, nil
-	} else {
-		return item.Value(), nil
 	}
+
+	return item.Value(), nil
 }
 
 func (s *StatusService) createArchiverStatusResponse(tickIntervals *protobuf.GetTickIntervalsResponse) (*protobuf.GetArchiverStatusResponse, error) {
-	tick, err := s.database.GetLastProcessedTick()
-	if err != nil {
-		return nil, fmt.Errorf("getting last processed tick: %w", err)
+	if len(tickIntervals.GetIntervals()) == 0 {
+		return nil, fmt.Errorf("tick intervals are empty")
 	}
 
-	// get epoch for current tick (needed for archiver data structure)
-	epoch, err := findEpoch(tickIntervals, tick)
-	if err != nil {
-		return nil, fmt.Errorf("finding epoch: %w", err)
-	}
+	lastInterval := tickIntervals.GetIntervals()[len(tickIntervals.Intervals)-1]
+	tick := lastInterval.GetLastTick()
+	epoch := lastInterval.GetEpoch()
 
 	status := &protobuf.GetArchiverStatusResponse{
 		LastProcessedTick: &protobuf.ProcessedTick{
@@ -186,7 +183,7 @@ func calculateTickIntervalsPerEpoch(tickIntervals *protobuf.GetTickIntervalsResp
 		Epoch: 0,
 	}
 	for index, interval := range tickIntervals.GetIntervals() {
-		if interval.Epoch > tickIntervalsPerEpoch.Epoch { // create new epoch
+		if interval.Epoch > tickIntervalsPerEpoch.Epoch { // create a new epoch
 			tickIntervalsPerEpoch = &protobuf.ProcessedTickIntervalsPerEpoch{
 				Epoch:     interval.Epoch,
 				Intervals: []*protobuf.ProcessedTickInterval{},
@@ -226,13 +223,4 @@ func calculateSkippedTicks(tickIntervals *protobuf.GetTickIntervalsResponse) []*
 		next = interval.LastTick + 1
 	}
 	return skippedTicksList
-}
-
-func findEpoch(response *protobuf.GetTickIntervalsResponse, tick uint32) (uint32, error) {
-	for _, interval := range response.GetIntervals() {
-		if tick >= interval.FirstTick && tick <= interval.LastTick {
-			return interval.Epoch, nil
-		}
-	}
-	return 0, fmt.Errorf("no epoch found for tick [%d]", tick)
 }
