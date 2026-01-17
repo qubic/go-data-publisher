@@ -1,7 +1,7 @@
 //go:build !ci
 // +build !ci
 
-package elastic
+package useless
 
 import (
 	"context"
@@ -17,12 +17,13 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/joho/godotenv"
 	"github.com/qubic/go-data-publisher/status-service/domain"
+	"github.com/qubic/go-data-publisher/status-service/elastic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	elasticClient *Client
+	elasticClient *elastic.Client
 )
 
 func TestElasticClient_getTickIntervals(t *testing.T) {
@@ -147,5 +148,5 @@ func setup() {
 	if err != nil {
 		log.Fatalf("error creating elastic client: %v", err)
 	}
-	elasticClient = NewClient(esClient, cfg.Elastic.TransactionsIndex, cfg.Elastic.TickDataIndex, cfg.Elastic.TIckIntervalsIndex)
+	elasticClient = elastic.NewClient(esClient, cfg.Elastic.TransactionsIndex, cfg.Elastic.TickDataIndex, cfg.Elastic.TIckIntervalsIndex)
 }
