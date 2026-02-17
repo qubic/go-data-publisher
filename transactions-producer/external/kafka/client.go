@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -57,7 +56,7 @@ func (kc *Client) PublishTickTransactions(tickTransactions []entities.TickTransa
 
 	for err := range errorChannel {
 		if err != nil {
-			return errors.New("encountered errors while producing tick transaction records")
+			return fmt.Errorf("producing transactions record: %w", err)
 		}
 	}
 

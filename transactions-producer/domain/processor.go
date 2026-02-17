@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/qubic/transactions-producer/entities"
+	"github.com/twmb/franz-go/pkg/kerr"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -175,7 +176,14 @@ func (p *Processor) processTick(epoch, tick uint32) error {
 		}
 		err = p.publisher.PublishTickTransactions(tickTransactions)
 		if err != nil {
-			return fmt.Errorf("inserting batch: %v", err)
+			var kafkaErr *kerr.Error
+			if errors.As(err, &kafkaErr) { // go 1.26 would support errors.AsType
+				if !kafkaErr.Retriable {
+					// fatal leads to os.Exit
+					p.logger.Fatalw("non-retriable error", "epoch", epoch, "tick", tick, "error", err)
+				}
+			}
+			return fmt.Errorf("inserting batch: %w", err)
 		}
 	}
 	return nil
