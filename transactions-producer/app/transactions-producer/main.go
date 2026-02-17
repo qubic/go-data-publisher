@@ -56,6 +56,7 @@ func run() error {
 		Kafka                          struct {
 			BootstrapServers []string `conf:"default:localhost:9092"`
 			TxTopic          string   `conf:"default:qubic-transactions-local"`
+			MaxMessageSizeMB int      `conf:"default:1"`
 		}
 		MetricsNamespace string `conf:"default:qubic_kafka"`
 		MetricsPort      int    `conf:"default:9999"`
@@ -117,6 +118,7 @@ func run() error {
 		kgo.DefaultProduceTopic(cfg.Kafka.TxTopic),
 		kgo.SeedBrokers(cfg.Kafka.BootstrapServers...),
 		kgo.ProducerBatchCompression(kgo.ZstdCompression()),
+		kgo.ProducerBatchMaxBytes(int32(cfg.Kafka.MaxMessageSizeMB*1024*1024)),
 		kgo.WithLogger(kgo.BasicLogger(os.Stdout, kgo.LogLevelInfo, nil)),
 	)
 	if err != nil {
