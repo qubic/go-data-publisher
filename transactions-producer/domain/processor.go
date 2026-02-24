@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/qubic/transactions-producer/entities"
+	"github.com/twmb/franz-go/pkg/kerr"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -60,6 +61,13 @@ func (p *Processor) Start() error {
 	for range ticker {
 		err := p.process()
 		if err != nil {
+			var kafkaErr *kerr.Error
+			if errors.As(err, &kafkaErr) { // go 1.26 would support errors.AsType
+				if !kafkaErr.Retriable {
+					return fmt.Errorf("non-retriable kafka error: %w", err)
+				}
+			}
+			// only exit, if non-retriable kafka error
 			p.logger.Errorw("error running processing cycle", "error", err)
 		}
 	}
@@ -69,19 +77,19 @@ func (p *Processor) Start() error {
 func (p *Processor) PublishSingleTicks(ticks []uint32) error {
 	intervals, e := p.fetcher.GetProcessedTickIntervalsPerEpoch(context.Background())
 	if e != nil {
-		return fmt.Errorf("getting tick intervals: %v", e)
+		return fmt.Errorf("getting tick intervals: %w", e)
 	}
 
 	for _, tick := range ticks {
 		epoch, err := getEpochForTick(tick, intervals)
 		if err != nil {
-			return fmt.Errorf("getting epoch for tick [%d]: %v", tick, err)
+			return fmt.Errorf("getting epoch for tick [%d]: %w", tick, err)
 		}
 
 		p.logger.Infow("Trying to publish transactions", "tick", tick)
 		err = p.processTick(epoch, tick)
 		if err != nil {
-			return fmt.Errorf("processing tick [%d]: %v", tick, err)
+			return fmt.Errorf("processing tick [%d]: %w", tick, err)
 		}
 		p.logger.Infow("Published transactions", "tick", tick)
 	}
@@ -93,26 +101,26 @@ func (p *Processor) process() error {
 	defer cancel()
 	intervals, err := p.fetcher.GetProcessedTickIntervalsPerEpoch(ctx)
 	if err != nil {
-		return fmt.Errorf("getting tick intervals: %v", err)
+		return fmt.Errorf("getting tick intervals: %w", err)
 	}
 	p.setLatestSourceTickToMetrics(intervals)
 
 	tick, err := p.statusStore.GetLastProcessedTick()
 	if err != nil {
-		return fmt.Errorf("get last processed tick: %v", err)
+		return fmt.Errorf("get last processed tick: %w", err)
 	}
 
 	start, end, epoch, err := calculateTickRange(tick, intervals)
 	if err != nil {
-		return fmt.Errorf("calculating tick range: %v", err)
+		return fmt.Errorf("calculating tick range: %w", err)
 	}
 
 	if start <= end && start > 0 && end > 0 && epoch > 0 {
 
-		// if start == end then process one tick
+		// if start == end, then process one tick
 		err = p.processTickRange(epoch, start, end)
 		if err != nil {
-			return fmt.Errorf("processing tick range: %v", err)
+			return fmt.Errorf("processing tick range: %w", err)
 		}
 	}
 	return nil
@@ -127,12 +135,12 @@ func (p *Processor) processTickRange(epoch, from, to uint32) error {
 		if len(nextTicks) == p.maxWorkers || tick == to {
 			err := p.processTickRangeParallel(epoch, nextTicks)
 			if err != nil {
-				return fmt.Errorf("processing ticks [%d]: %v", nextTicks, err)
+				return fmt.Errorf("processing ticks [%d]: %w", nextTicks, err)
 			}
 
-			err = p.statusStore.SetLastProcessedTick(tick) // set after completed batch only
+			err = p.statusStore.SetLastProcessedTick(tick) // set after completing the batch
 			if err != nil {
-				return fmt.Errorf("storing last processed tick [%d]: %v", tick, err)
+				return fmt.Errorf("storing last processed tick [%d]: %w", tick, err)
 			}
 
 			batchSize := len(nextTicks)
@@ -161,7 +169,7 @@ func (p *Processor) processTick(epoch, tick uint32) error {
 	defer cancel()
 	transactions, err := p.fetcher.GetTickTransactions(ctx, tick)
 	if err != nil {
-		return fmt.Errorf("fetching transactions: %v", err)
+		return fmt.Errorf("fetching transactions: %w", err)
 	}
 	if len(transactions) == 0 {
 		p.logger.Infow("Skipping tick without transactions", "epoch", epoch, "tick", tick)
@@ -175,7 +183,9 @@ func (p *Processor) processTick(epoch, tick uint32) error {
 		}
 		err = p.publisher.PublishTickTransactions(tickTransactions)
 		if err != nil {
-			return fmt.Errorf("inserting batch: %v", err)
+			// extra log so that we know what tick failed
+			p.logger.Errorw("Error publishing tick transactions", "epoch", epoch, "tick", tick, "error", err)
+			return fmt.Errorf("inserting batch: %w", err)
 		}
 	}
 	return nil
