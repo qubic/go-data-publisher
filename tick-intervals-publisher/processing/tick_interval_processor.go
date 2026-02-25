@@ -2,6 +2,7 @@ package processing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"slices"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/qubic/tick-intervals-publisher/domain"
 	"github.com/qubic/tick-intervals-publisher/metrics"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 type ArchiveClient interface {
@@ -43,15 +45,36 @@ func NewTickIntervalProcessor(db DataStore, client ArchiveClient, producer Produ
 	return &tdp
 }
 
-func (p *TickIntervalProcessor) StartProcessing() {
-	log.Println("Start processing...")
-	ticker := time.Tick(5 * time.Second)
+func (p *TickIntervalProcessor) StartProcessing() error {
+	// do one initial processing on startup
+	err := p.process()
+	if err != nil {
+		return err
+	}
+	log.Println("Initial processing completed. Starting loop...")
+	ticker := time.Tick(15 * time.Second)
 	for range ticker {
-		err := p.process()
+		err = p.process()
 		if err != nil {
-			log.Printf("Error processing tick intervals: %v", err)
+			return err
 		}
 	}
+	return nil
+}
+
+func (p *TickIntervalProcessor) process() error {
+	err := p.processIntervals()
+	if err != nil {
+		var kafkaErr *kerr.Error
+		if errors.As(err, &kafkaErr) {
+			if !kafkaErr.Retriable {
+				return fmt.Errorf("non-retriable kafka error: %w", err)
+			}
+		}
+		// only exit, if non-retriable kafka error
+		log.Printf("Error processing tick intervals: %v", err)
+	}
+	return nil
 }
 
 func (p *TickIntervalProcessor) PublishCustomEpochs(epochs []uint32) error {
@@ -74,7 +97,7 @@ func (p *TickIntervalProcessor) PublishCustomEpochs(epochs []uint32) error {
 	return nil
 }
 
-func (p *TickIntervalProcessor) process() error {
+func (p *TickIntervalProcessor) processIntervals() error {
 	ctx := context.Background()
 	status, err := p.archiveClient.GetStatus(ctx)
 	if err != nil {
@@ -103,7 +126,7 @@ func (p *TickIntervalProcessor) process() error {
 
 			err = p.sendTickInterval(ctx, interval)
 			if err != nil {
-				return fmt.Errorf("sending tick interval: %w", err)
+				return fmt.Errorf("sending tick interval [%v]: %w", interval, err)
 			}
 
 			if interval.Epoch > processedEpoch {
@@ -126,7 +149,7 @@ func (p *TickIntervalProcessor) sendTickInterval(ctx context.Context, interval *
 	log.Printf("[INFO] processing interval for epoch [%d] from tick [%d] to [%d].", interval.Epoch, interval.From, interval.To)
 	err := p.producer.SendMessage(ctx, interval)
 	if err != nil {
-		return fmt.Errorf("sending tick interval: %w", err)
+		return fmt.Errorf("sending message: %w", err)
 	}
 	p.processingMetrics.IncProcessedMessages()
 	p.processingMetrics.SetProcessedTick(interval.Epoch, interval.To)
