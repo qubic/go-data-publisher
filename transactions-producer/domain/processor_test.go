@@ -519,9 +519,8 @@ func TestProcessor_Start_NonRetriableKafkaError(t *testing.T) {
 		},
 	}
 
-	// Create a non-retriable kafka error
+	// non-retriable kafka error
 	nonRetriableErr := kerr.MessageTooLarge
-	nonRetriableErr.Retriable = false
 
 	publisher := MockPublisher{
 		error: nonRetriableErr,
@@ -529,13 +528,13 @@ func TestProcessor_Start_NonRetriableKafkaError(t *testing.T) {
 
 	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 10, logger.Sugar(), metrics)
 
-	// Run Start in a goroutine with a timeout
+	// run with a timeout
 	done := make(chan error, 1)
 	go func() {
 		done <- txProcessor.Start()
 	}()
 
-	// Wait for the error or timeout
+	// wait for the error or timeout
 	select {
 	case err := <-done:
 		require.Error(t, err)
