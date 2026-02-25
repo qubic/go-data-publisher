@@ -2,12 +2,14 @@ package sync
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/qubic/tick-data-publisher/domain"
 	"github.com/qubic/tick-data-publisher/metrics"
+	"github.com/twmb/franz-go/pkg/kerr"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -47,14 +49,22 @@ func NewTickDataProcessor(db DataStore, client ArchiveClient, producer Producer,
 	return &tdp
 }
 
-func (p *TickDataProcessor) StartProcessing() {
+func (p *TickDataProcessor) StartProcessing() error {
 	ticker := time.Tick(1 * time.Second)
 	for range ticker {
 		err := p.process()
 		if err != nil {
+			var kafkaErr *kerr.Error
+			if errors.As(err, &kafkaErr) { // go 1.26 would support errors.AsType
+				if !kafkaErr.Retriable {
+					return fmt.Errorf("non-retriable kafka error: %w", err)
+				}
+			}
+			// only exit, if non-retriable kafka error
 			log.Printf("Error processing tick data: %v", err)
 		}
 	}
+	return nil
 }
 
 func (p *TickDataProcessor) PublishCustomTicks(ticks []uint32) error {
@@ -63,7 +73,7 @@ func (p *TickDataProcessor) PublishCustomTicks(ticks []uint32) error {
 	for _, tick := range ticks {
 		err := p.processTick(ctx, tick)
 		if err != nil {
-			return errors.Wrapf(err, "processing tick [%d]", tick)
+			return fmt.Errorf("processing tick [%d]: %w", tick, err)
 		}
 		log.Printf("Published tick [%d].", tick)
 	}
@@ -74,18 +84,18 @@ func (p *TickDataProcessor) process() error {
 	ctx := context.Background()
 	status, err := p.archiveClient.GetStatus(ctx)
 	if err != nil {
-		return errors.Wrap(err, "get archive status")
+		return fmt.Errorf("get archive status: %w", err)
 	}
 	p.processingMetrics.SetSourceTick(status.LatestEpoch, status.LatestTick)
 
 	tick, err := p.dataStore.GetLastProcessedTick()
 	if err != nil {
-		return errors.Wrap(err, "get last processed tick")
+		return fmt.Errorf("get last processed tick: %w", err)
 	}
 
 	start, end, epoch, err := calculateNextTickRange(tick, status.TickIntervals)
 	if err != nil {
-		return errors.Wrap(err, "calculating tick range")
+		return fmt.Errorf("calculating tick range: %w", err)
 	}
 	end = min(status.LatestTick, end) // don't exceed lastest tick
 
@@ -97,7 +107,7 @@ func (p *TickDataProcessor) process() error {
 		}
 		err = p.processTickRange(ctx, epoch, start, end)
 		if err != nil {
-			return errors.Wrap(err, "processing tick range")
+			return fmt.Errorf("processing tick range: %w", err)
 		}
 	}
 	return nil
@@ -111,12 +121,12 @@ func (p *TickDataProcessor) processTickRange(ctx context.Context, epoch, from, t
 		if len(nextTicks) == p.numWorkers || tick == to {
 			err := p.processTickRangeParallel(ctx, nextTicks)
 			if err != nil {
-				return errors.Wrapf(err, "processing ticks [%d]", nextTicks)
+				return fmt.Errorf("processing ticks [%d]: %w", nextTicks, err)
 			}
 			nextTicks = nil
 			err = p.dataStore.SetLastProcessedTick(tick) // set after completed batch only
 			if err != nil {
-				return errors.Wrapf(err, "storing last processed tick [%d]", tick)
+				return fmt.Errorf("storing last processed tick [%d]: %w", tick, err)
 			}
 			p.processingMetrics.SetProcessedTick(epoch, tick)
 		}
@@ -138,12 +148,12 @@ func (p *TickDataProcessor) processTickRangeParallel(ctx context.Context, ticks 
 func (p *TickDataProcessor) processTick(ctx context.Context, tick uint32) error {
 	tickData, err := p.archiveClient.GetTickData(ctx, tick)
 	if err != nil {
-		return errors.Wrap(err, "get tick data")
+		return fmt.Errorf("get tick data: %w", err)
 	}
 	if !isEmpty(tickData) {
 		err = p.producer.SendMessage(ctx, tickData)
 		if err != nil {
-			return errors.Wrap(err, "sending message")
+			return fmt.Errorf("sending message: %w", err)
 		}
 	}
 	p.processingMetrics.IncProcessedMessages()

@@ -8,8 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"errors"
+
 	"github.com/ardanlabs/conf"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/tick-data-publisher/api"
@@ -59,24 +60,24 @@ func run() error {
 		case errors.Is(err, conf.ErrHelpWanted):
 			usage, err := conf.Usage(envPrefix, &cfg)
 			if err != nil {
-				return errors.Wrap(err, "generating config usage")
+				return fmt.Errorf("generating config usage: %w", err)
 			}
 			fmt.Println(usage)
 			return nil
 		case errors.Is(err, conf.ErrVersionWanted):
 			version, err := conf.VersionString(envPrefix, &cfg)
 			if err != nil {
-				return errors.Wrap(err, "generating config version")
+				return fmt.Errorf("generating config version: %w", err)
 			}
 			fmt.Println(version)
 			return nil
 		}
-		return errors.Wrap(err, "parsing config")
+		return fmt.Errorf("parsing config: %w", err)
 	}
 
 	out, err := conf.String(&cfg)
 	if err != nil {
-		return errors.Wrap(err, "generating config for output")
+		return fmt.Errorf("generating config for output: %w", err)
 	}
 	log.Printf("main: Config :\n%v\n", out)
 
@@ -97,7 +98,7 @@ func run() error {
 
 	store, err := db.NewPebbleStore(cfg.Sync.InternalStoreFolder)
 	if err != nil {
-		return errors.Wrap(err, "creating db")
+		return fmt.Errorf("creating db: %w", err)
 	}
 
 	lastProcessedTick, err := store.GetLastProcessedTick()
@@ -105,17 +106,17 @@ func run() error {
 		log.Printf("Setting last processed tick to [%d]", cfg.Sync.StartTick)
 		setErr := store.SetLastProcessedTick(cfg.Sync.StartTick)
 		if setErr != nil {
-			return errors.Wrap(err, "setting last processed tick")
+			return fmt.Errorf("setting last processed tick: %w", err)
 		}
 	} else if err != nil {
-		return errors.Wrap(err, "getting last processed tick")
+		return fmt.Errorf("getting last processed tick: %w", err)
 	} else {
 		log.Printf("Resuming from tick: [%d].", lastProcessedTick)
 	}
 
 	cl, err := archiver.NewClient(cfg.Client.ArchiverGrpcHost)
 	if err != nil {
-		return errors.Wrap(err, "creating archiver client")
+		return fmt.Errorf("creating archiver client: %w", err)
 	}
 
 	producer := kafka.NewTickDataProducer(kcl)
@@ -127,7 +128,7 @@ func run() error {
 	} else if len(cfg.Sync.PublishCustomTicks) > 0 {
 		go func() { procErr <- processor.PublishCustomTicks(cfg.Sync.PublishCustomTicks) }()
 	} else {
-		go processor.StartProcessing()
+		go func() { procErr <- processor.StartProcessing() }()
 	}
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)

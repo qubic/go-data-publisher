@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 
-	"github.com/pkg/errors"
 	archiverproto "github.com/qubic/go-archiver-v2/protobuf"
 	"github.com/qubic/tick-data-publisher/domain"
 	"google.golang.org/grpc"
@@ -32,7 +32,7 @@ func NewClient(host string) (*Client, error) {
 func (c *Client) GetStatus(ctx context.Context) (*domain.Status, error) {
 	s, err := c.api.GetStatus(ctx, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "calling GetStatus api")
+		return nil, fmt.Errorf("calling GetStatus api: %w", err)
 	}
 
 	var intervals []*domain.TickInterval
@@ -60,7 +60,7 @@ func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*domain.Ti
 	}
 	response, err := c.api.GetTickData(ctx, &request)
 	if err != nil {
-		return nil, errors.Wrap(err, "calling GetTickData api")
+		return nil, fmt.Errorf("calling GetTickData api: %w", err)
 	}
 	if response == nil {
 		return nil, errors.New("nil tick data response")
@@ -71,7 +71,7 @@ func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*domain.Ti
 	}
 	tickData, err := convertTickData(response.GetTickData())
 	if err != nil {
-		return nil, errors.Wrap(err, "converting tick data")
+		return nil, fmt.Errorf("converting tick data: %w", err)
 	}
 	return tickData, nil
 }
@@ -79,7 +79,7 @@ func (c *Client) GetTickData(ctx context.Context, tickNumber uint32) (*domain.Ti
 func convertTickData(td *archiverproto.TickData) (*domain.TickData, error) {
 	sigBytes, err := hex.DecodeString(td.SignatureHex)
 	if err != nil {
-		return nil, errors.Wrapf(err, "decoding signature hex [%s]", td.SignatureHex)
+		return nil, fmt.Errorf("decoding signature hex [%s]: %w", td.SignatureHex, err)
 	}
 	return &domain.TickData{
 		ComputorIndex:     td.ComputorIndex,
