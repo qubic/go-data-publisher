@@ -1,7 +1,7 @@
 //go:build !ci
 // +build !ci
 
-package elastic
+package useless
 
 import (
 	"context"
@@ -17,11 +17,12 @@ import (
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/joho/godotenv"
+	"github.com/qubic/computors-consumer/elastic"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	elasticClient *Client
+	elasticClient *elastic.Client
 )
 
 func TestElasticClient_getLatestComputorsList(t *testing.T) {
@@ -87,5 +88,5 @@ func setup() {
 	if err != nil {
 		log.Fatalf("error creating elastic client: %v", err)
 	}
-	elasticClient = NewClient(esClient, cfg.Elastic.IndexName)
+	elasticClient = elastic.NewClient(esClient, cfg.Elastic.IndexName)
 }

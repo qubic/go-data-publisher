@@ -1,6 +1,6 @@
 module github.com/qubic/tick-data-publisher
 
-go 1.25.0
+go 1.26
 
 require (
 	github.com/ardanlabs/conf v1.5.0

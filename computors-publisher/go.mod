@@ -1,6 +1,6 @@
 module github.com/qubic/computors-publisher
 
-go 1.25.0
+go 1.26
 
 require (
 	github.com/ardanlabs/conf/v3 v3.10.0

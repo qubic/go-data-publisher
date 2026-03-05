@@ -1,6 +1,6 @@
 module github.com/qubic/tick-intervals-publisher
 
-go 1.25.5
+go 1.26
 
 require (
 	github.com/ardanlabs/conf v1.5.0
