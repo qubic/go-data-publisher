@@ -69,8 +69,7 @@ func (p *EpochComputorsProcessor) StartProcessing() error {
 func (p *EpochComputorsProcessor) process() error {
 	err := p.processEpochs()
 	if err != nil {
-		var kafkaErr *kerr.Error
-		if errors.As(err, &kafkaErr) { // go 1.26 would support errors.AsType
+		if kafkaErr, ok := errors.AsType[*kerr.Error](err); ok {
 			if !kafkaErr.Retriable {
 				return fmt.Errorf("non-retriable kafka error: %w", err)
 			}

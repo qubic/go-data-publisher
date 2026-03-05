@@ -65,8 +65,7 @@ func (p *TickIntervalProcessor) StartProcessing() error {
 func (p *TickIntervalProcessor) process() error {
 	err := p.processIntervals()
 	if err != nil {
-		var kafkaErr *kerr.Error
-		if errors.As(err, &kafkaErr) {
+		if kafkaErr, ok := errors.AsType[*kerr.Error](err); ok {
 			if !kafkaErr.Retriable {
 				return fmt.Errorf("non-retriable kafka error: %w", err)
 			}
