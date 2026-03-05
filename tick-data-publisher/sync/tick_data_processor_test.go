@@ -4,11 +4,13 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/qubic/tick-data-publisher/domain"
 	"github.com/qubic/tick-data-publisher/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 type FakeDataStore struct {
@@ -140,4 +142,61 @@ func TestTickDataProcessor_isEmpty(t *testing.T) {
 		Epoch:      666,
 	}))
 
+}
+
+type FakeProducerWithError struct {
+	err error
+}
+
+func (f *FakeProducerWithError) SendMessage(_ context.Context, _ *domain.TickData) error {
+	return f.err
+}
+
+func TestTickDataProcessor_StartProcessing_NonRetriableKafkaError(t *testing.T) {
+	dataStore := &FakeDataStore{}
+	archiveClient := &FakeArchiveClient{defaultCreateTickData}
+
+	// non-retriable Kafka error
+	nonRetriableErr := kerr.MessageTooLarge
+	producer := &FakeProducerWithError{err: nonRetriableErr}
+	processor := NewTickDataProcessor(dataStore, archiveClient, producer, 1, m)
+
+	// run with a timeout
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- processor.StartProcessing()
+	}()
+
+	// Wait for the error or timeout
+	select {
+	case err := <-errChan:
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "non-retriable kafka error")
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for non-retriable error")
+	}
+}
+
+func TestTickDataProcessor_StartProcessing_RetriableKafkaError(t *testing.T) {
+	dataStore := &FakeDataStore{}
+	archiveClient := &FakeArchiveClient{defaultCreateTickData}
+
+	// retriable Kafka error
+	retriableErr := kerr.LeaderNotAvailable
+	producer := &FakeProducerWithError{err: retriableErr}
+	processor := NewTickDataProcessor(dataStore, archiveClient, producer, 1, m)
+
+	// run with a short timeout
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- processor.StartProcessing()
+	}()
+
+	// wait briefly - should continue running with retriable errors
+	select {
+	case err := <-errChan:
+		t.Fatalf("StartProcessing should not exit on retriable error, but got: %v", err)
+	case <-time.After(2 * time.Second):
+		// expected - StartProcessing continues running with retriable errors
+	}
 }

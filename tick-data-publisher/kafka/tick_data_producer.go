@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/qubic/tick-data-publisher/domain"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
@@ -27,7 +27,7 @@ func (p *TickDataProducer) SendMessage(ctx context.Context, tickData *domain.Tic
 	}
 	// we produce synchronously here because we already parallelize before
 	if err = p.kcl.ProduceSync(ctx, record).FirstErr(); err != nil {
-		return errors.Wrap(err, "failed to produce record")
+		return fmt.Errorf("failed to produce record: %w", err)
 	}
 	return nil
 }
@@ -35,7 +35,7 @@ func (p *TickDataProducer) SendMessage(ctx context.Context, tickData *domain.Tic
 func createRecord(tickData *domain.TickData) (*kgo.Record, error) {
 	payload, err := json.Marshal(tickData)
 	if err != nil {
-		return nil, errors.Wrapf(err, "marshalling to json")
+		return nil, fmt.Errorf("marshalling to json: %w", err)
 	}
 	key := make([]byte, 4)
 	binary.LittleEndian.PutUint32(key, tickData.TickNumber)

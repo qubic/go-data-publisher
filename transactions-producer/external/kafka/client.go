@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -35,7 +34,7 @@ func (kc *Client) PublishTickTransactions(tickTransactions []entities.TickTransa
 
 		record, err := createTickTransactionsRecord(tick)
 		if err != nil {
-			log.Printf("Error while creating tick transactions record: %v", err)
+			log.Printf("Error while creating record: %v", err)
 			errorChannel <- err
 			break
 		}
@@ -44,7 +43,7 @@ func (kc *Client) PublishTickTransactions(tickTransactions []entities.TickTransa
 		kc.kcl.Produce(nil, record, func(_ *kgo.Record, err error) {
 			defer wg.Done()
 			if err != nil {
-				log.Printf("Error while producing transaction record: %v", err)
+				log.Printf("Error while producing record: %v", err)
 				errorChannel <- err
 				return
 			}
@@ -57,7 +56,7 @@ func (kc *Client) PublishTickTransactions(tickTransactions []entities.TickTransa
 
 	for err := range errorChannel {
 		if err != nil {
-			return errors.New("encountered errors while producing tick transaction records")
+			return fmt.Errorf("producing record: %w", err)
 		}
 	}
 

@@ -15,6 +15,7 @@ import (
 	"github.com/qubic/transactions-producer/infrastructure/store/pebbledb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/twmb/franz-go/pkg/kerr"
 	"go.uber.org/zap"
 )
 
@@ -65,14 +66,13 @@ func (mf *MockFetcher) GetTickTransactions(_ context.Context, tick uint32) ([]en
 
 type MockPublisher struct {
 	publishedTickTransactions []entities.TickTransactions
-	shouldError               bool
+	error                     error
 	locker                    sync.Mutex
 }
 
 func (mp *MockPublisher) PublishTickTransactions(tickTransactions []entities.TickTransactions) error {
-
-	if mp.shouldError {
-		return ErrMock
+	if mp.error != nil {
+		return mp.error
 	}
 	mp.locker.Lock() // increment might not work with many threads otherwise
 	mp.publishedTickTransactions = append(mp.publishedTickTransactions, tickTransactions...)
@@ -459,7 +459,9 @@ func TestTxProcessor_ProcessBatch(t *testing.T) {
 			startingTick := testRun.epochTickIntervals.Intervals[0].InitialProcessedTick
 			lastTick := testRun.epochTickIntervals.Intervals[len(testRun.epochTickIntervals.Intervals)-1].LastProcessedTick
 			fetcher.shouldError = testRun.shouldFetcherError
-			publisher.shouldError = testRun.shouldPublisherError
+			if testRun.shouldPublisherError {
+				publisher.error = ErrMock
+			}
 
 			lptExpected := startingTick
 			err = store.SetLastProcessedTick(startingTick)
@@ -486,5 +488,58 @@ func TestTxProcessor_ProcessBatch(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+func TestProcessor_Start_NonRetriableKafkaError(t *testing.T) {
+	dbDir, err := os.MkdirTemp("", "pebble_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(dbDir)
+
+	store, err := pebbledb.NewProcessorStore(dbDir)
+	require.NoError(t, err)
+	defer store.Close()
+	err = store.SetLastProcessedTick(0)
+	require.NoError(t, err)
+
+	logger, err := zap.NewDevelopment()
+	require.NoError(t, err)
+
+	fetcher := MockFetcher{
+		processedTickIntervalsPerEpoch: []entities.ProcessedTickIntervalsPerEpoch{
+			{
+				Epoch: 100,
+				Intervals: []entities.ProcessedTickInterval{
+					{
+						InitialProcessedTick: 10000001,
+						LastProcessedTick:    10000002,
+					},
+				},
+			},
+		},
+	}
+
+	// non-retriable kafka error
+	nonRetriableErr := kerr.MessageTooLarge
+
+	publisher := MockPublisher{
+		error: nonRetriableErr,
+	}
+
+	txProcessor := NewProcessor(&fetcher, time.Second, &publisher, store, 10, logger.Sugar(), metrics)
+
+	// run with a timeout
+	done := make(chan error, 1)
+	go func() {
+		done <- txProcessor.Start()
+	}()
+
+	// wait for the error or timeout
+	select {
+	case err := <-done:
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "non-retriable kafka error")
+	case <-time.After(5 * time.Second):
+		t.Fatal("Test timed out - Start() should have returned an error")
 	}
 }

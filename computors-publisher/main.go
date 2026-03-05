@@ -114,7 +114,8 @@ func run() error {
 	kafkaProducer := kafka.NewEpochComputorsProducer(kcl)
 
 	processor := sync.NewEpochComputorsProcessor(archiverClient, store, kafkaProducer, procMetrics)
-	go processor.StartProcessing()
+	procErr := make(chan error, 1)
+	go func() { procErr <- processor.StartProcessing() }()
 
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
@@ -143,11 +144,17 @@ func run() error {
 		case <-shutdown:
 			log.Println("main: Received shutdown signal, shutting down...")
 			return nil
+		case err := <-procErr:
+			if err != nil {
+				return fmt.Errorf("[ERROR] processing: %v", err)
+			} else {
+				log.Printf("main: Finished processing.")
+				return nil
+			}
 		case err := <-metricsError:
 			return fmt.Errorf("[ERROR] starting metrics server: %v", err)
 		case err := <-apiError:
 			return fmt.Errorf("[ERROR] starting api server: %v", err)
 		}
 	}
-	return nil
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/qubic/computors-publisher/domain"
 	"github.com/qubic/computors-publisher/metrics"
 	"github.com/qubic/go-qubic/common"
+	"github.com/twmb/franz-go/pkg/kerr"
 )
 
 type ArchiveClient interface {
@@ -48,21 +49,35 @@ func NewEpochComputorsProcessor(client ArchiveClient, store DataStore, producer 
 	}
 }
 
-func (p *EpochComputorsProcessor) StartProcessing() {
+func (p *EpochComputorsProcessor) StartProcessing() error {
 	// do one initial processing, so we do not wait until first tick
-	p.process()
+	err := p.process()
+	if err != nil {
+		return err
+	}
 	log.Println("Initial processing completed. Starting loop...")
 	ticker := time.Tick(time.Second * 10)
 	for range ticker {
-		p.process()
+		err = p.process()
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func (p *EpochComputorsProcessor) process() {
+func (p *EpochComputorsProcessor) process() error {
 	err := p.processEpochs()
 	if err != nil {
-		log.Printf("Error processing epoch computors: %v", err)
+		if kafkaErr, ok := errors.AsType[*kerr.Error](err); ok {
+			if !kafkaErr.Retriable {
+				return fmt.Errorf("non-retriable kafka error: %w", err)
+			}
+		}
+		// only exit, if non-retriable kafka error
+		log.Printf("Error processing computors: %v", err)
 	}
+	return nil
 }
 
 func (p *EpochComputorsProcessor) processEpochs() error {
@@ -95,7 +110,7 @@ func (p *EpochComputorsProcessor) processEpochs() error {
 	for _, epoch := range epochsToProcess {
 		err = p.processEpoch(epoch, status)
 		if err != nil {
-			return fmt.Errorf("processing epoch %d: %w", epoch, err)
+			return fmt.Errorf("processing epoch [%d]: %w", epoch, err)
 		}
 	}
 	p.processingMetrics.SetProcessedTick(archiverEpoch, archiverTick)
@@ -142,7 +157,7 @@ func (p *EpochComputorsProcessor) processEpoch(epoch uint32, status *domain.Stat
 		epochComputorList.Epoch, epochComputorList.TickNumber, epochComputorList.Signature)
 	err = p.Producer.SendMessage(context.Background(), epochComputorList)
 	if err != nil {
-		return fmt.Errorf("producing epoch computor list record for epoch [%d]: %w", epoch, err)
+		return fmt.Errorf("sending message: %w", err)
 	}
 	p.processingMetrics.SetProcessedTick(epochComputorList.Epoch, epochComputorList.TickNumber)
 	p.processingMetrics.IncProcessedMessages()

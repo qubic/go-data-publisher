@@ -1,20 +1,21 @@
 //go:build !ci
 // +build !ci
 
-package archiver
+package useless
 
 import (
 	"context"
 	"log"
 	"testing"
 
+	"github.com/qubic/tick-data-publisher/archiver"
 	"github.com/stretchr/testify/assert"
 )
 
 const url = "localhost:8001"
 
 func TestArchiverClient_getStatus(t *testing.T) {
-	client, err := NewClient(url)
+	client, err := archiver.NewClient(url)
 	assert.NoError(t, err)
 
 	status, err := client.GetStatus(context.Background())
@@ -28,7 +29,7 @@ func TestArchiverClient_getStatus(t *testing.T) {
 }
 
 func TestArchiverClient_getTickData(t *testing.T) {
-	client, err := NewClient(url)
+	client, err := archiver.NewClient(url)
 	assert.NoError(t, err)
 
 	tickData, err := client.GetTickData(context.Background(), 33717718)
@@ -40,7 +41,7 @@ func TestArchiverClient_getTickData(t *testing.T) {
 }
 
 func TestArchiverClient_getTickData_givenEmptyTick(t *testing.T) {
-	client, err := NewClient(url)
+	client, err := archiver.NewClient(url)
 	assert.NoError(t, err)
 
 	tickData, err := client.GetTickData(context.Background(), 33717719)

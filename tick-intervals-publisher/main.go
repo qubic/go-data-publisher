@@ -135,7 +135,7 @@ func run() error {
 	} else if len(cfg.Sync.PublishCustomEpochs) > 0 {
 		go func() { procErr <- processor.PublishCustomEpochs(cfg.Sync.PublishCustomEpochs) }()
 	} else {
-		go processor.StartProcessing()
+		go func() { procErr <- processor.StartProcessing() }()
 	}
 
 	shutdown := make(chan os.Signal, 1)
@@ -161,7 +161,7 @@ func run() error {
 			if err != nil {
 				return fmt.Errorf("[ERROR] processing: %v", err)
 			} else {
-				log.Printf("main: Finished proessing.")
+				log.Printf("main: Finished processing.")
 				return nil
 			}
 		case err := <-apiError:

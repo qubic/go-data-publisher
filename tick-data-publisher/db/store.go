@@ -2,13 +2,13 @@ package db
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"path/filepath"
 
 	"github.com/cockroachdb/pebble/v2"
-	"github.com/pkg/errors"
 )
 
 var ErrNotFound = errors.New("store resource not found")
@@ -35,7 +35,7 @@ func (ps *PebbleStore) SetLastProcessedTick(tick uint32) error {
 
 	err := ps.db.Set(key, value, pebble.Sync)
 	if err != nil {
-		return errors.Wrapf(err, "setting key [%s] to [%d]", lastProcessedTickKey, tick)
+		return fmt.Errorf("setting key [%s] to [%d]: %w", lastProcessedTickKey, tick, err)
 	}
 
 	return nil
@@ -50,7 +50,7 @@ func (ps *PebbleStore) GetLastProcessedTick() (tick uint32, err error) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
-		return 0, errors.Wrapf(err, "getting value for key [%s]", lastProcessedTickKey)
+		return 0, fmt.Errorf("getting value for key [%s]: %w", lastProcessedTickKey, err)
 	}
 	defer func(closer io.Closer) {
 		err := closer.Close()
@@ -67,7 +67,7 @@ func (ps *PebbleStore) deleteLastProcessedTick() error {
 	key := []byte(lastProcessedTickKey)
 	err := ps.db.Delete(key, pebble.Sync)
 	if err != nil {
-		return errors.Wrapf(err, "deleting key [%s]", lastProcessedTickKey)
+		return fmt.Errorf("deleting key [%s]: %w", lastProcessedTickKey, err)
 	}
 	return nil
 }
