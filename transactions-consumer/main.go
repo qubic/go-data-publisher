@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ardanlabs/conf"
+	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -114,6 +115,11 @@ func run() error {
 		RetryOnStatus: []int{502, 503, 504, 429},
 		MaxRetries:    cfg.Elastic.MaxRetries,
 		RetryBackoff:  calculateBackoff(),
+		Logger: extern.NewLogger(&elastictransport.TextLogger{
+			Output:             os.Stdout,
+			EnableRequestBody:  false,
+			EnableResponseBody: true, // Make response body available in the logger so we can log response
+		}),
 	})
 	var elasticClient consume.ElasticDocumentClient
 	if cfg.Elastic.Stub {
