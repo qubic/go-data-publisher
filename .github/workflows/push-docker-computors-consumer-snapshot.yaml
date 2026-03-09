@@ -1,4 +1,4 @@
-name: Create custom tick intervals consumer snapshot image
+name: Create custom computors consumer snapshot image
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./tick-intervals-consumer
-          file: ./tick-intervals-consumer/Dockerfile
+          context: ./computors-consumer
+          file: ./computors-consumer/Dockerfile
           push: true
-          tags: ghcr.io/qubic/tick-intervals-consumer:snapshot
+          tags: ghcr.io/qubic/computors-consumer:snapshot
