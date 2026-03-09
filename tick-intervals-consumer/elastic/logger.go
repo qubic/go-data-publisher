@@ -25,7 +25,7 @@ func (l *Logger) LogRoundTrip(request *http.Request, response *http.Response, er
 	}
 
 	// this filters for retriable errors
-	if response != nil && response.StatusCode > 201 {
+	if response != nil && response.StatusCode >= 400 {
 		return l.elasticLogger.LogRoundTrip(request, response, err, time, duration)
 	}
 	return nil
