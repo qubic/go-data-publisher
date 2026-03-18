@@ -4,75 +4,63 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/redis/go-redis/v9"
 )
 
 type EventsRedisClient struct {
-	rdb       *redis.Client
-	keyPrefix string
+	rdb     *redis.Client
+	keyName string
 }
 
 type EventsRedisClientCfg struct {
 	MasterName        string
 	SentinelAddresses []string
+	SentinelPassword  string
 	Password          string
 	Db                int
-	KeyPrefix         string
+	KeyName           string
 }
 
 func NewEventsClient(cfg EventsRedisClientCfg) *EventsRedisClient {
 	rdb := redis.NewFailoverClient(&redis.FailoverOptions{
-		MasterName:    cfg.MasterName,
-		SentinelAddrs: cfg.SentinelAddresses,
-		Password:      cfg.Password,
-		DB:            cfg.Db,
+		MasterName:       cfg.MasterName,
+		SentinelAddrs:    cfg.SentinelAddresses,
+		SentinelPassword: cfg.SentinelPassword,
+		Password:         cfg.Password,
+		DB:               cfg.Db,
 	})
 
 	return &EventsRedisClient{
-		rdb:       rdb,
-		keyPrefix: cfg.KeyPrefix,
+		rdb:     rdb,
+		keyName: cfg.KeyName,
 	}
 }
 
-func (er *EventsRedisClient) GetConsumedEventLogTick(ctx context.Context, tickNumber uint32) (consumedEventLogTick domain.RedisConsumedEventLogTick, exists bool, err error) {
-	key := fmt.Sprintf("%s%d", er.keyPrefix, tickNumber)
-	values, err := er.rdb.HGetAll(ctx, key).Result()
+func (er *EventsRedisClient) GetEventsLastIngestedTickStatus(ctx context.Context) (consumedEventLogTick domain.RedisEventsLastIngestedTickStatus, exists bool, err error) {
+	values, err := er.rdb.HGetAll(ctx, er.keyName).Result()
 	if err != nil {
-		return domain.RedisConsumedEventLogTick{}, false, fmt.Errorf("getting consumed event log tick hash from redis: %w", err)
+		return domain.RedisEventsLastIngestedTickStatus{}, false, fmt.Errorf("getting events last ingested tick status: %w", err)
 	}
 
 	if len(values) == 0 {
-		return domain.RedisConsumedEventLogTick{}, false, nil
+		return domain.RedisEventsLastIngestedTickStatus{}, false, nil
 	}
 
-	total, err := strconv.Atoi(values["total"])
+	tickNumber, err := strconv.ParseUint(values["tick"], 10, 32)
 	if err != nil {
-		return domain.RedisConsumedEventLogTick{}, false, fmt.Errorf("parsing total: %w", err)
+		return domain.RedisEventsLastIngestedTickStatus{}, false, fmt.Errorf("parsing tick number: %w", err)
 	}
 
-	stored, err := strconv.Atoi(values["stored"])
+	eventCount, err := strconv.ParseUint(values["logs"], 10, 32)
 	if err != nil {
-		return domain.RedisConsumedEventLogTick{}, false, fmt.Errorf("parsing stored: %w", err)
+		return domain.RedisEventsLastIngestedTickStatus{}, false, fmt.Errorf("parsing event count: %w", err)
 	}
 
-	dropped, err := strconv.Atoi(values["dropped"])
-	if err != nil {
-		return domain.RedisConsumedEventLogTick{}, false, fmt.Errorf("parsing dropped: %w", err)
-	}
-
-	timestampMs, err := strconv.ParseInt(values["timestamp"], 10, 64)
-	if err != nil {
-		return domain.RedisConsumedEventLogTick{}, false, fmt.Errorf("parsing timestamp: %w", err)
-	}
-
-	return domain.RedisConsumedEventLogTick{
-		Total:     total,
-		Stored:    stored,
-		Dropped:   dropped,
-		Timestamp: time.UnixMilli(timestampMs),
+	return domain.RedisEventsLastIngestedTickStatus{
+		TickNumber: uint32(tickNumber),
+		EventCount: uint32(eventCount),
 	}, true, nil
 }
 

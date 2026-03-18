@@ -23,7 +23,7 @@ func NewEventsClient(esClient *elasticsearch.Client, eventsIndex string) *Events
 	}
 }
 
-func (c *EventsClient) GetEventsCountForTick(ctx context.Context, tickNumber uint32) (int, error) {
+func (c *EventsClient) GetEventsCountForTick(ctx context.Context, tickNumber uint32) (uint32, error) {
 
 	res, err := c.esClient.Count(
 		c.esClient.Count.WithContext(ctx),
@@ -64,5 +64,5 @@ func (c *EventsClient) GetEventsCountForTick(ctx context.Context, tickNumber uin
 }
 
 type elasticCount struct {
-	Count int `json:"count"`
+	Count uint32 `json:"count"`
 }

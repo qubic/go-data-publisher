@@ -17,6 +17,7 @@ type Metrics struct {
 
 	eventsLastProcessedTickGauge prometheus.Gauge
 	eventsErrorGauge             prometheus.Gauge
+	eventsRedisLastIngestedTick  prometheus.Gauge
 }
 
 func NewMetrics(namespace string) *Metrics {
@@ -57,6 +58,12 @@ func NewMetrics(namespace string) *Metrics {
 			Name:      "errors_gauge",
 			Help:      "Number of occurred errors. Resets upon successful processing of a tick",
 		}),
+		eventsRedisLastIngestedTick: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "events",
+			Name:      "redis_last_ingested_tick",
+			Help:      "Last ingested tick reported by redis.",
+		}),
 	}
 	return &m
 }
@@ -83,6 +90,11 @@ func (m *Metrics) GetLastProcessedTick() uint32 {
 func (m *Metrics) SetEventsLastProcessedTick(tickNumber uint32) {
 	m.eventsLastProcessedTickGauge.Set(float64(tickNumber))
 }
+
 func (m *Metrics) SetEventsErrors(count uint) {
 	m.eventsErrorGauge.Set(float64(count))
+}
+
+func (m *Metrics) SetEventsRedisLastIngestedTick(tickNumber uint32) {
+	m.eventsRedisLastIngestedTick.Set(float64(tickNumber))
 }

@@ -66,11 +66,12 @@ func run() error {
 			Delay           time.Duration `conf:"default:800ms"`
 		}
 		EventsRedis struct {
-			MasterName        string   `conf:"default:mymaster"`
+			MasterName        string   `conf:"default:elastic-redis"`
 			SentinelAddresses []string `conf:"default:localhost:26379"`
+			SentinelPassword  string   `conf:"optional,mask"`
 			Password          string   `conf:"optional,mask"`
 			DB                int      `conf:"default:0"`
-			KeyPrefix         string   `conf:"default:eventTick-"`
+			KeyName           string   `conf:"default:tick:highest"`
 		}
 		Sync struct {
 			MetricsNamespace       string        `conf:"default:qubic_status_service"`
@@ -83,7 +84,6 @@ func run() error {
 			VerifyFullTickData     bool          `conf:"default:false"`
 			IntervalsCacheDuration time.Duration `conf:"default:1m"`
 			Events                 bool          `conf:"default:true"`
-			EventsStartTick        uint32        `conf:"optional"`
 		}
 	}
 
@@ -132,7 +132,7 @@ func run() error {
 	}
 	log.Printf("Resuming from tick: [%d].", startTick)
 
-	eventsStartTick, err := initializeEventsLastProcessedTick(cfg.Sync.EventsStartTick, store)
+	eventsStartTick, err := initializeEventsLastProcessedTick(store)
 	if err != nil {
 		return fmt.Errorf("initializing events last processed tick: %w", err)
 	}
@@ -172,9 +172,10 @@ func run() error {
 	eventsRedisClient := redis.NewEventsClient(redis.EventsRedisClientCfg{
 		MasterName:        cfg.EventsRedis.MasterName,
 		SentinelAddresses: cfg.EventsRedis.SentinelAddresses,
+		SentinelPassword:  cfg.EventsRedis.SentinelPassword,
 		Password:          cfg.EventsRedis.Password,
 		Db:                cfg.EventsRedis.DB,
-		KeyPrefix:         cfg.EventsRedis.KeyPrefix,
+		KeyName:           cfg.EventsRedis.KeyName,
 	})
 	defer eventsRedisClient.Close()
 
@@ -272,12 +273,16 @@ func initializeLastProcessedTick(startTick uint32, store *db.PebbleStore) (uint3
 	return lastProcessedTick, nil
 }
 
-func initializeEventsLastProcessedTick(startTick uint32, store *db.PebbleStore) (uint32, error) {
+func initializeEventsLastProcessedTick(store *db.PebbleStore) (uint32, error) {
 	lastProcessedTick, err := store.GetEventsLastProcessedTick()
-	if startTick > 0 || errors.Is(err, db.ErrNotFound) {
-		return startTick, store.SetEventsLastProcessedTick(startTick)
-	} else if err != nil {
-		return 0, errors.Wrap(err, "getting events last processed tick")
+	if err != nil {
+		if !errors.Is(err, db.ErrNotFound) {
+			return 0, fmt.Errorf("failed to read events last processed tick: %w", err)
+		}
+		err := store.SetEventsLastProcessedTick(0)
+		if err != nil {
+			return 0, fmt.Errorf("setting initial events last processed tick: %w", err)
+		}
 	}
 	return lastProcessedTick, nil
 }
