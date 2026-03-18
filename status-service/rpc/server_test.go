@@ -11,9 +11,10 @@ func TestStatusServiceServer_getStatus(t *testing.T) {
 	server := StatusServiceServer{
 		statusCache: &StatusService{
 			database: &FakeStatusProvider{
-				lastProcessedTick:   42,
-				processingEpoch:     43,
-				intervalInitialTick: 44,
+				lastProcessedTick:       42,
+				processingEpoch:         43,
+				intervalInitialTick:     44,
+				eventsLastProcessedTick: 31,
 			},
 		},
 	}
@@ -23,4 +24,5 @@ func TestStatusServiceServer_getStatus(t *testing.T) {
 	require.Equal(t, 42, int(response.LastProcessedTick))
 	require.Equal(t, 43, int(response.ProcessingEpoch))
 	require.Equal(t, 44, int(response.IntervalInitialTick))
+	require.Equal(t, 31, int(response.EventsLastProcessedTick))
 }
