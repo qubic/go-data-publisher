@@ -10,6 +10,7 @@ message GetStatusResponse {
   uint32 last_processed_tick = 1;
   uint32 processing_epoch = 2;
   uint32 interval_initial_tick = 3;
+  uint32 events_last_processed_tick = 4;
 }
 
 message GetHealthCheckResponse {

@@ -14,6 +14,9 @@ type Metrics struct {
 	processingTransactionsEpochGauge prometheus.Gauge
 	hasErrorGauge                    prometheus.Gauge
 	lastProcessedTick                uint32
+
+	eventsLastProcessedTickGauge prometheus.Gauge
+	eventsErrorGauge             prometheus.Gauge
 }
 
 func NewMetrics(namespace string) *Metrics {
@@ -40,25 +43,46 @@ func NewMetrics(namespace string) *Metrics {
 			Name: fmt.Sprintf("%s_has_error", namespace),
 			Help: "Number of subsequent processing errors",
 		}),
+
+		// Events processing related metrics
+		eventsLastProcessedTickGauge: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "events",
+			Name:      "last_processed_tick",
+			Help:      "Last processed events tick",
+		}),
+		eventsErrorGauge: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "events",
+			Name:      "errors_gauge",
+			Help:      "Number of occurred errors. Resets upon successful processing of a tick",
+		}),
 	}
 	return &m
 }
 
-func (metrics *Metrics) SetProcessedTransactionsTick(epoch uint32, tick uint32) {
-	metrics.lastProcessedTick = tick
-	metrics.processingTransactionsEpochGauge.Set(float64(epoch))
-	metrics.processedTransactionsTickGauge.Set(float64(tick))
+func (m *Metrics) SetProcessedTransactionsTick(epoch uint32, tick uint32) {
+	m.lastProcessedTick = tick
+	m.processingTransactionsEpochGauge.Set(float64(epoch))
+	m.processedTransactionsTickGauge.Set(float64(tick))
 }
 
-func (metrics *Metrics) SetSourceTick(epoch uint32, tick uint32) {
-	metrics.sourceEpochGauge.Set(float64(epoch))
-	metrics.sourceTickGauge.Set(float64(tick))
+func (m *Metrics) SetSourceTick(epoch uint32, tick uint32) {
+	m.sourceEpochGauge.Set(float64(epoch))
+	m.sourceTickGauge.Set(float64(tick))
 }
 
-func (metrics *Metrics) SetError(count uint) {
-	metrics.hasErrorGauge.Set(float64(count))
+func (m *Metrics) SetError(count uint) {
+	m.hasErrorGauge.Set(float64(count))
 }
 
-func (metrics *Metrics) GetLastProcessedTick() uint32 {
-	return metrics.lastProcessedTick
+func (m *Metrics) GetLastProcessedTick() uint32 {
+	return m.lastProcessedTick
+}
+
+func (m *Metrics) SetEventsLastProcessedTick(tickNumber uint32) {
+	m.eventsLastProcessedTickGauge.Set(float64(tickNumber))
+}
+func (m *Metrics) SetEventsErrors(count uint) {
+	m.eventsErrorGauge.Set(float64(count))
 }
