@@ -48,12 +48,12 @@ func (er *EventsRedisClient) GetEventsLastIngestedTickStatus(ctx context.Context
 		return domain.RedisEventsLastIngestedTickStatus{}, false, nil
 	}
 
-	tickNumber, err := strconv.ParseUint(values["tick"], 10, 32)
+	tickNumber, err := strconv.ParseUint(values["tickNumber"], 10, 32)
 	if err != nil {
 		return domain.RedisEventsLastIngestedTickStatus{}, false, fmt.Errorf("parsing tick number: %w", err)
 	}
 
-	eventCount, err := strconv.ParseUint(values["logs"], 10, 32)
+	eventCount, err := strconv.ParseUint(values["count"], 10, 32)
 	if err != nil {
 		return domain.RedisEventsLastIngestedTickStatus{}, false, fmt.Errorf("parsing event count: %w", err)
 	}
