@@ -15,18 +15,17 @@ type FakeEventsSearchClient struct {
 	err   error
 }
 
-func (f *FakeEventsSearchClient) GetEventsCountForTick(_ context.Context, _ uint32) (uint32, error) {
+func (f *FakeEventsSearchClient) GetLogCountForTick(_ context.Context, _ uint32) (uint32, error) {
 	return f.count, f.err
 }
 
 type FakeEventsRedisClient struct {
-	status domain.RedisEventsLastIngestedTickStatus
-	exists bool
+	status domain.RedisLogsLastIngestedTickStatus
 	err    error
 }
 
-func (f *FakeEventsRedisClient) GetEventsLastIngestedTickStatus(_ context.Context) (domain.RedisEventsLastIngestedTickStatus, bool, error) {
-	return f.status, f.exists, f.err
+func (f *FakeEventsRedisClient) GetLogLastIngestedTickStatus(_ context.Context) (domain.RedisLogsLastIngestedTickStatus, error) {
+	return f.status, f.err
 }
 
 type FakeEventsDataStore struct {
@@ -35,11 +34,11 @@ type FakeEventsDataStore struct {
 	setErr            error
 }
 
-func (f *FakeEventsDataStore) GetEventsLastProcessedTick() (uint32, error) {
+func (f *FakeEventsDataStore) GetLogLastProcessedTick() (uint32, error) {
 	return f.lastProcessedTick, f.getErr
 }
 
-func (f *FakeEventsDataStore) SetEventsLastProcessedTick(tick uint32) error {
+func (f *FakeEventsDataStore) SetLogLastProcessedTick(tick uint32) error {
 	if f.setErr != nil {
 		return f.setErr
 	}
@@ -56,12 +55,11 @@ func TestEventsProcessor_Sync_GivenMatchingCounts_ThenUpdateLastProcessedTick(t 
 		err:   nil,
 	}
 	fakeRedis := &FakeEventsRedisClient{
-		status: domain.RedisEventsLastIngestedTickStatus{
+		status: domain.RedisLogsLastIngestedTickStatus{
 			TickNumber: 32100000,
-			EventCount: 100,
+			LogCount:   100,
 		},
-		exists: true,
-		err:    nil,
+		err: nil,
 	}
 	fakeStore := &FakeEventsDataStore{
 		lastProcessedTick: 32000000,
@@ -69,7 +67,7 @@ func TestEventsProcessor_Sync_GivenMatchingCounts_ThenUpdateLastProcessedTick(t 
 		setErr:            nil,
 	}
 
-	eventsProcessor := NewEventsProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
+	eventsProcessor := NewLogProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
 	err := eventsProcessor.sync()
 	require.NoError(t, err)
 	require.Equal(t, uint32(32100000), fakeStore.lastProcessedTick)
@@ -82,12 +80,11 @@ func TestEventsProcessor_Sync_GivenMismatchingCounts_ThenError(t *testing.T) {
 		err:   nil,
 	}
 	fakeRedis := &FakeEventsRedisClient{
-		status: domain.RedisEventsLastIngestedTickStatus{
+		status: domain.RedisLogsLastIngestedTickStatus{
 			TickNumber: 32100000,
-			EventCount: 100,
+			LogCount:   100,
 		},
-		exists: true,
-		err:    nil,
+		err: nil,
 	}
 	fakeStore := &FakeEventsDataStore{
 		lastProcessedTick: 32000000,
@@ -95,7 +92,7 @@ func TestEventsProcessor_Sync_GivenMismatchingCounts_ThenError(t *testing.T) {
 		setErr:            nil,
 	}
 
-	eventsProcessor := NewEventsProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
+	eventsProcessor := NewLogProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
 	err := eventsProcessor.sync()
 	require.Error(t, err)
 	require.Equal(t, uint32(32000000), fakeStore.lastProcessedTick)
@@ -104,13 +101,13 @@ func TestEventsProcessor_Sync_GivenMismatchingCounts_ThenError(t *testing.T) {
 func TestEventsProcessor_Sync_GivenRedisKeyNotExists_ThenError(t *testing.T) {
 	fakeElastic := &FakeEventsSearchClient{}
 	fakeRedis := &FakeEventsRedisClient{
-		exists: false,
+		err: errors.New("expected test error"),
 	}
 	fakeStore := &FakeEventsDataStore{
 		lastProcessedTick: 32000000,
 	}
 
-	eventsProcessor := NewEventsProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
+	eventsProcessor := NewLogProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
 	err := eventsProcessor.sync()
 	require.Error(t, err)
 	require.Equal(t, uint32(32000000), fakeStore.lastProcessedTick)
@@ -119,17 +116,16 @@ func TestEventsProcessor_Sync_GivenRedisKeyNotExists_ThenError(t *testing.T) {
 func TestEventsProcessor_Sync_GivenAlreadyCaughtUp_ThenNoOp(t *testing.T) {
 	fakeElastic := &FakeEventsSearchClient{}
 	fakeRedis := &FakeEventsRedisClient{
-		status: domain.RedisEventsLastIngestedTickStatus{
+		status: domain.RedisLogsLastIngestedTickStatus{
 			TickNumber: 32000000,
-			EventCount: 50,
+			LogCount:   50,
 		},
-		exists: true,
 	}
 	fakeStore := &FakeEventsDataStore{
 		lastProcessedTick: 32000000,
 	}
 
-	eventsProcessor := NewEventsProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
+	eventsProcessor := NewLogProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
 	err := eventsProcessor.sync()
 	require.NoError(t, err)
 	require.Equal(t, uint32(32000000), fakeStore.lastProcessedTick)
@@ -140,17 +136,16 @@ func TestEventsProcessor_Sync_GivenElasticError_ThenError(t *testing.T) {
 		err: errors.New("es unavailable"),
 	}
 	fakeRedis := &FakeEventsRedisClient{
-		status: domain.RedisEventsLastIngestedTickStatus{
+		status: domain.RedisLogsLastIngestedTickStatus{
 			TickNumber: 32100000,
-			EventCount: 100,
+			LogCount:   100,
 		},
-		exists: true,
 	}
 	fakeStore := &FakeEventsDataStore{
 		lastProcessedTick: 32000000,
 	}
 
-	eventsProcessor := NewEventsProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
+	eventsProcessor := NewLogProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
 	err := eventsProcessor.sync()
 	require.Error(t, err)
 	require.Equal(t, uint32(32000000), fakeStore.lastProcessedTick)
@@ -165,7 +160,7 @@ func TestEventsProcessor_Sync_GivenRedisError_ThenError(t *testing.T) {
 		lastProcessedTick: 32000000,
 	}
 
-	eventsProcessor := NewEventsProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
+	eventsProcessor := NewLogProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
 	err := eventsProcessor.sync()
 	require.Error(t, err)
 	require.Equal(t, uint32(32000000), fakeStore.lastProcessedTick)
@@ -176,18 +171,17 @@ func TestEventsProcessor_Sync_GivenDataStoreSaveError_ThenError(t *testing.T) {
 		count: 100,
 	}
 	fakeRedis := &FakeEventsRedisClient{
-		status: domain.RedisEventsLastIngestedTickStatus{
+		status: domain.RedisLogsLastIngestedTickStatus{
 			TickNumber: 32100000,
-			EventCount: 100,
+			LogCount:   100,
 		},
-		exists: true,
 	}
 	fakeStore := &FakeEventsDataStore{
 		lastProcessedTick: 32000000,
 		setErr:            errors.New("disk full"),
 	}
 
-	eventsProcessor := NewEventsProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
+	eventsProcessor := NewLogProcessor(fakeElastic, fakeRedis, fakeStore, 0, eventsMetrics)
 	err := eventsProcessor.sync()
 	require.Error(t, err)
 	require.Equal(t, uint32(32000000), fakeStore.lastProcessedTick)

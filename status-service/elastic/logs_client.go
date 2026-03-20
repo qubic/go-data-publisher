@@ -11,24 +11,26 @@ import (
 	"github.com/elastic/go-elasticsearch/v8"
 )
 
-type EventsClient struct {
-	esClient    *elasticsearch.Client
-	eventsIndex string
+const logCountQuery = `{ "query": { "term": { "tickNumber": %d } } }`
+
+type LogsClient struct {
+	esClient       *elasticsearch.Client
+	logEventsIndex string
 }
 
-func NewEventsClient(esClient *elasticsearch.Client, eventsIndex string) *EventsClient {
-	return &EventsClient{
-		esClient:    esClient,
-		eventsIndex: eventsIndex,
+func NewLogsClient(esClient *elasticsearch.Client, logsIndex string) *LogsClient {
+	return &LogsClient{
+		esClient:       esClient,
+		logEventsIndex: logsIndex,
 	}
 }
 
-func (c *EventsClient) GetEventsCountForTick(ctx context.Context, tickNumber uint32) (uint32, error) {
+func (c *LogsClient) GetLogCountForTick(ctx context.Context, tickNumber uint32) (uint32, error) {
 
 	res, err := c.esClient.Count(
 		c.esClient.Count.WithContext(ctx),
-		c.esClient.Count.WithIndex(c.eventsIndex),
-		c.esClient.Count.WithBody(strings.NewReader(fmt.Sprintf(tickNumberQuery, tickNumber))),
+		c.esClient.Count.WithIndex(c.logEventsIndex),
+		c.esClient.Count.WithBody(strings.NewReader(fmt.Sprintf(logCountQuery, tickNumber))),
 	)
 	if err != nil {
 		return 0, fmt.Errorf("calling elastic: %w", err)

@@ -1,6 +1,6 @@
 package domain
 
-type RedisEventsLastIngestedTickStatus struct {
+type RedisLogsLastIngestedTickStatus struct {
 	TickNumber uint32
-	EventCount uint32
+	LogCount   uint32
 }

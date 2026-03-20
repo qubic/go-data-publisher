@@ -22,7 +22,7 @@ type StatusProvider interface {
 	GetCurrentIntervalInitialTick() (tick uint32, err error)
 	GetSkippedTicks() ([]uint32, error)
 	GetSourceStatus() (*domain.Status, error)
-	GetEventsLastProcessedTick() (tick uint32, err error)
+	GetLogLastProcessedTick() (tick uint32, err error)
 }
 
 type StatusService struct {
@@ -136,8 +136,8 @@ func (s *StatusService) GetArchiverStatusResponse() (*protobuf.GetArchiverStatus
 	return item.Value(), nil
 }
 
-func (s *StatusService) GetEventsLastProcessedTick() (tick uint32, err error) {
-	return s.database.GetEventsLastProcessedTick()
+func (s *StatusService) GetLogLastProcessedTick() (tick uint32, err error) {
+	return s.database.GetLogLastProcessedTick()
 }
 
 func (s *StatusService) getElasticIntervals(ctx context.Context, beforeEpoch uint32) ([]*domain.TickInterval, error) {

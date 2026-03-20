@@ -15,9 +15,9 @@ type Metrics struct {
 	hasErrorGauge                    prometheus.Gauge
 	lastProcessedTick                uint32
 
-	eventsLastProcessedTickGauge prometheus.Gauge
-	eventsErrorGauge             prometheus.Gauge
-	eventsRedisLastIngestedTick  prometheus.Gauge
+	logsLastProcessedTickGauge prometheus.Gauge
+	logsErrorGauge             prometheus.Gauge
+	logsRedisLastIngestedTick  prometheus.Gauge
 }
 
 func NewMetrics(namespace string) *Metrics {
@@ -31,7 +31,7 @@ func NewMetrics(namespace string) *Metrics {
 			Name: fmt.Sprintf("%s_processed_transactions_epoch", namespace),
 			Help: "The current processing epoch",
 		}),
-		// metrics for comparison to event source
+		// metrics for comparison to source
 		sourceTickGauge: promauto.NewGauge(prometheus.GaugeOpts{
 			Name: fmt.Sprintf("%s_source_tick", namespace),
 			Help: "The latest known source tick",
@@ -45,22 +45,22 @@ func NewMetrics(namespace string) *Metrics {
 			Help: "Number of subsequent processing errors",
 		}),
 
-		// Events processing related metrics
-		eventsLastProcessedTickGauge: promauto.NewGauge(prometheus.GaugeOpts{
+		// Logs processing related metrics
+		logsLastProcessedTickGauge: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Subsystem: "events",
+			Subsystem: "logs",
 			Name:      "last_processed_tick",
-			Help:      "Last processed events tick",
+			Help:      "Last processed logs tick",
 		}),
-		eventsErrorGauge: promauto.NewGauge(prometheus.GaugeOpts{
+		logsErrorGauge: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Subsystem: "events",
+			Subsystem: "logs",
 			Name:      "errors_gauge",
 			Help:      "Number of occurred errors. Resets upon successful processing of a tick",
 		}),
-		eventsRedisLastIngestedTick: promauto.NewGauge(prometheus.GaugeOpts{
+		logsRedisLastIngestedTick: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Subsystem: "events",
+			Subsystem: "logs",
 			Name:      "redis_last_ingested_tick",
 			Help:      "Last ingested tick reported by redis.",
 		}),
@@ -87,14 +87,14 @@ func (m *Metrics) GetLastProcessedTick() uint32 {
 	return m.lastProcessedTick
 }
 
-func (m *Metrics) SetEventsLastProcessedTick(tickNumber uint32) {
-	m.eventsLastProcessedTickGauge.Set(float64(tickNumber))
+func (m *Metrics) SetLogsLastProcessedTick(tickNumber uint32) {
+	m.logsLastProcessedTickGauge.Set(float64(tickNumber))
 }
 
-func (m *Metrics) SetEventsErrors(count uint) {
-	m.eventsErrorGauge.Set(float64(count))
+func (m *Metrics) SetLogsErrors(count uint) {
+	m.logsErrorGauge.Set(float64(count))
 }
 
-func (m *Metrics) SetEventsRedisLastIngestedTick(tickNumber uint32) {
-	m.eventsRedisLastIngestedTick.Set(float64(tickNumber))
+func (m *Metrics) SetLogsRedisLastIngestedTick(tickNumber uint32) {
+	m.logsRedisLastIngestedTick.Set(float64(tickNumber))
 }

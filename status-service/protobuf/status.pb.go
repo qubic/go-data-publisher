@@ -24,13 +24,13 @@ const (
 )
 
 type GetStatusResponse struct {
-	state                   protoimpl.MessageState `protogen:"open.v1"`
-	LastProcessedTick       uint32                 `protobuf:"varint,1,opt,name=last_processed_tick,json=lastProcessedTick,proto3" json:"last_processed_tick,omitempty"`
-	ProcessingEpoch         uint32                 `protobuf:"varint,2,opt,name=processing_epoch,json=processingEpoch,proto3" json:"processing_epoch,omitempty"`
-	IntervalInitialTick     uint32                 `protobuf:"varint,3,opt,name=interval_initial_tick,json=intervalInitialTick,proto3" json:"interval_initial_tick,omitempty"`
-	EventsLastProcessedTick uint32                 `protobuf:"varint,4,opt,name=events_last_processed_tick,json=eventsLastProcessedTick,proto3" json:"events_last_processed_tick,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	LastProcessedTick    uint32                 `protobuf:"varint,1,opt,name=last_processed_tick,json=lastProcessedTick,proto3" json:"last_processed_tick,omitempty"`
+	ProcessingEpoch      uint32                 `protobuf:"varint,2,opt,name=processing_epoch,json=processingEpoch,proto3" json:"processing_epoch,omitempty"`
+	IntervalInitialTick  uint32                 `protobuf:"varint,3,opt,name=interval_initial_tick,json=intervalInitialTick,proto3" json:"interval_initial_tick,omitempty"`
+	LastProcessedLogTick uint32                 `protobuf:"varint,4,opt,name=last_processed_log_tick,json=lastProcessedLogTick,proto3" json:"last_processed_log_tick,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *GetStatusResponse) Reset() {
@@ -84,9 +84,9 @@ func (x *GetStatusResponse) GetIntervalInitialTick() uint32 {
 	return 0
 }
 
-func (x *GetStatusResponse) GetEventsLastProcessedTick() uint32 {
+func (x *GetStatusResponse) GetLastProcessedLogTick() uint32 {
 	if x != nil {
-		return x.EventsLastProcessedTick
+		return x.LastProcessedLogTick
 	}
 	return 0
 }
@@ -616,12 +616,12 @@ var File_status_proto protoreflect.FileDescriptor
 
 const file_status_proto_rawDesc = "" +
 	"\n" +
-	"\fstatus.proto\x12\x11status.service.pb\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xdf\x01\n" +
+	"\fstatus.proto\x12\x11status.service.pb\x1a\x1cgoogle/api/annotations.proto\x1a\x1bgoogle/protobuf/empty.proto\"\xd9\x01\n" +
 	"\x11GetStatusResponse\x12.\n" +
 	"\x13last_processed_tick\x18\x01 \x01(\rR\x11lastProcessedTick\x12)\n" +
 	"\x10processing_epoch\x18\x02 \x01(\rR\x0fprocessingEpoch\x122\n" +
-	"\x15interval_initial_tick\x18\x03 \x01(\rR\x13intervalInitialTick\x12;\n" +
-	"\x1aevents_last_processed_tick\x18\x04 \x01(\rR\x17eventsLastProcessedTick\"0\n" +
+	"\x15interval_initial_tick\x18\x03 \x01(\rR\x13intervalInitialTick\x125\n" +
+	"\x17last_processed_log_tick\x18\x04 \x01(\rR\x14lastProcessedLogTick\"0\n" +
 	"\x16GetHealthCheckResponse\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\">\n" +
 	"\x17GetSkippedTicksResponse\x12#\n" +

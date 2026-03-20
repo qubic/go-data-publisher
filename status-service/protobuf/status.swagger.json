@@ -201,7 +201,7 @@
           "type": "integer",
           "format": "int64"
         },
-        "eventsLastProcessedTick": {
+        "lastProcessedLogTick": {
           "type": "integer",
           "format": "int64"
         }

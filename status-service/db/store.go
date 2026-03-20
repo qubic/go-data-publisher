@@ -24,7 +24,7 @@ const lastProcessedEpochKey = "lpe"
 const skippedTicksKey = "skipped"
 const processingStatusKey = "status"
 const initialTickOfCurrentTickRangeKey = "itoctrk"
-const lastProcessedEventsTickKey = "lpet"
+const lastProcessedLogTickKey = "lplt"
 
 type PebbleStore struct {
 	db *pebble.DB
@@ -110,11 +110,11 @@ func (ps *PebbleStore) GetSkippedTicks() ([]uint32, error) {
 	return tickList, nil
 }
 
-func (ps *PebbleStore) SetEventsLastProcessedTick(tick uint32) error {
-	return ps.setUint32(lastProcessedEventsTickKey, tick)
+func (ps *PebbleStore) SetLogLastProcessedTick(tick uint32) error {
+	return ps.setUint32(lastProcessedLogTickKey, tick)
 }
-func (ps *PebbleStore) GetEventsLastProcessedTick() (tick uint32, err error) {
-	return ps.getUint32(lastProcessedEventsTickKey)
+func (ps *PebbleStore) GetLogLastProcessedTick() (tick uint32, err error) {
+	return ps.getUint32(lastProcessedLogTickKey)
 }
 
 func (ps *PebbleStore) loadSkippedTicksSet() (map[string]bool, error) {

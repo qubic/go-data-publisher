@@ -83,7 +83,7 @@ func run() error {
 			TickData               bool          `conf:"default:true"`
 			VerifyFullTickData     bool          `conf:"default:false"`
 			IntervalsCacheDuration time.Duration `conf:"default:1m"`
-			Events                 bool          `conf:"default:true"`
+			EventLogs              bool          `conf:"default:true"`
 		}
 	}
 
@@ -132,11 +132,11 @@ func run() error {
 	}
 	log.Printf("Resuming from tick: [%d].", startTick)
 
-	eventsStartTick, err := initializeEventsLastProcessedTick(store)
+	logsStartTick, err := initializeLogsLastProcessedTick(store)
 	if err != nil {
-		return fmt.Errorf("initializing events last processed tick: %w", err)
+		return fmt.Errorf("initializing event logs last processed tick: %w", err)
 	}
-	log.Printf("Resuming events from tick: [%d].", eventsStartTick)
+	log.Printf("Resuming event logs from tick: [%d].", logsStartTick)
 
 	cert, err := os.ReadFile(cfg.Elastic.CertificatePath)
 	if err != nil {
@@ -153,31 +153,6 @@ func run() error {
 		return fmt.Errorf("creating elastic client: %w", err)
 	}
 	elasticClient := elastic.NewClient(esClient, cfg.Elastic.TransactionIndex, cfg.Elastic.TickDataIndex, cfg.Elastic.TickIntervalsIndex)
-
-	eventsCert, err := os.ReadFile(cfg.EventsElastic.CertificatePath)
-	if err != nil {
-		log.Printf("[WARN] main: could not read events elastic certificate: %v", err)
-	}
-	eventsEsClient, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses:     cfg.EventsElastic.Addresses,
-		Username:      cfg.EventsElastic.Username,
-		Password:      cfg.EventsElastic.Password,
-		CACert:        eventsCert,
-		RetryOnStatus: []int{502, 503, 504, 429},
-	})
-	if err != nil {
-		return fmt.Errorf("creating events elastic client: %w", err)
-	}
-	eventsElasticClient := elastic.NewEventsClient(eventsEsClient, cfg.EventsElastic.EventsIndex)
-	eventsRedisClient := redis.NewEventsClient(redis.EventsRedisClientCfg{
-		MasterName:        cfg.EventsRedis.MasterName,
-		SentinelAddresses: cfg.EventsRedis.SentinelAddresses,
-		SentinelPassword:  cfg.EventsRedis.SentinelPassword,
-		Password:          cfg.EventsRedis.Password,
-		Db:                cfg.EventsRedis.DB,
-		KeyName:           cfg.EventsRedis.KeyName,
-	})
-	defer eventsRedisClient.Close()
 
 	var cl sync.ArchiveClient
 	if cfg.Archiver.Legacy {
@@ -206,12 +181,38 @@ func run() error {
 		log.Println("[WARN] main: sync disabled")
 	}
 
-	eventsProcessor := sync.NewEventsProcessor(eventsElasticClient, eventsRedisClient, store, cfg.EventsElastic.Delay, m)
-	if cfg.Sync.Events {
-		go eventsProcessor.Synchronize()
-		log.Println("main: starting to process events")
+	if cfg.Sync.EventLogs {
+		eventLogsCert, err := os.ReadFile(cfg.EventsElastic.CertificatePath)
+		if err != nil {
+			log.Printf("[WARN] main: could not read event logs elastic certificate: %v", err)
+		}
+		eventLogsEsClient, err := elasticsearch.NewClient(elasticsearch.Config{
+			Addresses:     cfg.EventsElastic.Addresses,
+			Username:      cfg.EventsElastic.Username,
+			Password:      cfg.EventsElastic.Password,
+			CACert:        eventLogsCert,
+			RetryOnStatus: []int{502, 503, 504, 429},
+		})
+		if err != nil {
+			return fmt.Errorf("creating event logs elastic client: %w", err)
+		}
+		eventLogsElasticClient := elastic.NewLogsClient(eventLogsEsClient, cfg.EventsElastic.EventsIndex)
+		eventLogsRedisClient := redis.NewLogsClient(redis.LogsRedisClientCfg{
+			MasterName:           cfg.EventsRedis.MasterName,
+			SentinelAddresses:    cfg.EventsRedis.SentinelAddresses,
+			SentinelPassword:     cfg.EventsRedis.SentinelPassword,
+			Password:             cfg.EventsRedis.Password,
+			Db:                   cfg.EventsRedis.DB,
+			LogLastTickStatusKey: cfg.EventsRedis.KeyName,
+		})
+		defer eventLogsRedisClient.Close()
+
+		eventLogsProcessor := sync.NewLogProcessor(eventLogsElasticClient, eventLogsRedisClient, store, cfg.EventsElastic.Delay, m)
+
+		go eventLogsProcessor.Synchronize()
+		log.Println("main: starting to process event logs")
 	} else {
-		log.Println("[WARN] main: events sync disabled")
+		log.Println("[WARN] main: event logs sync disabled")
 	}
 
 	shutdown := make(chan os.Signal, 1)
@@ -273,15 +274,15 @@ func initializeLastProcessedTick(startTick uint32, store *db.PebbleStore) (uint3
 	return lastProcessedTick, nil
 }
 
-func initializeEventsLastProcessedTick(store *db.PebbleStore) (uint32, error) {
-	lastProcessedTick, err := store.GetEventsLastProcessedTick()
+func initializeLogsLastProcessedTick(store *db.PebbleStore) (uint32, error) {
+	lastProcessedTick, err := store.GetLogLastProcessedTick()
 	if err != nil {
 		if !errors.Is(err, db.ErrNotFound) {
-			return 0, fmt.Errorf("failed to read events last processed tick: %w", err)
+			return 0, fmt.Errorf("failed to read logs last processed tick: %w", err)
 		}
-		err := store.SetEventsLastProcessedTick(0)
+		err := store.SetLogLastProcessedTick(0)
 		if err != nil {
-			return 0, fmt.Errorf("setting initial events last processed tick: %w", err)
+			return 0, fmt.Errorf("setting initial logs last processed tick: %w", err)
 		}
 	}
 	return lastProcessedTick, nil

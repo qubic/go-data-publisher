@@ -40,7 +40,7 @@ func (f *FakeStatusProvider) GetSourceStatus() (*domain.Status, error) {
 	return f.sourceStatus, nil
 }
 
-func (f *FakeStatusProvider) GetEventsLastProcessedTick() (uint32, error) {
+func (f *FakeStatusProvider) GetLogLastProcessedTick() (uint32, error) {
 	return f.eventsLastProcessedTick, nil
 }
 
@@ -104,7 +104,7 @@ func TestStatusService_GetEventsLastProcessedTick(t *testing.T) {
 	statusService := &StatusService{
 		database: statusProvider,
 	}
-	tick, err := statusService.GetEventsLastProcessedTick()
+	tick, err := statusService.GetLogLastProcessedTick()
 	require.NoError(t, err)
 	assert.Equal(t, 32, int(tick))
 }
