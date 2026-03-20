@@ -21,6 +21,7 @@ import (
 	"github.com/qubic/go-data-publisher/status-service/elastic"
 	"github.com/qubic/go-data-publisher/status-service/metrics"
 	"github.com/qubic/go-data-publisher/status-service/protobuf"
+	"github.com/qubic/go-data-publisher/status-service/redis"
 	"github.com/qubic/go-data-publisher/status-service/rpc"
 	"github.com/qubic/go-data-publisher/status-service/sync"
 )
@@ -56,6 +57,22 @@ func run() error {
 			CertificatePath    string        `conf:"default:http_ca.crt"`
 			Delay              time.Duration `conf:"default:800ms"`
 		}
+		EventsElastic struct {
+			Addresses       []string      `conf:"default:https://localhost:9200"`
+			Username        string        `conf:"default:qubic-query"`
+			Password        string        `conf:"optional,mask"`
+			EventsIndex     string        `conf:"default:qubic-event-logs-read"`
+			CertificatePath string        `conf:"default:http_ca.crt"`
+			Delay           time.Duration `conf:"default:800ms"`
+		}
+		EventsRedis struct {
+			MasterName        string   `conf:"default:elastic-redis"`
+			SentinelAddresses []string `conf:"default:localhost:26379"`
+			SentinelPassword  string   `conf:"optional,mask"`
+			Password          string   `conf:"optional,mask"`
+			DB                int      `conf:"default:0"`
+			KeyName           string   `conf:"default:tick:highest"`
+		}
 		Sync struct {
 			MetricsNamespace       string        `conf:"default:qubic_status_service"`
 			InternalStoreFolder    string        `conf:"default:store"`
@@ -66,6 +83,7 @@ func run() error {
 			TickData               bool          `conf:"default:true"`
 			VerifyFullTickData     bool          `conf:"default:false"`
 			IntervalsCacheDuration time.Duration `conf:"default:1m"`
+			EventLogs              bool          `conf:"default:true"`
 		}
 	}
 
@@ -114,6 +132,12 @@ func run() error {
 	}
 	log.Printf("Resuming from tick: [%d].", startTick)
 
+	logsStartTick, err := initializeLogsLastProcessedTick(store)
+	if err != nil {
+		return fmt.Errorf("initializing event logs last processed tick: %w", err)
+	}
+	log.Printf("Resuming event logs from tick: [%d].", logsStartTick)
+
 	cert, err := os.ReadFile(cfg.Elastic.CertificatePath)
 	if err != nil {
 		log.Printf("[WARN] main: could not read elastic certificate: %v", err)
@@ -125,6 +149,9 @@ func run() error {
 		CACert:        cert,
 		RetryOnStatus: []int{502, 503, 504, 429},
 	})
+	if err != nil {
+		return fmt.Errorf("creating elastic client: %w", err)
+	}
 	elasticClient := elastic.NewClient(esClient, cfg.Elastic.TransactionIndex, cfg.Elastic.TickDataIndex, cfg.Elastic.TickIntervalsIndex)
 
 	var cl sync.ArchiveClient
@@ -152,6 +179,40 @@ func run() error {
 		log.Println("main: starting to process")
 	} else {
 		log.Println("[WARN] main: sync disabled")
+	}
+
+	if cfg.Sync.EventLogs {
+		eventLogsCert, err := os.ReadFile(cfg.EventsElastic.CertificatePath)
+		if err != nil {
+			log.Printf("[WARN] main: could not read event logs elastic certificate: %v", err)
+		}
+		eventLogsEsClient, err := elasticsearch.NewClient(elasticsearch.Config{
+			Addresses:     cfg.EventsElastic.Addresses,
+			Username:      cfg.EventsElastic.Username,
+			Password:      cfg.EventsElastic.Password,
+			CACert:        eventLogsCert,
+			RetryOnStatus: []int{502, 503, 504, 429},
+		})
+		if err != nil {
+			return fmt.Errorf("creating event logs elastic client: %w", err)
+		}
+		eventLogsElasticClient := elastic.NewLogsClient(eventLogsEsClient, cfg.EventsElastic.EventsIndex)
+		eventLogsRedisClient := redis.NewLogsClient(redis.LogsRedisClientCfg{
+			MasterName:           cfg.EventsRedis.MasterName,
+			SentinelAddresses:    cfg.EventsRedis.SentinelAddresses,
+			SentinelPassword:     cfg.EventsRedis.SentinelPassword,
+			Password:             cfg.EventsRedis.Password,
+			Db:                   cfg.EventsRedis.DB,
+			LogLastTickStatusKey: cfg.EventsRedis.KeyName,
+		})
+		defer eventLogsRedisClient.Close()
+
+		eventLogsProcessor := sync.NewLogProcessor(eventLogsElasticClient, eventLogsRedisClient, store, cfg.EventsElastic.Delay, m)
+
+		go eventLogsProcessor.Synchronize()
+		log.Println("main: starting to process event logs")
+	} else {
+		log.Println("[WARN] main: event logs sync disabled")
 	}
 
 	shutdown := make(chan os.Signal, 1)
@@ -209,7 +270,20 @@ func initializeLastProcessedTick(startTick uint32, store *db.PebbleStore) (uint3
 		return startTick, store.SetLastProcessedTick(startTick)
 	} else if err != nil {
 		return 0, errors.Wrap(err, "getting last processed tick")
-	} else {
-		return lastProcessedTick, nil
 	}
+	return lastProcessedTick, nil
+}
+
+func initializeLogsLastProcessedTick(store *db.PebbleStore) (uint32, error) {
+	lastProcessedTick, err := store.GetLogLastProcessedTick()
+	if err != nil {
+		if !errors.Is(err, db.ErrNotFound) {
+			return 0, fmt.Errorf("failed to read logs last processed tick: %w", err)
+		}
+		err := store.SetLogLastProcessedTick(0)
+		if err != nil {
+			return 0, fmt.Errorf("setting initial logs last processed tick: %w", err)
+		}
+	}
+	return lastProcessedTick, nil
 }

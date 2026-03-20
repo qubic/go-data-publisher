@@ -21,7 +21,7 @@ func (c *Client) GetTransactionHashes(ctx context.Context, tickNumber uint32) ([
 		return nil, fmt.Errorf("calling elastic: %w", err)
 	}
 	defer func(Body io.ReadCloser) {
-		err = Body.Close()
+		err := Body.Close()
 		if err != nil {
 			log.Printf("Error closing body: %v", err)
 		}

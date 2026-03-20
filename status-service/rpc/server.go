@@ -56,10 +56,17 @@ func (s *StatusServiceServer) GetStatus(context.Context, *emptypb.Empty) (*proto
 		return nil, status.Errorf(codes.Internal, "getting status")
 	}
 
+	lastProcessedLogTick, err := s.statusCache.GetLogLastProcessedTick()
+	if err != nil {
+		log.Printf("[ERROR] getting status (log last processed tick): %v", err)
+		return nil, status.Errorf(codes.Internal, "getting status")
+	}
+
 	return &protobuf.GetStatusResponse{
-		LastProcessedTick:   lastProcessedTick,
-		ProcessingEpoch:     lastProcessedEpoch,
-		IntervalInitialTick: initialTickOfCurrentTickRange,
+		LastProcessedTick:    lastProcessedTick,
+		ProcessingEpoch:      lastProcessedEpoch,
+		IntervalInitialTick:  initialTickOfCurrentTickRange,
+		LastProcessedLogTick: lastProcessedLogTick,
 	}, nil
 }
 

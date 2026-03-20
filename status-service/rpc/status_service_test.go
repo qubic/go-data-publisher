@@ -13,10 +13,11 @@ import (
 )
 
 type FakeStatusProvider struct {
-	lastProcessedTick   uint32
-	processingEpoch     uint32
-	intervalInitialTick uint32
-	sourceStatus        *domain.Status
+	lastProcessedTick       uint32
+	processingEpoch         uint32
+	intervalInitialTick     uint32
+	eventsLastProcessedTick uint32
+	sourceStatus            *domain.Status
 }
 
 func (f *FakeStatusProvider) GetCurrentIntervalInitialTick() (uint32, error) {
@@ -37,6 +38,10 @@ func (f *FakeStatusProvider) GetSkippedTicks() ([]uint32, error) {
 
 func (f *FakeStatusProvider) GetSourceStatus() (*domain.Status, error) {
 	return f.sourceStatus, nil
+}
+
+func (f *FakeStatusProvider) GetLogLastProcessedTick() (uint32, error) {
+	return f.eventsLastProcessedTick, nil
 }
 
 func (f *FakeStatusProvider) GetArchiverStatus() (*protobuf.GetArchiverStatusResponse, error) {
@@ -89,6 +94,19 @@ func TestStatusService_GetLastProcessedTick(t *testing.T) {
 	tick, err := statusService.GetLastProcessedTick()
 	require.NoError(t, err)
 	assert.Equal(t, 42, int(tick))
+}
+
+func TestStatusService_GetEventsLastProcessedTick(t *testing.T) {
+	statusProvider := &FakeStatusProvider{
+		eventsLastProcessedTick: 32,
+	}
+
+	statusService := &StatusService{
+		database: statusProvider,
+	}
+	tick, err := statusService.GetLogLastProcessedTick()
+	require.NoError(t, err)
+	assert.Equal(t, 32, int(tick))
 }
 
 func TestStatusService_GetLastProcessedEpoch(t *testing.T) {

@@ -200,6 +200,10 @@
         "intervalInitialTick": {
           "type": "integer",
           "format": "int64"
+        },
+        "lastProcessedLogTick": {
+          "type": "integer",
+          "format": "int64"
         }
       }
     },

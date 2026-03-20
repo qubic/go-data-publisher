@@ -145,3 +145,64 @@ func TestStore_GetProcessingStatus_GivenNone_thenError(t *testing.T) {
 	_, err = store.GetSourceStatus()
 	require.Error(t, err)
 }
+
+func TestPebbleStore_SetAndGetLogLastProcessedTick(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "processor_store_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	store, err := NewPebbleStore(tempDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	var tick uint32 = 321
+	err = store.SetLogLastProcessedTick(tick)
+	require.NoError(t, err)
+
+	retrievedTick, err := store.GetLogLastProcessedTick()
+	require.NoError(t, err)
+	require.Equal(t, tick, retrievedTick)
+}
+
+func TestPebbleStore_GetLogLastProcessedTickNotSet(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "processor_store_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	store, err := NewPebbleStore(tempDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	_, err = store.GetLogLastProcessedTick()
+	require.Error(t, err)
+	require.Equal(t, ErrNotFound, err)
+
+}
+
+func TestPebbleStore_UpdateLogLastProcessedTick(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "processor_store_test")
+	require.NoError(t, err)
+	defer os.RemoveAll(tempDir)
+
+	store, err := NewPebbleStore(tempDir)
+	require.NoError(t, err)
+	defer store.Close()
+
+	var initialTick uint32 = 321
+	var newTick uint32 = 654
+
+	err = store.SetLogLastProcessedTick(initialTick)
+	require.NoError(t, err)
+
+	retrievedTick, err := store.GetLogLastProcessedTick()
+	require.NoError(t, err)
+	require.Equal(t, initialTick, retrievedTick)
+
+	err = store.SetLogLastProcessedTick(newTick)
+	require.NoError(t, err)
+
+	retrievedTick, err = store.GetLogLastProcessedTick()
+	require.NoError(t, err)
+	require.Equal(t, newTick, retrievedTick)
+
+}
