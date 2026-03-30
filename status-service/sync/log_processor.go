@@ -62,12 +62,12 @@ func (ep *LogProcessor) sync() error {
 
 	lastProcessedTick, err := ep.dataStore.GetLogLastProcessedTick()
 	if err != nil {
-		return fmt.Errorf("getting logs last processed tick: %w", err)
+		return fmt.Errorf("getting last processed log tick: %w", err)
 	}
 
 	lastIngestedTickStatus, err := ep.redisClient.GetLogLastIngestedTickStatus(ctx)
 	if err != nil {
-		return fmt.Errorf("getting logs last ingested tick status from redis: %w", err)
+		return fmt.Errorf("getting last ingested log tick from redis: %w", err)
 	}
 
 	ep.metrics.SetLogsRedisLastIngestedTick(lastIngestedTickStatus.TickNumber)

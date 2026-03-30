@@ -41,11 +41,11 @@ func NewLogsClient(cfg LogsRedisClientCfg) *LogsRedisClient {
 func (er *LogsRedisClient) GetLogLastIngestedTickStatus(ctx context.Context) (consumedEventLogTick domain.RedisLogsLastIngestedTickStatus, err error) {
 	values, err := er.rdb.HGetAll(ctx, er.logLastTickStatusKey).Result()
 	if err != nil {
-		return domain.RedisLogsLastIngestedTickStatus{}, fmt.Errorf("getting log last ingested tick status: %w", err)
+		return domain.RedisLogsLastIngestedTickStatus{}, fmt.Errorf("getting last ingested log tick: %w", err)
 	}
 
 	if len(values) == 0 {
-		return domain.RedisLogsLastIngestedTickStatus{}, fmt.Errorf("not hash has been found at key %s", er.logLastTickStatusKey)
+		return domain.RedisLogsLastIngestedTickStatus{}, fmt.Errorf("no data found for key [%s]", er.logLastTickStatusKey)
 	}
 
 	tickNumber, err := strconv.ParseUint(values["tickNumber"], 10, 32)
