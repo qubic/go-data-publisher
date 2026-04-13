@@ -6,8 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"net/http"
-	"strconv"
+	"strings"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
@@ -32,18 +31,19 @@ func (c *Client) GetMinimalTickData(ctx context.Context, tickNumber uint32) (*Ti
 }
 
 func (c *Client) minimalTickDataCall(ctx context.Context, tickNumber uint32) (*esapi.Response, error) {
-	return c.esClient.Get(
-		c.tickDataIndex,
-		strconv.FormatUint(uint64(tickNumber), 10),
-		c.esClient.Get.WithContext(ctx),
-		c.esClient.Get.WithSource("epoch", "tickNumber", "signature"))
+	return c.esClient.Search(
+		c.esClient.Search.WithContext(ctx),
+		c.esClient.Search.WithIndex(c.tickDataIndex),
+		c.esClient.Search.WithBody(strings.NewReader(fmt.Sprintf(tickNumberQuery, tickNumber))),
+		c.esClient.Search.WithSource("epoch", "tickNumber", "signature"),
+	)
 }
 
 func (c *Client) fullTickDataCall(ctx context.Context, tickNumber uint32) (*esapi.Response, error) {
-	return c.esClient.Get(
-		c.tickDataIndex,
-		strconv.FormatUint(uint64(tickNumber), 10),
-		c.esClient.Get.WithContext(ctx),
+	return c.esClient.Search(
+		c.esClient.Search.WithContext(ctx),
+		c.esClient.Search.WithIndex(c.tickDataIndex),
+		c.esClient.Search.WithBody(strings.NewReader(fmt.Sprintf(tickNumberQuery, tickNumber))),
 	)
 }
 
@@ -59,13 +59,7 @@ func queryTickData(call func(c context.Context, tn uint32) (*esapi.Response, err
 		}
 	}(res.Body)
 
-	// return if there is no tick data (alternative would be to ignore status code and check found property)
-	if res.StatusCode == http.StatusNotFound {
-		log.Printf("[INFO] Elastic tick [%d]: no tick data.", tickNumber)
-		return nil, nil
-	}
-
-	if res.IsError() { // there could be some other status error
+	if res.IsError() {
 		var e map[string]interface{}
 		if err = json.NewDecoder(res.Body).Decode(&e); err != nil {
 			return nil, fmt.Errorf("decoding error information: %w", err)
@@ -76,12 +70,18 @@ func queryTickData(call func(c context.Context, tn uint32) (*esapi.Response, err
 		log.Printf("[WARN] elastic returned warnings: %v", res.Warnings())
 	}
 
-	var response elasticDocument
+	var response elasticHits
 	if err = json.NewDecoder(res.Body).Decode(&response); err != nil {
 		return nil, fmt.Errorf("decoding response information: %w", err)
 	}
+
+	if len(response.Hits.Hits) == 0 {
+		log.Printf("[INFO] Elastic tick [%d]: no tick data.", tickNumber)
+		return nil, nil
+	}
+
 	tickData := TickData{}
-	if err = json.Unmarshal(response.Source, &tickData); err != nil {
+	if err = json.Unmarshal(response.Hits.Hits[0].Source, &tickData); err != nil {
 		return nil, fmt.Errorf("unmarshalling hit.source: %w", err)
 	}
 

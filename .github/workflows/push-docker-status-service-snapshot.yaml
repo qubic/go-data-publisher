@@ -3,7 +3,7 @@ name: Create custom status service snapshot image
 on:
   push:
     branches:
-      - 'events-last-processed-tick'
+      - 'feature/search-not-get'
 
 jobs:
   docker-publish:
@@ -33,4 +33,4 @@ jobs:
           context: ./status-service
           file: ./status-service/Dockerfile
           push: true
-          tags: ghcr.io/qubic/status-service:events-last-processed-tick
+          tags: ghcr.io/qubic/status-service:snapshot
