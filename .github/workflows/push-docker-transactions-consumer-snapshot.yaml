@@ -3,7 +3,7 @@ name: Create custom transactions consumer snapshot image
 on:
   push:
     branches:
-      - improve-elastic-error-logs
+      - feature/split-eph-transactions
 
 jobs:
   docker-publish:
@@ -33,4 +33,4 @@ jobs:
           context: ./transactions-consumer
           file: ./transactions-consumer/Dockerfile
           push: true
-          tags: ghcr.io/qubic/transactions-consumer:snapshot
+          tags: ghcr.io/qubic/transactions-consumer:eph
