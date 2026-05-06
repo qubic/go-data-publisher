@@ -13,14 +13,12 @@ import (
 )
 
 type ElasticClient struct {
-	esClient  *elasticsearch.Client
-	indexName string
+	esClient *elasticsearch.Client
 }
 
-func NewElasticClient(esClient *elasticsearch.Client, indexName string) *ElasticClient {
+func NewElasticClient(esClient *elasticsearch.Client) *ElasticClient {
 	return &ElasticClient{
-		esClient:  esClient,
-		indexName: indexName,
+		esClient: esClient,
 	}
 }
 
@@ -29,11 +27,11 @@ type EsDocument struct {
 	Payload []byte
 }
 
-func (c *ElasticClient) BulkIndex(ctx context.Context, data []EsDocument) error {
+func (c *ElasticClient) BulkIndex(ctx context.Context, data []EsDocument, indexName string) error {
 	start := time.Now().UnixMilli()
 	bi, err := esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
-		Index:      c.indexName,              // The default index name
-		Client:     c.esClient,               // The Elasticsearch client
+		Index:      indexName,
+		Client:     c.esClient,
 		NumWorkers: min(runtime.NumCPU(), 8), // 8 parallel connections are enough
 	})
 	if err != nil {

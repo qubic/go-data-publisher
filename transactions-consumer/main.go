@@ -38,13 +38,14 @@ func run() error {
 
 	var cfg struct {
 		Elastic struct {
-			Addresses   []string `conf:"default:https://localhost:9200"`
-			Username    string   `conf:"default:qubic-ingestion"`
-			Password    string   `conf:"optional,mask"`
-			IndexName   string   `conf:"default:qubic-transactions-alias"`
-			Certificate string   `conf:"default:http_ca.crt"`
-			MaxRetries  int      `conf:"default:15"`
-			Stub        bool     `conf:"optional"` // only for testing
+			Addresses          []string `conf:"default:https://localhost:9200"`
+			Username           string   `conf:"default:qubic-ingestion"`
+			Password           string   `conf:"optional,mask"`
+			IndexName          string   `conf:"default:qubic-transactions-write"`
+			EphemeralIndexName string   `conf:"default:qubic-eph-transactions-write"`
+			Certificate        string   `conf:"default:http_ca.crt"`
+			MaxRetries         int      `conf:"default:15"`
+			Stub               bool     `conf:"optional"` // only for testing
 		}
 		Broker struct {
 			BootstrapServers []string `conf:"default:localhost:9092"`
@@ -54,7 +55,8 @@ func run() error {
 			ConsumerGroup    string   `conf:"default:qubic-elastic"`
 		}
 		Sync struct {
-			Enabled bool `conf:"default:true"` // only for testing
+			EphemeralInputTypes []uint32 `conf:"default:6"`
+			Enabled             bool     `conf:"default:true"` // only for testing
 		}
 	}
 
@@ -126,10 +128,15 @@ func run() error {
 		log.Printf("[WARN] main: Using stub ES client.")
 		elasticClient = &ElasticClientStub{}
 	} else {
-		elasticClient = extern.NewElasticClient(esClient, cfg.Elastic.IndexName)
+		elasticClient = extern.NewElasticClient(esClient)
 	}
 	processingMetrics := metrics.NewMetrics(cfg.Broker.MetricsNamespace)
-	consumer := consume.NewTransactionConsumer(kcl, elasticClient, processingMetrics)
+	consumerConfig := &consume.ConsumerConfig{
+		PermanentIndexName:  cfg.Elastic.IndexName,
+		EphemeralIndexName:  cfg.Elastic.EphemeralIndexName,
+		EphemeralInputTypes: cfg.Sync.EphemeralInputTypes,
+	}
+	consumer := consume.NewTransactionConsumer(kcl, elasticClient, processingMetrics, consumerConfig)
 	procError := make(chan error, 1)
 	if cfg.Sync.Enabled {
 		go func() {
@@ -187,6 +194,6 @@ func randomMillis() time.Duration {
 type ElasticClientStub struct {
 }
 
-func (c *ElasticClientStub) BulkIndex(_ context.Context, _ []extern.EsDocument) error {
+func (c *ElasticClientStub) BulkIndex(_ context.Context, _ []extern.EsDocument, _ string) error {
 	return nil
 }
