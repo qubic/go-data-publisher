@@ -55,7 +55,7 @@ func run() error {
 			ConsumerGroup    string   `conf:"default:qubic-elastic"`
 		}
 		Sync struct {
-			EphemeralInputTypes []uint32 `conf:"default:6"`
+			EphemeralInputTypes []uint32 `conf:"optional"`
 			Enabled             bool     `conf:"default:true"` // only for testing
 		}
 	}
