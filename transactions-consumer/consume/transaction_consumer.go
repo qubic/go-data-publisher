@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"slices"
 	"time"
 
 	"github.com/pkg/errors"
@@ -19,15 +20,24 @@ type KafkaClient interface {
 }
 
 type ElasticDocumentClient interface {
-	BulkIndex(ctx context.Context, data []extern.EsDocument) error
+	BulkIndex(ctx context.Context, data []extern.EsDocument, indexName string) error
+}
+
+type ConsumerConfig struct {
+	PermanentIndexName  string
+	EphemeralIndexName  string
+	EphemeralInputTypes []uint32
 }
 
 type TransactionConsumer struct {
-	kafkaClient     KafkaClient
-	elasticClient   ElasticDocumentClient
-	consumerMetrics *metrics.Metrics
-	currentTick     uint32
-	currentEpoch    uint32
+	kafkaClient         KafkaClient
+	elasticClient       ElasticDocumentClient
+	permanentIndexName  string
+	ephemeralIndexName  string
+	ephemeralInputTypes []uint32
+	consumerMetrics     *metrics.Metrics
+	currentTick         uint32
+	currentEpoch        uint32
 }
 
 type TickTransactions struct {
@@ -50,11 +60,14 @@ type Transaction struct {
 	MoneyFlew bool   `json:"moneyFlew"`
 }
 
-func NewTransactionConsumer(client KafkaClient, elasticClient ElasticDocumentClient, m *metrics.Metrics) *TransactionConsumer {
+func NewTransactionConsumer(client KafkaClient, elasticClient ElasticDocumentClient, m *metrics.Metrics, config *ConsumerConfig) *TransactionConsumer {
 	return &TransactionConsumer{
-		kafkaClient:     client,
-		consumerMetrics: m,
-		elasticClient:   elasticClient,
+		kafkaClient:         client,
+		consumerMetrics:     m,
+		elasticClient:       elasticClient,
+		permanentIndexName:  config.PermanentIndexName,
+		ephemeralIndexName:  config.EphemeralIndexName,
+		ephemeralInputTypes: config.EphemeralInputTypes,
 	}
 }
 
@@ -64,7 +77,7 @@ func (c *TransactionConsumer) Consume() error {
 		if err == nil {
 			log.Printf("Processed [%d] transactions. Latest tick: [%d]", count, c.currentTick)
 		} else {
-			// if there is an error consuming we abort. We need to fix the error before trying again.
+			// if there is an error consuming, we abort. We need to fix the error before trying again.
 			log.Printf("Error consuming batch: %v", err) // exits
 			return errors.Wrap(err, "consuming batch")
 		}
@@ -85,7 +98,8 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 		return -1, errors.New("fetching records")
 	}
 
-	var documents []extern.EsDocument
+	var permanentDocuments []extern.EsDocument
+	var ephemeralDocuments []extern.EsDocument
 	iter := fetches.RecordIter()
 	for !iter.Done() {
 		record := iter.Next()
@@ -101,10 +115,14 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 			if err != nil {
 				return -1, errors.Wrapf(err, "unmarshalling transaction %+v", transaction)
 			}
-			documents = append(documents, extern.EsDocument{
-				Id:      transaction.Hash,
-				Payload: val,
-			})
+			document := extern.EsDocument{Id: transaction.Hash, Payload: val}
+
+			if c.isEphemeral(transaction.InputType, transaction.Dest) {
+				ephemeralDocuments = append(ephemeralDocuments, document)
+			} else {
+				permanentDocuments = append(permanentDocuments, document)
+			}
+
 		}
 
 		// on the initial sync metrics will be wrong because the publisher publishes multiple epochs in parallel, but we
@@ -117,17 +135,28 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 		c.consumerMetrics.IncProcessedMessages()
 	}
 
-	err := c.elasticClient.BulkIndex(ctx, documents)
+	err := c.elasticClient.BulkIndex(ctx, ephemeralDocuments, c.ephemeralIndexName)
 	if err != nil {
-		return -1, errors.Wrapf(err, "bulk indexing [%d] documents.", len(documents))
+		return -1, errors.Wrapf(err, "bulk indexing [%d] documents (eph).", len(ephemeralDocuments))
 	}
+
+	err = c.elasticClient.BulkIndex(ctx, permanentDocuments, c.permanentIndexName)
+	if err != nil {
+		return -1, errors.Wrapf(err, "bulk indexing [%d] documents.", len(permanentDocuments))
+	}
+
 	c.consumerMetrics.SetProcessedTick(c.currentEpoch, c.currentTick)
 
 	err = c.kafkaClient.CommitUncommittedOffsets(ctx)
 	if err != nil {
 		return -1, errors.Wrap(err, "committing offsets")
 	}
-	return len(documents), nil
+	return len(permanentDocuments) + len(ephemeralDocuments), nil
+}
+
+func (c *TransactionConsumer) isEphemeral(inputType uint32, dest string) bool {
+	const zeroAddress = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFXIB"
+	return len(c.ephemeralInputTypes) > 0 && slices.Contains(c.ephemeralInputTypes, inputType) && dest == zeroAddress
 }
 
 func unmarshalTickTransactions(record *kgo.Record, tickTransactions *TickTransactions) error {
