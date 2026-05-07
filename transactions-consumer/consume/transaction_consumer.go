@@ -117,7 +117,7 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 			}
 			document := extern.EsDocument{Id: transaction.Hash, Payload: val}
 
-			if c.isEphemeral(transaction.InputType, transaction.Dest) {
+			if c.isEphemeral(transaction.InputType, transaction.Dest, transaction.Amount) {
 				ephemeralDocuments = append(ephemeralDocuments, document)
 			} else {
 				permanentDocuments = append(permanentDocuments, document)
@@ -158,9 +158,12 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 	return len(permanentDocuments) + len(ephemeralDocuments), nil
 }
 
-func (c *TransactionConsumer) isEphemeral(inputType uint32, dest string) bool {
+func (c *TransactionConsumer) isEphemeral(inputType uint32, dest string, amount int64) bool {
 	const zeroAddress = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFXIB"
-	return len(c.ephemeralInputTypes) > 0 && slices.Contains(c.ephemeralInputTypes, inputType) && dest == zeroAddress
+	return len(c.ephemeralInputTypes) > 0 &&
+		slices.Contains(c.ephemeralInputTypes, inputType) &&
+		dest == zeroAddress &&
+		amount == 0
 }
 
 func unmarshalTickTransactions(record *kgo.Record, tickTransactions *TickTransactions) error {
