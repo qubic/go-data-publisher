@@ -135,19 +135,23 @@ func (c *TransactionConsumer) consumeBatch() (int, error) {
 		c.consumerMetrics.IncProcessedMessages()
 	}
 
-	err := c.elasticClient.BulkIndex(ctx, ephemeralDocuments, c.ephemeralIndexName)
-	if err != nil {
-		return -1, errors.Wrapf(err, "bulk indexing [%d] documents (eph).", len(ephemeralDocuments))
+	if len(ephemeralDocuments) != 0 {
+		err := c.elasticClient.BulkIndex(ctx, ephemeralDocuments, c.ephemeralIndexName)
+		if err != nil {
+			return -1, errors.Wrapf(err, "bulk indexing [%d] documents (eph).", len(ephemeralDocuments))
+		}
 	}
 
-	err = c.elasticClient.BulkIndex(ctx, permanentDocuments, c.permanentIndexName)
-	if err != nil {
-		return -1, errors.Wrapf(err, "bulk indexing [%d] documents.", len(permanentDocuments))
+	if len(permanentDocuments) != 0 {
+		err := c.elasticClient.BulkIndex(ctx, permanentDocuments, c.permanentIndexName)
+		if err != nil {
+			return -1, errors.Wrapf(err, "bulk indexing [%d] documents.", len(permanentDocuments))
+		}
 	}
 
 	c.consumerMetrics.SetProcessedTick(c.currentEpoch, c.currentTick)
 
-	err = c.kafkaClient.CommitUncommittedOffsets(ctx)
+	err := c.kafkaClient.CommitUncommittedOffsets(ctx)
 	if err != nil {
 		return -1, errors.Wrap(err, "committing offsets")
 	}

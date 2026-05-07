@@ -69,10 +69,11 @@ func (c *ElasticClient) BulkIndex(ctx context.Context, data []EsDocument, indexN
 			biStats.NumFlushed,
 		)
 	} else {
-		log.Printf("Indexed %d documents (%d bytes, %d requests) in %dms.",
+		log.Printf("Indexed %d documents (%d bytes, %d requests) into %s in %dms.",
 			biStats.NumFlushed,
 			biStats.FlushedBytes,
 			biStats.NumRequests,
+			indexName,
 			end-start,
 		)
 	}
