@@ -143,7 +143,9 @@ func (p *Processor) processTickRange(epoch, from, to uint32) error {
 			}
 
 			batchSize := len(nextTicks)
-			p.logger.Infow("Published tick transactions", "nr_ticks", batchSize, "epoch", epoch, "tick", tick)
+			if batchSize > 1 {
+				p.logger.Infow("Published batch", "count", batchSize, "epoch", epoch, "tick", tick)
+			}
 			p.syncMetrics.IncProcessedTicks(batchSize)
 			p.syncMetrics.SetProcessedTick(epoch, tick)
 			nextTicks = nil
@@ -165,14 +167,20 @@ func (p *Processor) processTickRangeParallel(epoch uint32, ticks []uint32) error
 func (p *Processor) processTick(epoch, tick uint32) error {
 	ctx, cancel := context.WithTimeout(context.Background(), p.fetchTimeout)
 	defer cancel()
+
+	fetchStart := time.Now()
 	transactions, err := p.fetcher.GetTickTransactions(ctx, tick)
+	fetchDuration := time.Since(fetchStart)
 	if err != nil {
 		return fmt.Errorf("fetching transactions: %w", err)
 	}
 	if len(transactions) == 0 {
-		p.logger.Infow("Skipping tick without transactions", "epoch", epoch, "tick", tick)
+		p.logger.Infow("Skipping tick without transactions", "epoch", epoch, "tick", tick, "fetch", fetchDuration.Milliseconds())
 	} else {
+		publishStart := time.Now()
 		err = p.publisher.PublishTickTransactions(transactions)
+		publishDuration := time.Since(publishStart)
+		p.logger.Infow("Published tick", "tick", tick, "transactions", len(transactions), "fetch-ms", fetchDuration.Milliseconds(), "publish-ms", publishDuration.Milliseconds())
 		if err != nil {
 			// extra log so that we know what tick failed
 			p.logger.Errorw("Error publishing tick transactions", "epoch", epoch, "tick", tick, "error", err)

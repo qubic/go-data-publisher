@@ -35,6 +35,7 @@ func main() {
 
 func run() error {
 	config := zap.NewProductionConfig()
+	config.Encoding = "console"
 	// this is just for sugar, to display a readable date instead of an epoch time
 	config.EncoderConfig.EncodeTime = zapcore.TimeEncoderOfLayout(time.DateTime)
 
@@ -49,7 +50,7 @@ func run() error {
 		InternalStoreFolder            string        `conf:"default:store"`
 		ArchiverGrpcHost               string        `conf:"default:127.0.0.1:6001"`
 		ArchiverReadTimeout            time.Duration `conf:"default:30s"`
-		NrWorkers                      int           `conf:"default:20"`
+		NrWorkers                      int           `conf:"default:1"`
 		PublishCustomTicks             []uint32      `conf:"optional"`
 		OverrideLastProcessedTick      bool          `conf:"default:false"`
 		OverrideLastProcessedTickValue uint32        `conf:"default:0"`
