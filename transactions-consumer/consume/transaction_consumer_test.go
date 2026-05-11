@@ -145,6 +145,7 @@ func TestTransactionConsumer_IsEphemeral(t *testing.T) {
 		ephemeralInputTypes []uint32
 		inputType           uint32
 		dest                string
+		amount              int64
 		want                bool
 	}{
 		{
@@ -152,6 +153,7 @@ func TestTransactionConsumer_IsEphemeral(t *testing.T) {
 			ephemeralInputTypes: []uint32{1, 2, 3},
 			inputType:           2,
 			dest:                zeroAddress,
+			amount:              0,
 			want:                true,
 		},
 		{
@@ -159,6 +161,7 @@ func TestTransactionConsumer_IsEphemeral(t *testing.T) {
 			ephemeralInputTypes: []uint32{},
 			inputType:           2,
 			dest:                zeroAddress,
+			amount:              0,
 			want:                false,
 		},
 		{
@@ -166,6 +169,7 @@ func TestTransactionConsumer_IsEphemeral(t *testing.T) {
 			ephemeralInputTypes: nil,
 			inputType:           2,
 			dest:                zeroAddress,
+			amount:              0,
 			want:                false,
 		},
 		{
@@ -173,6 +177,7 @@ func TestTransactionConsumer_IsEphemeral(t *testing.T) {
 			ephemeralInputTypes: []uint32{1, 3},
 			inputType:           2,
 			dest:                zeroAddress,
+			amount:              0,
 			want:                false,
 		},
 		{
@@ -180,6 +185,15 @@ func TestTransactionConsumer_IsEphemeral(t *testing.T) {
 			ephemeralInputTypes: []uint32{1, 2, 3},
 			inputType:           2,
 			dest:                otherAddress,
+			amount:              0,
+			want:                false,
+		},
+		{
+			name:                "positive amount - not ephemeral",
+			ephemeralInputTypes: []uint32{1, 2, 3},
+			inputType:           2,
+			dest:                zeroAddress,
+			amount:              1,
 			want:                false,
 		},
 	}
@@ -187,7 +201,7 @@ func TestTransactionConsumer_IsEphemeral(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &TransactionConsumer{ephemeralInputTypes: tt.ephemeralInputTypes}
-			got := c.isEphemeral(tt.inputType, tt.dest)
+			got := c.isEphemeral(tt.inputType, tt.dest, tt.amount)
 			assert.Equal(t, tt.want, got)
 		})
 	}
