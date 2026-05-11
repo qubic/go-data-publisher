@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"testing"
 
@@ -11,13 +12,15 @@ import (
 )
 
 type MockKafkaClient struct {
-	shouldError  bool
-	MessageCount uint
+	shouldError     bool
+	MessageCount    uint
+	ProducedRecords []*kgo.Record
 }
 
-func (mkc *MockKafkaClient) Produce(_ context.Context, _ *kgo.Record, promise func(*kgo.Record, error)) {
+func (mkc *MockKafkaClient) Produce(_ context.Context, r *kgo.Record, promise func(*kgo.Record, error)) {
 
 	mkc.MessageCount++
+	mkc.ProducedRecords = append(mkc.ProducedRecords, r)
 
 	if mkc.shouldError {
 		go promise(nil, errors.New("dummy error"))
@@ -112,4 +115,57 @@ func TestClient_PublishTransactions(t *testing.T) {
 
 		})
 	}
+}
+
+func TestClient_PublishTransactions_JsonPayload(t *testing.T) {
+	tx1 := entities.Tx{
+		TxID:       "nagnkafzthqkxvbdewcrypgvkwdzkbbyupekzxpyrtdvvmqgugxbdhvmhvef",
+		SourceID:   "BTDXTBFYNBMVCGYBRRTNBZAFUBZNTWSRNSLGMTKGTBNJZTPXJLFHNSLVVQGY",
+		DestID:     "RLRNPMAFKPPLUZQXJLTTNFSCJMQEHWMWDVJHMAMZGAMEQWSDUFRJKHLCLDTD",
+		Amount:     100,
+		TickNumber: 50000017,
+		Signature:  "aabbcc",
+		Timestamp:  1744610180,
+		MoneyFlew:  true,
+	}
+	tx2 := entities.Tx{
+		TxID:       "nwybffwfxkkvuuaxmqyhnqnpxpkywjuxrhhrnacfahfdfbvrthvqayzimhmr",
+		SourceID:   "DXQWUEYPBRQPCWLSERRGSSNKNVXHZRCQJBFSWBYRVQHGCWGNXFJZBYEESUCY",
+		DestID:     "FVFNJFSPEVHAZQUSDREUKDEGHNKCZJAYYRLMKVFYCDYYVKYGEUFKRSTTWUFB",
+		Amount:     1,
+		TickNumber: 50000017,
+		InputType:  2,
+		InputSize:  3,
+		Input:      "blah",
+		Signature:  "ddeeff",
+		Timestamp:  1744610180,
+		MoneyFlew:  false,
+	}
+
+	mockClient := &MockKafkaClient{}
+	kc := NewClient(mockClient)
+
+	err := kc.PublishTickTransactions(entities.TickTransactions{
+		Epoch:        100,
+		TickNumber:   50000017,
+		Transactions: []entities.Tx{tx1, tx2},
+	})
+	assert.NoError(t, err)
+	assert.Len(t, mockClient.ProducedRecords, 2)
+
+	expectedJson1 := `{"hash":"nagnkafzthqkxvbdewcrypgvkwdzkbbyupekzxpyrtdvvmqgugxbdhvmhvef",
+						"source":"BTDXTBFYNBMVCGYBRRTNBZAFUBZNTWSRNSLGMTKGTBNJZTPXJLFHNSLVVQGY",
+						"destination":"RLRNPMAFKPPLUZQXJLTTNFSCJMQEHWMWDVJHMAMZGAMEQWSDUFRJKHLCLDTD",
+						"amount":100,"tickNumber":50000017,"inputType":0,"inputSize":0,"inputData":"",
+						"signature":"aabbcc","timestamp":1744610180,"moneyFlew":true}`
+	expectedJson2 := `{"hash":"nwybffwfxkkvuuaxmqyhnqnpxpkywjuxrhhrnacfahfdfbvrthvqayzimhmr",
+						"source":"DXQWUEYPBRQPCWLSERRGSSNKNVXHZRCQJBFSWBYRVQHGCWGNXFJZBYEESUCY",
+						"destination":"FVFNJFSPEVHAZQUSDREUKDEGHNKCZJAYYRLMKVFYCDYYVKYGEUFKRSTTWUFB",
+						"amount":1,"tickNumber":50000017,"inputType":2,"inputSize":3,"inputData":"blah",
+						"signature":"ddeeff","timestamp":1744610180,"moneyFlew":false}`
+	assert.JSONEq(t, expectedJson1, string(mockClient.ProducedRecords[0].Value))
+	assert.JSONEq(t, expectedJson2, string(mockClient.ProducedRecords[1].Value))
+	assert.Equal(t, 50000017, int(binary.LittleEndian.Uint32(mockClient.ProducedRecords[0].Key)))
+	assert.Equal(t, 50000017, int(binary.LittleEndian.Uint32(mockClient.ProducedRecords[1].Key)))
+
 }
