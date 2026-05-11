@@ -11,17 +11,17 @@ import (
 // the deserialization will fail and/or ingesting to elastic will not work.
 func TestTransaction_MarshalAndUnmarshal(t *testing.T) {
 	transaction := &Transaction{
-		Hash:       "transaction-hash",
-		Source:     "source-identity",
-		Dest:       "destination-identity",
-		Amount:     1,
-		TickNumber: 2,
-		InputType:  3,
-		InputSize:  4,
-		InputData:  "input-data",
-		Signature:  "signature",
-		Timestamp:  5,
-		MoneyFlew:  true,
+		Hash:        "transaction-hash",
+		Source:      "source-identity",
+		Destination: "destination-identity",
+		Amount:      1,
+		TickNumber:  2,
+		InputType:   3,
+		InputSize:   4,
+		InputData:   "input-data",
+		Signature:   "signature",
+		Timestamp:   5,
+		MoneyFlew:   true,
 	}
 
 	expectedJson := `{"hash":"transaction-hash","source":"source-identity","destination":"destination-identity","amount":1,"tickNumber":2,"inputType":3,"inputSize":4,"inputData":"input-data","signature":"signature","timestamp":5,"moneyFlew":true}`

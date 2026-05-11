@@ -44,17 +44,17 @@ type TransactionConsumer struct {
 }
 
 type Transaction struct {
-	Hash       string `json:"hash"`
-	Source     string `json:"source"`
-	Dest       string `json:"destination"`
-	Amount     int64  `json:"amount"`
-	TickNumber uint32 `json:"tickNumber"`
-	InputType  uint32 `json:"inputType"`
-	InputSize  uint32 `json:"inputSize"`
-	InputData  string `json:"inputData"`
-	Signature  string `json:"signature"`
-	Timestamp  uint64 `json:"timestamp"`
-	MoneyFlew  bool   `json:"moneyFlew"`
+	Hash        string `json:"hash"`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	Amount      int64  `json:"amount"`
+	TickNumber  uint32 `json:"tickNumber"`
+	InputType   uint32 `json:"inputType"`
+	InputSize   uint32 `json:"inputSize"`
+	InputData   string `json:"inputData"`
+	Signature   string `json:"signature"`
+	Timestamp   uint64 `json:"timestamp"`
+	MoneyFlew   bool   `json:"moneyFlew"`
 }
 
 func NewTransactionConsumer(client KafkaClient, elasticClient ElasticDocumentClient, m *metrics.Metrics, config *ConsumerConfig) *TransactionConsumer {
@@ -116,7 +116,7 @@ func (c *TransactionConsumer) consumeBatch(ctx context.Context) (int, error) {
 		}
 
 		document := extern.EsDocument{Id: transaction.Hash, Payload: data}
-		if c.isEphemeral(transaction.InputType, transaction.Dest, transaction.Amount) {
+		if c.isEphemeral(transaction.InputType, transaction.Destination, transaction.Amount) {
 			ephemeralDocuments = append(ephemeralDocuments, document)
 		} else {
 			permanentDocuments = append(permanentDocuments, document)
