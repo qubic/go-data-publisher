@@ -18,7 +18,7 @@ type Fetcher interface {
 }
 
 type Publisher interface {
-	PublishTickTransactions(tickTransactions entities.TickTransactions) error
+	PublishTickTransactions(tickTransactions []entities.Tx) error
 }
 
 type statusStore interface {
@@ -172,12 +172,7 @@ func (p *Processor) processTick(epoch, tick uint32) error {
 	if len(transactions) == 0 {
 		p.logger.Infow("Skipping tick without transactions", "epoch", epoch, "tick", tick)
 	} else {
-		tickTransactions := entities.TickTransactions{
-			Epoch:        epoch,
-			TickNumber:   tick,
-			Transactions: transactions,
-		}
-		err = p.publisher.PublishTickTransactions(tickTransactions)
+		err = p.publisher.PublishTickTransactions(transactions)
 		if err != nil {
 			// extra log so that we know what tick failed
 			p.logger.Errorw("Error publishing tick transactions", "epoch", epoch, "tick", tick, "error", err)

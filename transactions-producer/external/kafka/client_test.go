@@ -69,29 +69,21 @@ func TestClient_PublishTransactions(t *testing.T) {
 
 	testData := []struct {
 		name             string
-		tickTransactions entities.TickTransactions
+		tickTransactions []entities.Tx
 		expectedCount    uint
 		shouldError      bool
 	}{
 		{
-			name: "TestPublishTransactions_1",
-			tickTransactions: entities.TickTransactions{
-				Epoch:        100,
-				TickNumber:   50000017,
-				Transactions: testTx,
-			},
-			expectedCount: 3,
-			shouldError:   false,
+			name:             "TestPublishTransactions_1",
+			tickTransactions: testTx,
+			expectedCount:    3,
+			shouldError:      false,
 		},
 		{
-			name: "TestPublishTransactions_2",
-			tickTransactions: entities.TickTransactions{
-				Epoch:        101,
-				TickNumber:   10000001,
-				Transactions: testTx,
-			},
-			expectedCount: 3,
-			shouldError:   true,
+			name:             "TestPublishTransactions_2",
+			tickTransactions: testTx,
+			expectedCount:    3,
+			shouldError:      true,
 		},
 	}
 
@@ -145,11 +137,7 @@ func TestClient_PublishTransactions_JsonPayload(t *testing.T) {
 	mockClient := &MockKafkaClient{}
 	kc := NewClient(mockClient)
 
-	err := kc.PublishTickTransactions(entities.TickTransactions{
-		Epoch:        100,
-		TickNumber:   50000017,
-		Transactions: []entities.Tx{tx1, tx2},
-	})
+	err := kc.PublishTickTransactions([]entities.Tx{tx1, tx2})
 	assert.NoError(t, err)
 	assert.Len(t, mockClient.ProducedRecords, 2)
 

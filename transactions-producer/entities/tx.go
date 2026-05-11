@@ -14,12 +14,6 @@ type Tx struct {
 	MoneyFlew  bool   `json:"moneyFlew"`
 }
 
-type TickTransactions struct {
-	Epoch        uint32 `json:"epoch"`
-	TickNumber   uint32 `json:"tickNumber"`
-	Transactions []Tx   `json:"transactions"`
-}
-
 type ProcessedTickIntervalsPerEpoch struct {
 	Epoch     uint32
 	Intervals []ProcessedTickInterval

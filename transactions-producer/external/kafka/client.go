@@ -25,15 +25,14 @@ func NewClient(kafkaClient KafkaClient) *Client {
 	}
 }
 
-func (kc *Client) PublishTickTransactions(tickTransactions entities.TickTransactions) error {
+func (kc *Client) PublishTickTransactions(transactions []entities.Tx) error {
 
 	wg := sync.WaitGroup{}
-	errorChannel := make(chan error, len(tickTransactions.Transactions))
+	errorChannel := make(chan error, len(transactions))
 
-	tickNumber := tickTransactions.TickNumber
-	for _, transaction := range tickTransactions.Transactions {
+	for _, transaction := range transactions {
 
-		record, err := createTickTransactionRecord(tickNumber, transaction)
+		record, err := createTickTransactionRecord(transaction)
 		if err != nil {
 			log.Printf("Error while creating record: %v", err)
 			errorChannel <- err
@@ -45,7 +44,7 @@ func (kc *Client) PublishTickTransactions(tickTransactions entities.TickTransact
 			defer wg.Done()
 			if err != nil {
 				log.Printf("Error while producing record: %v", err)
-				errorChannel <- fmt.Errorf("publishing tick [%d] and transaction [%s]: %w", tickNumber, transaction.TxID, err)
+				errorChannel <- fmt.Errorf("publishing tick [%d] and transaction [%s]: %w", transaction.TickNumber, transaction.TxID, err)
 				return
 			}
 			errorChannel <- nil
@@ -65,14 +64,14 @@ func (kc *Client) PublishTickTransactions(tickTransactions entities.TickTransact
 	return nil
 }
 
-func createTickTransactionRecord(tickNumber uint32, tx entities.Tx) (*kgo.Record, error) {
+func createTickTransactionRecord(tx entities.Tx) (*kgo.Record, error) {
 
 	payload, err := json.Marshal(tx)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling transaction to json: %w", err)
 	}
 	key := make([]byte, 4)
-	binary.LittleEndian.PutUint32(key, tickNumber)
+	binary.LittleEndian.PutUint32(key, tx.TickNumber)
 
 	return &kgo.Record{
 		Key:   key,
