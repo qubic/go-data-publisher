@@ -70,12 +70,12 @@ type MockPublisher struct {
 	locker                    sync.Mutex
 }
 
-func (mp *MockPublisher) PublishTickTransactions(tickTransactions []entities.TickTransactions) error {
+func (mp *MockPublisher) PublishTickTransactions(tickTransactions entities.TickTransactions) error {
 	if mp.error != nil {
 		return mp.error
 	}
 	mp.locker.Lock() // increment might not work with many threads otherwise
-	mp.publishedTickTransactions = append(mp.publishedTickTransactions, tickTransactions...)
+	mp.publishedTickTransactions = append(mp.publishedTickTransactions, tickTransactions)
 	mp.locker.Unlock()
 	return nil
 }

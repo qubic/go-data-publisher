@@ -18,7 +18,7 @@ type Fetcher interface {
 }
 
 type Publisher interface {
-	PublishTickTransactions(tickTransactions []entities.TickTransactions) error
+	PublishTickTransactions(tickTransactions entities.TickTransactions) error
 }
 
 type statusStore interface {
@@ -145,7 +145,6 @@ func (p *Processor) processTickRange(epoch, from, to uint32) error {
 			batchSize := len(nextTicks)
 			p.logger.Infow("Published tick transactions", "nr_ticks", batchSize, "epoch", epoch, "tick", tick)
 			p.syncMetrics.IncProcessedTicks(batchSize)
-			p.syncMetrics.IncProcessedMessages(batchSize)
 			p.syncMetrics.SetProcessedTick(epoch, tick)
 			nextTicks = nil
 		}
@@ -173,12 +172,10 @@ func (p *Processor) processTick(epoch, tick uint32) error {
 	if len(transactions) == 0 {
 		p.logger.Infow("Skipping tick without transactions", "epoch", epoch, "tick", tick)
 	} else {
-		tickTransactions := []entities.TickTransactions{
-			{
-				Epoch:        epoch,
-				TickNumber:   tick,
-				Transactions: transactions,
-			},
+		tickTransactions := entities.TickTransactions{
+			Epoch:        epoch,
+			TickNumber:   tick,
+			Transactions: transactions,
 		}
 		err = p.publisher.PublishTickTransactions(tickTransactions)
 		if err != nil {
@@ -186,6 +183,7 @@ func (p *Processor) processTick(epoch, tick uint32) error {
 			p.logger.Errorw("Error publishing tick transactions", "epoch", epoch, "tick", tick, "error", err)
 			return fmt.Errorf("inserting batch: %w", err)
 		}
+		p.syncMetrics.IncProcessedMessages(len(transactions))
 	}
 	return nil
 }
