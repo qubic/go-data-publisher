@@ -14,11 +14,11 @@ import (
 
 type Fetcher interface {
 	GetProcessedTickIntervalsPerEpoch(ctx context.Context) ([]entities.ProcessedTickIntervalsPerEpoch, error)
-	GetTickTransactions(ctx context.Context, tick uint32) ([]entities.Tx, error)
+	GetTickTransactions(ctx context.Context, tick uint32) ([]entities.Transaction, error)
 }
 
 type Publisher interface {
-	PublishTickTransactions(tickTransactions []entities.Tx) error
+	PublishTickTransactions(tickTransactions []entities.Transaction) error
 }
 
 type statusStore interface {

@@ -25,7 +25,7 @@ func NewClient(kafkaClient KafkaClient) *Client {
 	}
 }
 
-func (kc *Client) PublishTickTransactions(transactions []entities.Tx) error {
+func (kc *Client) PublishTickTransactions(transactions []entities.Transaction) error {
 
 	wg := sync.WaitGroup{}
 	errorChannel := make(chan error, len(transactions))
@@ -44,7 +44,7 @@ func (kc *Client) PublishTickTransactions(transactions []entities.Tx) error {
 			defer wg.Done()
 			if err != nil {
 				log.Printf("Error while producing record: %v", err)
-				errorChannel <- fmt.Errorf("publishing tick [%d] and transaction [%s]: %w", transaction.TickNumber, transaction.TxID, err)
+				errorChannel <- fmt.Errorf("publishing tick [%d] and transaction [%s]: %w", transaction.TickNumber, transaction.Hash, err)
 				return
 			}
 			errorChannel <- nil
@@ -64,7 +64,7 @@ func (kc *Client) PublishTickTransactions(transactions []entities.Tx) error {
 	return nil
 }
 
-func createTickTransactionRecord(tx entities.Tx) (*kgo.Record, error) {
+func createTickTransactionRecord(tx entities.Transaction) (*kgo.Record, error) {
 
 	payload, err := json.Marshal(tx)
 	if err != nil {

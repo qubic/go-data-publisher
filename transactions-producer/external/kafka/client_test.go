@@ -32,44 +32,44 @@ func (mkc *MockKafkaClient) Produce(_ context.Context, r *kgo.Record, promise fu
 
 func TestClient_PublishTransactions(t *testing.T) {
 
-	testTx := []entities.Tx{
+	testTx := []entities.Transaction{
 		{
-			TxID:       "nagnkafzthqkxvbdewcrypgvkwdzkbbyupekzxpyrtdvvmqgugxbdhvmhvef",
-			SourceID:   "BTDXTBFYNBMVCGYBRRTNBZAFUBZNTWSRNSLGMTKGTBNJZTPXJLFHNSLVVQGY",
-			DestID:     "RLRNPMAFKPPLUZQXJLTTNFSCJMQEHWMWDVJHMAMZGAMEQWSDUFRJKHLCLDTD",
-			Amount:     100,
-			TickNumber: 50000017,
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Hash:        "nagnkafzthqkxvbdewcrypgvkwdzkbbyupekzxpyrtdvvmqgugxbdhvmhvef",
+			Source:      "BTDXTBFYNBMVCGYBRRTNBZAFUBZNTWSRNSLGMTKGTBNJZTPXJLFHNSLVVQGY",
+			Destination: "RLRNPMAFKPPLUZQXJLTTNFSCJMQEHWMWDVJHMAMZGAMEQWSDUFRJKHLCLDTD",
+			Amount:      100,
+			TickNumber:  50000017,
+			Signature:   "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+			Timestamp:   1744610180,
+			MoneyFlew:   true,
 		},
 		{
-			TxID:       "nwybffwfxkkvuuaxmqyhnqnpxpkywjuxrhhrnacfahfdfbvrthvqayzimhmr",
-			SourceID:   "DXQWUEYPBRQPCWLSERRGSSNKNVXHZRCQJBFSWBYRVQHGCWGNXFJZBYEESUCY",
-			DestID:     "FVFNJFSPEVHAZQUSDREUKDEGHNKCZJAYYRLMKVFYCDYYVKYGEUFKRSTTWUFB\n",
-			Amount:     1,
-			TickNumber: 50000017,
-			InputType:  2,
-			InputSize:  3,
-			Input:      "blah",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  false,
+			Hash:        "nwybffwfxkkvuuaxmqyhnqnpxpkywjuxrhhrnacfahfdfbvrthvqayzimhmr",
+			Source:      "DXQWUEYPBRQPCWLSERRGSSNKNVXHZRCQJBFSWBYRVQHGCWGNXFJZBYEESUCY",
+			Destination: "FVFNJFSPEVHAZQUSDREUKDEGHNKCZJAYYRLMKVFYCDYYVKYGEUFKRSTTWUFB\n",
+			Amount:      1,
+			TickNumber:  50000017,
+			InputType:   2,
+			InputSize:   3,
+			InputData:   "blah",
+			Signature:   "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+			Timestamp:   1744610180,
+			MoneyFlew:   false,
 		},
 		{
-			TxID:       "rejzbpzxaqcdahzjwcxbwpzmwtecikjyfiefzgftxmmajpbqadtggmftfagi",
-			SourceID:   "SZQFEDERBJSCVQNNACQGQLHNKYCKGMTJAXTLXEERJBJZTBTYYYXNSGPEDRMC",
-			DestID:     "LUNPMWFMRZCWDFRUQUMXNXBAKQDBKBQQEDSVRUBGSFUDXBHDURGNJZCSQXFF",
-			TickNumber: 50000017,
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Hash:        "rejzbpzxaqcdahzjwcxbwpzmwtecikjyfiefzgftxmmajpbqadtggmftfagi",
+			Source:      "SZQFEDERBJSCVQNNACQGQLHNKYCKGMTJAXTLXEERJBJZTBTYYYXNSGPEDRMC",
+			Destination: "LUNPMWFMRZCWDFRUQUMXNXBAKQDBKBQQEDSVRUBGSFUDXBHDURGNJZCSQXFF",
+			TickNumber:  50000017,
+			Signature:   "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+			Timestamp:   1744610180,
+			MoneyFlew:   true,
 		},
 	}
 
 	testData := []struct {
 		name             string
-		tickTransactions []entities.Tx
+		tickTransactions []entities.Transaction
 		expectedCount    uint
 		shouldError      bool
 	}{
@@ -110,34 +110,34 @@ func TestClient_PublishTransactions(t *testing.T) {
 }
 
 func TestClient_PublishTransactions_JsonPayload(t *testing.T) {
-	tx1 := entities.Tx{
-		TxID:       "nagnkafzthqkxvbdewcrypgvkwdzkbbyupekzxpyrtdvvmqgugxbdhvmhvef",
-		SourceID:   "BTDXTBFYNBMVCGYBRRTNBZAFUBZNTWSRNSLGMTKGTBNJZTPXJLFHNSLVVQGY",
-		DestID:     "RLRNPMAFKPPLUZQXJLTTNFSCJMQEHWMWDVJHMAMZGAMEQWSDUFRJKHLCLDTD",
-		Amount:     100,
-		TickNumber: 50000017,
-		Signature:  "aabbcc",
-		Timestamp:  1744610180,
-		MoneyFlew:  true,
+	tx1 := entities.Transaction{
+		Hash:        "nagnkafzthqkxvbdewcrypgvkwdzkbbyupekzxpyrtdvvmqgugxbdhvmhvef",
+		Source:      "BTDXTBFYNBMVCGYBRRTNBZAFUBZNTWSRNSLGMTKGTBNJZTPXJLFHNSLVVQGY",
+		Destination: "RLRNPMAFKPPLUZQXJLTTNFSCJMQEHWMWDVJHMAMZGAMEQWSDUFRJKHLCLDTD",
+		Amount:      100,
+		TickNumber:  50000017,
+		Signature:   "aabbcc",
+		Timestamp:   1744610180,
+		MoneyFlew:   true,
 	}
-	tx2 := entities.Tx{
-		TxID:       "nwybffwfxkkvuuaxmqyhnqnpxpkywjuxrhhrnacfahfdfbvrthvqayzimhmr",
-		SourceID:   "DXQWUEYPBRQPCWLSERRGSSNKNVXHZRCQJBFSWBYRVQHGCWGNXFJZBYEESUCY",
-		DestID:     "FVFNJFSPEVHAZQUSDREUKDEGHNKCZJAYYRLMKVFYCDYYVKYGEUFKRSTTWUFB",
-		Amount:     1,
-		TickNumber: 50000017,
-		InputType:  2,
-		InputSize:  3,
-		Input:      "blah",
-		Signature:  "ddeeff",
-		Timestamp:  1744610180,
-		MoneyFlew:  false,
+	tx2 := entities.Transaction{
+		Hash:        "nwybffwfxkkvuuaxmqyhnqnpxpkywjuxrhhrnacfahfdfbvrthvqayzimhmr",
+		Source:      "DXQWUEYPBRQPCWLSERRGSSNKNVXHZRCQJBFSWBYRVQHGCWGNXFJZBYEESUCY",
+		Destination: "FVFNJFSPEVHAZQUSDREUKDEGHNKCZJAYYRLMKVFYCDYYVKYGEUFKRSTTWUFB",
+		Amount:      1,
+		TickNumber:  50000017,
+		InputType:   2,
+		InputSize:   3,
+		InputData:   "blah",
+		Signature:   "ddeeff",
+		Timestamp:   1744610180,
+		MoneyFlew:   false,
 	}
 
 	mockClient := &MockKafkaClient{}
 	kc := NewClient(mockClient)
 
-	err := kc.PublishTickTransactions([]entities.Tx{tx1, tx2})
+	err := kc.PublishTickTransactions([]entities.Transaction{tx1, tx2})
 	assert.NoError(t, err)
 	assert.Len(t, mockClient.ProducedRecords, 2)
 

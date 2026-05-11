@@ -37,40 +37,40 @@ func (mf *MockFetcher) GetProcessedTickIntervalsPerEpoch(_ context.Context) ([]e
 	return mf.processedTickIntervalsPerEpoch, nil
 }
 
-func (mf *MockFetcher) GetTickTransactions(_ context.Context, tick uint32) ([]entities.Tx, error) {
+func (mf *MockFetcher) GetTickTransactions(_ context.Context, tick uint32) ([]entities.Transaction, error) {
 
 	if mf.shouldError {
 		return nil, ErrMock
 	}
 
 	if mf.emptyTicks != nil && slices.Contains(mf.emptyTicks, tick) {
-		return []entities.Tx{}, nil
+		return []entities.Transaction{}, nil
 	}
 
-	return []entities.Tx{
+	return []entities.Transaction{
 		{
-			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-			DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Amount:     100,
-			TickNumber: tick,
-			InputType:  0,
-			InputSize:  0,
-			Input:      "",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Hash:        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Source:      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+			Destination: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+			Amount:      100,
+			TickNumber:  tick,
+			InputType:   0,
+			InputSize:   0,
+			InputData:   "",
+			Signature:   "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+			Timestamp:   1744610180,
+			MoneyFlew:   true,
 		},
 	}, nil
 }
 
 type MockPublisher struct {
-	publishedTickTransactions []entities.Tx
+	publishedTickTransactions []entities.Transaction
 	error                     error
 	locker                    sync.Mutex
 }
 
-func (mp *MockPublisher) PublishTickTransactions(tickTransactions []entities.Tx) error {
+func (mp *MockPublisher) PublishTickTransactions(tickTransactions []entities.Transaction) error {
 	if mp.error != nil {
 		return mp.error
 	}
@@ -147,84 +147,84 @@ func TestTxProcessor_process(t *testing.T) {
 
 func TestTxProcessor_RunCycle(t *testing.T) {
 
-	expected := []entities.Tx{
+	expected := []entities.Transaction{
 		{
-			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-			DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Amount:     100,
-			TickNumber: 10000001,
-			InputType:  0,
-			InputSize:  0,
-			Input:      "",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Hash:        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Source:      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+			Destination: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+			Amount:      100,
+			TickNumber:  10000001,
+			InputType:   0,
+			InputSize:   0,
+			InputData:   "",
+			Signature:   "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+			Timestamp:   1744610180,
+			MoneyFlew:   true,
 		},
 		{
-			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-			DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Amount:     100,
-			TickNumber: 10000002,
-			InputType:  0,
-			InputSize:  0,
-			Input:      "",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Hash:        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Source:      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+			Destination: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+			Amount:      100,
+			TickNumber:  10000002,
+			InputType:   0,
+			InputSize:   0,
+			InputData:   "",
+			Signature:   "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+			Timestamp:   1744610180,
+			MoneyFlew:   true,
 		},
 		{
-			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-			DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Amount:     100,
-			TickNumber: 40000001,
-			InputType:  0,
-			InputSize:  0,
-			Input:      "",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Hash:        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Source:      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+			Destination: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+			Amount:      100,
+			TickNumber:  40000001,
+			InputType:   0,
+			InputSize:   0,
+			InputData:   "",
+			Signature:   "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+			Timestamp:   1744610180,
+			MoneyFlew:   true,
 		},
 		{
-			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-			DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Amount:     100,
-			TickNumber: 40000002,
-			InputType:  0,
-			InputSize:  0,
-			Input:      "",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Hash:        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Source:      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+			Destination: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+			Amount:      100,
+			TickNumber:  40000002,
+			InputType:   0,
+			InputSize:   0,
+			InputData:   "",
+			Signature:   "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+			Timestamp:   1744610180,
+			MoneyFlew:   true,
 		},
 		{
-			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-			DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Amount:     100,
-			TickNumber: 50000016,
-			InputType:  0,
-			InputSize:  0,
-			Input:      "",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Hash:        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Source:      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+			Destination: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+			Amount:      100,
+			TickNumber:  50000016,
+			InputType:   0,
+			InputSize:   0,
+			InputData:   "",
+			Signature:   "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+			Timestamp:   1744610180,
+			MoneyFlew:   true,
 		},
 		{
-			TxID:       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-			SourceID:   "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-			DestID:     "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
-			Amount:     100,
-			TickNumber: 50000017,
-			InputType:  0,
-			InputSize:  0,
-			Input:      "",
-			Signature:  "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
-			Timestamp:  1744610180,
-			MoneyFlew:  true,
+			Hash:        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Source:      "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+			Destination: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB",
+			Amount:      100,
+			TickNumber:  50000017,
+			InputType:   0,
+			InputSize:   0,
+			InputData:   "",
+			Signature:   "99999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999",
+			Timestamp:   1744610180,
+			MoneyFlew:   true,
 		},
 	}
 
@@ -282,7 +282,7 @@ func TestTxProcessor_RunCycle(t *testing.T) {
 	got := publisher.publishedTickTransactions
 
 	// Make sure the results are sorted by tick number, as the data is added asynchronously
-	slices.SortFunc(got, func(a, b entities.Tx) int {
+	slices.SortFunc(got, func(a, b entities.Transaction) int {
 		return cmp2.Compare(a.TickNumber, b.TickNumber)
 	})
 

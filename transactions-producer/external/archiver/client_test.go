@@ -14,7 +14,7 @@ func TestArchiverClient_ArchiveTxToEntityTx(t *testing.T) {
 	testData := []struct {
 		name                 string
 		archiverTransactions []*archiverproto.TransactionData
-		expected             []entities.Tx
+		expected             []entities.Transaction
 	}{
 		{
 			name: "TestArchiverToEntityFormat_1",
@@ -35,19 +35,19 @@ func TestArchiverClient_ArchiveTxToEntityTx(t *testing.T) {
 					MoneyFlew: false,
 				},
 			},
-			expected: []entities.Tx{
+			expected: []entities.Transaction{
 				{
-					TxID:       "czxyxioyrhtkbbinsnhoieectcugxmbscizlynmaieilqhmnwojaekdczaki",
-					SourceID:   "FZTXBUWQTOWAHBODSZKVMUQRRPDDASKDOQLSDGLIUCVWDSYWIBAKAXRBKEJJ",
-					DestID:     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFXIB",
-					Amount:     0,
-					TickNumber: 23582758,
-					InputType:  1,
-					InputSize:  848,
-					Input:      "dCAo5j2A40g1p4wfyLYxauNnEgaM4Af+KGJZ9n4LjR/YIa1d2dayBYGiaOYxiWCGffyLYzfuMGFZlp3+fdnolYGLWcaqLYogh9GcZJm2saeMozjGJ2Iit+n3fp9Ipep7osfSMIlfV9Wcad1WpfWAGGZuKWiaOKotit+IpYNlH4aJoWJZOMIpfGJoji+AHxiN84iidxolaZ02vhxfYrZZoYjh5+Yjh5n1/ZVo4oaRjmhaZnotiGHogfV7Yghx8X1iJhWUfGHmsa9gmWiRl2hiFg3shx94daaJGuhp63EiiIntiaH3wfGImpX5m2rfFyn8Zh71+ZKGnpiSHGqiGJmae1gYhhxkYeh58XAaJm2KfWGmWiFsGmYp5odcxlX8hxp2fhhhWXZeJ4Xh+G3xet74jfN6n6fZ64je98ohil5ofZxhGhe6IGgiF8HIZeHoZiCHodhZ6mFhR84jfmGXNfGIImhx7ojexnIOhtpHsZ+IoaZJlodiN6ocapp17Zd73Dhdz4hf1qIXZ6HGHZhomiX5l4cfSIoXaaInledqF7Zl5WdapgYkZFmWoXuHYVe1nYVgeH2+Z+HXuZdgmQalpYcc584XbRemaahwXge58mdYZ1GTZNo2AZR6nvaRqF/Yxp2gXpjWjhlm14ZRyHTf1tIacZqGmc99V/hqHHEZpqHUhhnV7aCEYff1omfhhgYdYl7HNaFx2aXuGXoeZkmiZliIcY2D2oiFmnihBeYahVjXzaVqIfeuHF/fCGYZhiHIVe2FIUguEnghWFXsiOF3memGmVZ1oIMhCFIVhiD4Vd9v4TepfINeyHmJh2CGhdBnGyACFoDZBnGbXhmm6Z2E3Fd1n3shF/3nhViHHZB4oPc5oWbYJlWbZhfmLZpnWGYx534d9omXX9iXFZ9wXJadh2Gd5oWpexeW8dSFX2e1xWRZh0GehViGgZt5YdZRf3ahKFGXaN+3jaBw3IW9mH8aFvWXYNlIYaCD3bZFy4GfBe2OgqDoTg+EIRhRpGaXqDIMgyE3Ddl1H3caDWUgllYAg+DYReGCoAdiGGheyB3hhOEYIgp44DXiGoCed43gb9yIKfl0oWcKFXNhSC2Id93XleCF4VhmG4XeiDYIh2FHlgYAAAA=",
-					Signature:  "I0pFA7cbPoEJLJuswrwkNt5JCX7pT5R/b/RsWD/WLK2NnACGziKd1DAbK5xaHtlRHapvPK47I3XL6YrvrJIDAA==",
-					Timestamp:  1744649165000,
-					MoneyFlew:  false,
+					Hash:        "czxyxioyrhtkbbinsnhoieectcugxmbscizlynmaieilqhmnwojaekdczaki",
+					Source:      "FZTXBUWQTOWAHBODSZKVMUQRRPDDASKDOQLSDGLIUCVWDSYWIBAKAXRBKEJJ",
+					Destination: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFXIB",
+					Amount:      0,
+					TickNumber:  23582758,
+					InputType:   1,
+					InputSize:   848,
+					InputData:   "dCAo5j2A40g1p4wfyLYxauNnEgaM4Af+KGJZ9n4LjR/YIa1d2dayBYGiaOYxiWCGffyLYzfuMGFZlp3+fdnolYGLWcaqLYogh9GcZJm2saeMozjGJ2Iit+n3fp9Ipep7osfSMIlfV9Wcad1WpfWAGGZuKWiaOKotit+IpYNlH4aJoWJZOMIpfGJoji+AHxiN84iidxolaZ02vhxfYrZZoYjh5+Yjh5n1/ZVo4oaRjmhaZnotiGHogfV7Yghx8X1iJhWUfGHmsa9gmWiRl2hiFg3shx94daaJGuhp63EiiIntiaH3wfGImpX5m2rfFyn8Zh71+ZKGnpiSHGqiGJmae1gYhhxkYeh58XAaJm2KfWGmWiFsGmYp5odcxlX8hxp2fhhhWXZeJ4Xh+G3xet74jfN6n6fZ64je98ohil5ofZxhGhe6IGgiF8HIZeHoZiCHodhZ6mFhR84jfmGXNfGIImhx7ojexnIOhtpHsZ+IoaZJlodiN6ocapp17Zd73Dhdz4hf1qIXZ6HGHZhomiX5l4cfSIoXaaInledqF7Zl5WdapgYkZFmWoXuHYVe1nYVgeH2+Z+HXuZdgmQalpYcc584XbRemaahwXge58mdYZ1GTZNo2AZR6nvaRqF/Yxp2gXpjWjhlm14ZRyHTf1tIacZqGmc99V/hqHHEZpqHUhhnV7aCEYff1omfhhgYdYl7HNaFx2aXuGXoeZkmiZliIcY2D2oiFmnihBeYahVjXzaVqIfeuHF/fCGYZhiHIVe2FIUguEnghWFXsiOF3memGmVZ1oIMhCFIVhiD4Vd9v4TepfINeyHmJh2CGhdBnGyACFoDZBnGbXhmm6Z2E3Fd1n3shF/3nhViHHZB4oPc5oWbYJlWbZhfmLZpnWGYx534d9omXX9iXFZ9wXJadh2Gd5oWpexeW8dSFX2e1xWRZh0GehViGgZt5YdZRf3ahKFGXaN+3jaBw3IW9mH8aFvWXYNlIYaCD3bZFy4GfBe2OgqDoTg+EIRhRpGaXqDIMgyE3Ddl1H3caDWUgllYAg+DYReGCoAdiGGheyB3hhOEYIgp44DXiGoCed43gb9yIKfl0oWcKFXNhSC2Id93XleCF4VhmG4XeiDYIh2FHlgYAAAA=",
+					Signature:   "I0pFA7cbPoEJLJuswrwkNt5JCX7pT5R/b/RsWD/WLK2NnACGziKd1DAbK5xaHtlRHapvPK47I3XL6YrvrJIDAA==",
+					Timestamp:   1744649165000,
+					MoneyFlew:   false,
 				},
 			},
 		},

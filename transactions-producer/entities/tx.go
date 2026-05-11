@@ -1,17 +1,17 @@
 package entities
 
-type Tx struct {
-	TxID       string `json:"hash"`
-	SourceID   string `json:"source"`
-	DestID     string `json:"destination"`
-	Amount     int64  `json:"amount"`
-	TickNumber uint32 `json:"tickNumber"`
-	InputType  uint32 `json:"inputType"`
-	InputSize  uint32 `json:"inputSize"`
-	Input      string `json:"inputData"`
-	Signature  string `json:"signature"`
-	Timestamp  uint64 `json:"timestamp"`
-	MoneyFlew  bool   `json:"moneyFlew"`
+type Transaction struct {
+	Hash        string `json:"hash"`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	Amount      int64  `json:"amount"`
+	TickNumber  uint32 `json:"tickNumber"`
+	InputType   uint32 `json:"inputType"`
+	InputSize   uint32 `json:"inputSize"`
+	InputData   string `json:"inputData"`
+	Signature   string `json:"signature"`
+	Timestamp   uint64 `json:"timestamp"`
+	MoneyFlew   bool   `json:"moneyFlew"`
 }
 
 type ProcessedTickIntervalsPerEpoch struct {
