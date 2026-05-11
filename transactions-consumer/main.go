@@ -53,6 +53,7 @@ func run() error {
 			MetricsNamespace string   `conf:"default:qubic_kafka"`
 			ConsumeTopic     string   `conf:"default:qubic-transactions"`
 			ConsumerGroup    string   `conf:"default:qubic-elastic"`
+			MaxPollRecords   int      `conf:"default:4096"` // default 1 tick max
 		}
 		Sync struct {
 			EphemeralInputTypes []uint32 `conf:"optional"`
@@ -135,12 +136,16 @@ func run() error {
 		PermanentIndexName:  cfg.Elastic.IndexName,
 		EphemeralIndexName:  cfg.Elastic.EphemeralIndexName,
 		EphemeralInputTypes: cfg.Sync.EphemeralInputTypes,
+		MaxPollRecords:      cfg.Broker.MaxPollRecords,
 	}
 	consumer := consume.NewTransactionConsumer(kcl, elasticClient, processingMetrics, consumerConfig)
+
 	procError := make(chan error, 1)
+	consumerCtx, consumerCtxCancel := context.WithCancel(context.Background())
+	defer consumerCtxCancel()
 	if cfg.Sync.Enabled {
 		go func() {
-			procError <- consumer.Consume()
+			procError <- consumer.Consume(consumerCtx)
 		}()
 	} else {
 		log.Println("[WARN] main: Message consuming disabled")
@@ -164,10 +169,14 @@ func run() error {
 		select {
 		case <-shutdown:
 			log.Println("main: Received shutdown signal, shutting down...")
+			consumerCtxCancel()
+			<-procError // Wait for consumer to stop
 			return nil
 		case err := <-procError:
 			return fmt.Errorf("[ERROR] processing error: %v", err)
 		case err := <-serverError:
+			consumerCtxCancel()
+			<-procError // Wait for consumer to stop
 			return fmt.Errorf("[ERROR] starting server: %v", err)
 		}
 	}

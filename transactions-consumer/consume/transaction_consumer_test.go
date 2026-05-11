@@ -57,7 +57,7 @@ func TestTransactionConsumer_ConsumeBatch(t *testing.T) {
 		currentEpoch:       0,
 	}
 
-	count, err := transactionConsumer.consumeBatch()
+	count, err := transactionConsumer.consumeBatch(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 	assert.Equal(t, uint32(123), transactionConsumer.currentEpoch)
@@ -82,7 +82,7 @@ func TestTransactionConsumer_GivenFetchError_ThenError(t *testing.T) {
 		currentEpoch:    0,
 	}
 
-	_, err := transactionConsumer.consumeBatch()
+	_, err := transactionConsumer.consumeBatch(t.Context())
 	require.ErrorContains(t, err, "fetching records")
 }
 
@@ -98,7 +98,7 @@ func TestTransactionConsumer_GivenInvalidJson_ThenError(t *testing.T) {
 		currentEpoch:    0,
 	}
 
-	_, err := transactionConsumer.consumeBatch()
+	_, err := transactionConsumer.consumeBatch(t.Context())
 	require.ErrorContains(t, err, "unmarshalling")
 }
 
@@ -121,7 +121,7 @@ func TestTransactionConsumer_EphemeralAndPermanentIndexedSeparately(t *testing.T
 		ephemeralInputTypes: []uint32{6},
 	}
 
-	count, err := consumer.consumeBatch()
+	count, err := consumer.consumeBatch(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, 3, count)
 

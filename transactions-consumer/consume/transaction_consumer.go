@@ -3,6 +3,7 @@ package consume
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"slices"
 	"time"
@@ -24,6 +25,7 @@ type ElasticDocumentClient interface {
 }
 
 type ConsumerConfig struct {
+	MaxPollRecords      int
 	PermanentIndexName  string
 	EphemeralIndexName  string
 	EphemeralInputTypes []uint32
@@ -32,6 +34,7 @@ type ConsumerConfig struct {
 type TransactionConsumer struct {
 	kafkaClient         KafkaClient
 	elasticClient       ElasticDocumentClient
+	maxPollRecords      int
 	permanentIndexName  string
 	ephemeralIndexName  string
 	ephemeralInputTypes []uint32
@@ -68,27 +71,34 @@ func NewTransactionConsumer(client KafkaClient, elasticClient ElasticDocumentCli
 		permanentIndexName:  config.PermanentIndexName,
 		ephemeralIndexName:  config.EphemeralIndexName,
 		ephemeralInputTypes: config.EphemeralInputTypes,
+		maxPollRecords:      config.MaxPollRecords,
 	}
 }
 
-func (c *TransactionConsumer) Consume() error {
-	for {
-		count, err := c.consumeBatch()
-		if err == nil {
-			log.Printf("Processed [%d] transactions. Latest tick: [%d]", count, c.currentTick)
-		} else {
-			// if there is an error consuming, we abort. We need to fix the error before trying again.
-			log.Printf("Error consuming batch: %v", err) // exits
-			return errors.Wrap(err, "consuming batch")
+func (c *TransactionConsumer) Consume(ctx context.Context) error {
+	ticker := time.Tick(100 * time.Millisecond) // drops ticks if consuming is too slow
+	for range ticker {
+		select {
+		case <-ctx.Done():
+			log.Println("Shutdown signal received, stopping consumer.")
+			return nil
+
+		default:
+			count, err := c.consumeBatch(ctx)
+			if err != nil {
+				return fmt.Errorf("consuming batch: %w", err)
+			}
+			if count > 0 {
+				log.Printf("Processed [%d] transactions. Latest tick: [%d].", count, c.currentTick)
+			}
 		}
-		time.Sleep(100 * time.Millisecond)
 	}
+	return nil
 }
 
-func (c *TransactionConsumer) consumeBatch() (int, error) {
-	ctx := context.Background()
-	defer c.kafkaClient.AllowRebalance()            // because of the configured kgo.BlockRebalanceOnPoll() option
-	fetches := c.kafkaClient.PollRecords(ctx, 1000) // batch process max x messages in one run
+func (c *TransactionConsumer) consumeBatch(ctx context.Context) (int, error) {
+	defer c.kafkaClient.AllowRebalance()                        // because of the configured kgo.BlockRebalanceOnPoll() option
+	fetches := c.kafkaClient.PollRecords(ctx, c.maxPollRecords) // batch process max x messages in one run
 	if errs := fetches.Errors(); len(errs) > 0 {
 		// Only non-retryable errors are returned.
 		// Errors are typically per partition.
