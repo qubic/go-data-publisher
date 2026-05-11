@@ -11,7 +11,6 @@ type Metrics struct {
 	processedTickGauge    prometheus.Gauge
 	processedMessageCount prometheus.Counter
 	processedTicksCount   prometheus.Counter
-	processingEpochGauge  prometheus.Gauge
 }
 
 func NewMetrics(namespace string) *Metrics {
@@ -20,10 +19,6 @@ func NewMetrics(namespace string) *Metrics {
 		processedTickGauge: promauto.NewGauge(prometheus.GaugeOpts{
 			Name: fmt.Sprintf("%s_processed_tick", namespace),
 			Help: "The latest fully processed tick",
-		}),
-		processingEpochGauge: promauto.NewGauge(prometheus.GaugeOpts{
-			Name: fmt.Sprintf("%s_processed_epoch", namespace),
-			Help: "The current processing epoch",
 		}),
 		processedTicksCount: promauto.NewCounter(prometheus.CounterOpts{
 			Name: fmt.Sprintf("%s_processed_tick_count", namespace),
@@ -37,8 +32,7 @@ func NewMetrics(namespace string) *Metrics {
 	return &m
 }
 
-func (metrics *Metrics) SetProcessedTick(epoch uint32, tick uint32) {
-	metrics.processingEpochGauge.Set(float64(epoch))
+func (metrics *Metrics) SetProcessedTick(tick uint32) {
 	metrics.processedTickGauge.Set(float64(tick))
 }
 

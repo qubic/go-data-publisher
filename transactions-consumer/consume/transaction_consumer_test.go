@@ -17,11 +17,11 @@ var m = metrics.NewMetrics("foo")
 
 type FakeKafkaClient struct {
 	partitionErr error
-	value        []byte
+	values       [][]byte
 }
 
 func (fkc *FakeKafkaClient) PollRecords(_ context.Context, _ int) kgo.Fetches {
-	return createFetches(fkc.partitionErr, fkc.value)
+	return createFetches(fkc.partitionErr, fkc.values...)
 }
 
 func (fkc *FakeKafkaClient) CommitUncommittedOffsets(_ context.Context) error {
@@ -43,9 +43,11 @@ func (c *FakeElasticClient) BulkIndex(_ context.Context, data []extern.EsDocumen
 	return nil
 }
 
-func TestTransactionConsumer_ConsumeBatch(t *testing.T) {
+func TestTransactionConsumer_ConsumeBatch_InputMessageEqualsElasticDocument(t *testing.T) {
+	expectedJson := `{"hash":"transaction-hash","source":"source-identity","destination":"destination-identity","amount":1,"tickNumber":456,"inputType":3,"inputSize":4,"inputData":"input-data","signature":"signature","timestamp":5,"moneyFlew":true}`
+
 	kafkaClient := &FakeKafkaClient{
-		value: []byte(`{"epoch":123,"tickNumber":456,"transactions":[{"hash":"transaction-hash","source":"source-identity","destination":"destination-identity","amount":1,"tickNumber":2,"inputType":3,"inputSize":4,"inputData":"input-data","signature":"signature","timestamp":5,"moneyFlew":true}]}`),
+		values: [][]byte{[]byte(expectedJson)},
 	}
 	localElastic := &FakeElasticClient{}
 	transactionConsumer := &TransactionConsumer{
@@ -54,32 +56,30 @@ func TestTransactionConsumer_ConsumeBatch(t *testing.T) {
 		consumerMetrics:    m,
 		permanentIndexName: "default",
 		currentTick:        0,
-		currentEpoch:       0,
 	}
 
 	count, err := transactionConsumer.consumeBatch(t.Context())
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
-	assert.Equal(t, uint32(123), transactionConsumer.currentEpoch)
-	assert.Equal(t, uint32(456), transactionConsumer.currentTick)
+	assert.Equal(t, 456, int(transactionConsumer.currentTick))
 
 	docs := localElastic.BatchesByIndex["default"]
 	require.NotNil(t, docs)
+
 	assert.Equal(t, "transaction-hash", docs[0].Id)
-	assert.Equal(t, []byte(`{"hash":"transaction-hash","source":"source-identity","destination":"destination-identity","amount":1,"tickNumber":2,"inputType":3,"inputSize":4,"inputData":"input-data","signature":"signature","timestamp":5,"moneyFlew":true}`), docs[0].Payload)
+	assert.JSONEq(t, expectedJson, string(docs[0].Payload))
 }
 
 func TestTransactionConsumer_GivenFetchError_ThenError(t *testing.T) {
 	kafkaClient := &FakeKafkaClient{
 		partitionErr: errors.New("partition-error"),
-		value:        []byte("foo"),
+		values:       [][]byte{[]byte("foo")},
 	}
 	transactionConsumer := &TransactionConsumer{
 		kafkaClient:     kafkaClient,
 		elasticClient:   &FakeElasticClient{},
 		consumerMetrics: m,
 		currentTick:     0,
-		currentEpoch:    0,
 	}
 
 	_, err := transactionConsumer.consumeBatch(t.Context())
@@ -88,14 +88,13 @@ func TestTransactionConsumer_GivenFetchError_ThenError(t *testing.T) {
 
 func TestTransactionConsumer_GivenInvalidJson_ThenError(t *testing.T) {
 	kafkaClient := &FakeKafkaClient{
-		value: []byte(`{"hash":"transaction-hash"}`),
+		values: [][]byte{[]byte(`{[{"foo":"bar"}]}`)},
 	}
 	transactionConsumer := &TransactionConsumer{
 		kafkaClient:     kafkaClient,
 		elasticClient:   &FakeElasticClient{},
 		consumerMetrics: m,
 		currentTick:     0,
-		currentEpoch:    0,
 	}
 
 	_, err := transactionConsumer.consumeBatch(t.Context())
@@ -105,11 +104,11 @@ func TestTransactionConsumer_GivenInvalidJson_ThenError(t *testing.T) {
 func TestTransactionConsumer_EphemeralAndPermanentIndexedSeparately(t *testing.T) {
 	const zeroAddress = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFXIB"
 	kafkaClient := &FakeKafkaClient{
-		value: []byte(`{"epoch":1,"tickNumber":1,"transactions":[` +
-			`{"hash":"ephemeral-tx","source":"src","destination":"` + zeroAddress + `","amount":0,"tickNumber":1,"inputType":6,"inputSize":0,"inputData":"","signature":"","timestamp":0,"moneyFlew":false},` +
-			`{"hash":"permanent-tx-1","source":"src","destination":"other-dest-1","amount":0,"tickNumber":1,"inputType":6,"inputSize":0,"inputData":"","signature":"","timestamp":0,"moneyFlew":false},` +
-			`{"hash":"permanent-tx-2","source":"src","destination":"other-dest-2","amount":0,"tickNumber":1,"inputType":0,"inputSize":0,"inputData":"","signature":"","timestamp":0,"moneyFlew":false}` +
-			`]}`),
+		values: [][]byte{
+			[]byte(`{"hash":"ephemeral-tx","source":"src","destination":"` + zeroAddress + `","amount":0,"tickNumber":1,"inputType":6,"inputSize":0,"inputData":"","signature":"","timestamp":0,"moneyFlew":false}`),
+			[]byte(`{"hash":"permanent-tx-1","source":"src","destination":"other-dest-1","amount":0,"tickNumber":1,"inputType":6,"inputSize":0,"inputData":"","signature":"","timestamp":0,"moneyFlew":false}`),
+			[]byte(`{"hash":"permanent-tx-2","source":"src","destination":"other-dest-2","amount":0,"tickNumber":1,"inputType":0,"inputSize":0,"inputData":"","signature":"","timestamp":0,"moneyFlew":false}`),
+		},
 	}
 	localElastic := &FakeElasticClient{}
 	consumer := &TransactionConsumer{
@@ -193,19 +192,19 @@ func TestTransactionConsumer_IsEphemeral(t *testing.T) {
 	}
 }
 
-func createFetches(err error, value []byte) kgo.Fetches {
+func createFetches(err error, values ...[]byte) kgo.Fetches {
+	records := make([]*kgo.Record, len(values))
+	for i, v := range values {
+		records[i] = &kgo.Record{Value: v}
+	}
 	return kgo.Fetches{
 		{
 			Topics: []kgo.FetchTopic{
 				{
 					Partitions: []kgo.FetchPartition{
 						{
-							Records: []*kgo.Record{
-								{
-									Value: value,
-								},
-							},
-							Err: err,
+							Records: records,
+							Err:     err,
 						},
 					},
 				},
