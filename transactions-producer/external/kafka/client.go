@@ -32,7 +32,7 @@ func (kc *Client) PublishTickTransactions(transactions []entities.Transaction) e
 
 	for _, transaction := range transactions {
 
-		record, err := createTickTransactionRecord(transaction)
+		record, err := createTransactionRecord(transaction)
 		if err != nil {
 			log.Printf("Error while creating record: %v", err)
 			errorChannel <- err
@@ -64,7 +64,7 @@ func (kc *Client) PublishTickTransactions(transactions []entities.Transaction) e
 	return nil
 }
 
-func createTickTransactionRecord(tx entities.Transaction) (*kgo.Record, error) {
+func createTransactionRecord(tx entities.Transaction) (*kgo.Record, error) {
 
 	payload, err := json.Marshal(tx)
 	if err != nil {
