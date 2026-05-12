@@ -50,7 +50,7 @@ func run() error {
 		InternalStoreFolder            string        `conf:"default:store"`
 		ArchiverGrpcHost               string        `conf:"default:127.0.0.1:6001"`
 		ArchiverReadTimeout            time.Duration `conf:"default:30s"`
-		NrWorkers                      int           `conf:"default:1"`
+		NrWorkers                      int           `conf:"default:10"`
 		PublishCustomTicks             []uint32      `conf:"optional"`
 		OverrideLastProcessedTick      bool          `conf:"default:false"`
 		OverrideLastProcessedTickValue uint32        `conf:"default:0"`
