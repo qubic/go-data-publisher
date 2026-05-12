@@ -2,6 +2,10 @@
 .iml
 vendor/
 
+# ai
+.claude/
+.junie/
+
 # zipped packages
 *.gz
 *.tgz

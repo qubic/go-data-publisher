@@ -25,7 +25,7 @@ func NewClient(host string) (*Client, error) {
 	return &Client{archiverClient: archiverproto.NewArchiveServiceClient(archiverConn)}, nil
 }
 
-func (c *Client) GetTickTransactions(ctx context.Context, tick uint32) ([]entities.Tx, error) {
+func (c *Client) GetTickTransactions(ctx context.Context, tick uint32) ([]entities.Transaction, error) {
 	resp, err := c.archiverClient.GetTickTransactionsV2(ctx, &archiverproto.GetTickTransactionsRequestV2{TickNumber: tick})
 	if err != nil {
 		return nil, fmt.Errorf("calling grpc method: %v", err)
@@ -48,8 +48,8 @@ func (c *Client) GetProcessedTickIntervalsPerEpoch(ctx context.Context) ([]entit
 	return archiveStatusToEntitiesProcessedTickIntervals(resp.ProcessedTickIntervalsPerEpoch), nil
 }
 
-func archiveTxsToEntitiesTx(archiveTxs []*archiverproto.TransactionData) ([]entities.Tx, error) {
-	entitiesTx := make([]entities.Tx, 0, len(archiveTxs))
+func archiveTxsToEntitiesTx(archiveTxs []*archiverproto.TransactionData) ([]entities.Transaction, error) {
+	entitiesTx := make([]entities.Transaction, 0, len(archiveTxs))
 
 	for _, archiveTx := range archiveTxs {
 		inputBytes, err := hex.DecodeString(archiveTx.Transaction.InputHex)
@@ -61,18 +61,18 @@ func archiveTxsToEntitiesTx(archiveTxs []*archiverproto.TransactionData) ([]enti
 			return nil, fmt.Errorf("decoding signature hex: %v", err)
 		}
 
-		entitiesTx = append(entitiesTx, entities.Tx{
-			TxID:       archiveTx.Transaction.TxId,
-			SourceID:   archiveTx.Transaction.SourceId,
-			DestID:     archiveTx.Transaction.DestId,
-			Amount:     archiveTx.Transaction.Amount,
-			TickNumber: archiveTx.Transaction.TickNumber,
-			InputType:  archiveTx.Transaction.InputType,
-			InputSize:  archiveTx.Transaction.InputSize,
-			Input:      base64.StdEncoding.EncodeToString(inputBytes),
-			Signature:  base64.StdEncoding.EncodeToString(sigBytes),
-			Timestamp:  archiveTx.Timestamp,
-			MoneyFlew:  archiveTx.MoneyFlew,
+		entitiesTx = append(entitiesTx, entities.Transaction{
+			Hash:        archiveTx.Transaction.TxId,
+			Source:      archiveTx.Transaction.SourceId,
+			Destination: archiveTx.Transaction.DestId,
+			Amount:      archiveTx.Transaction.Amount,
+			TickNumber:  archiveTx.Transaction.TickNumber,
+			InputType:   archiveTx.Transaction.InputType,
+			InputSize:   archiveTx.Transaction.InputSize,
+			InputData:   base64.StdEncoding.EncodeToString(inputBytes),
+			Signature:   base64.StdEncoding.EncodeToString(sigBytes),
+			Timestamp:   archiveTx.Timestamp,
+			MoneyFlew:   archiveTx.MoneyFlew,
 		})
 	}
 
