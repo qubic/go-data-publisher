@@ -12,7 +12,7 @@ import (
 func (c *Client) GetTransactionHashes(ctx context.Context, tickNumber uint32) ([]string, error) {
 	res, err := c.esClient.Search(
 		c.esClient.Search.WithContext(ctx),
-		c.esClient.Search.WithSize(1024),
+		c.esClient.Search.WithSize(4096),
 		c.esClient.Search.WithSource("false"), // ID (== hash) is enough for us
 		c.esClient.Search.WithIndex(c.transactionsIndex),
 		c.esClient.Search.WithBody(strings.NewReader(fmt.Sprintf(tickNumberQuery, tickNumber))),
