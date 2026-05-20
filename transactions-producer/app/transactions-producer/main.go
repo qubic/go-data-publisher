@@ -54,6 +54,7 @@ func run() error {
 		PublishCustomTicks             []uint32      `conf:"optional"`
 		OverrideLastProcessedTick      bool          `conf:"default:false"`
 		OverrideLastProcessedTickValue uint32        `conf:"default:0"`
+		MaxRecvSizeInMb                int           `conf:"default:20"`
 		Kafka                          struct {
 			BootstrapServers []string `conf:"default:localhost:9092"`
 			TxTopic          string   `conf:"default:qubic-transactions-local"`
@@ -128,7 +129,8 @@ func run() error {
 
 	kafkaClient := kafka.NewClient(kcl)
 
-	archiverClient, err := archiver.NewClient(cfg.ArchiverGrpcHost)
+	maxRecvSize := cfg.MaxRecvSizeInMb * 1024 * 1024
+	archiverClient, err := archiver.NewClient(cfg.ArchiverGrpcHost, maxRecvSize)
 	if err != nil {
 		return fmt.Errorf("creating archiver client: %v", err)
 	}
