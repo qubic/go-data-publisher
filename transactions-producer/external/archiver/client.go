@@ -16,13 +16,13 @@ type Client struct {
 	archiverClient archiverproto.ArchiveServiceClient
 }
 
-func NewClient(host string) (*Client, error) {
+func NewClient(host string, maxCallRecvMsgSize int) (*Client, error) {
 	archiverConn, err := grpc.NewClient(host,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(
-			grpc.MaxCallRecvMsgSize(10*1024*1024),
-			grpc.MaxCallSendMsgSize(10*1024*1024),
-		))
+			grpc.MaxCallRecvMsgSize(maxCallRecvMsgSize),
+		),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("creating grpc connection: %v", err)
 	}
