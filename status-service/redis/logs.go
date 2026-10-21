@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/redis/go-redis/v9"
@@ -30,6 +31,9 @@ func NewLogsClient(cfg LogsRedisClientCfg) *LogsRedisClient {
 		SentinelPassword: cfg.SentinelPassword,
 		Password:         cfg.Password,
 		DB:               cfg.Db,
+		// go-redis v9.22 raised the defaults to 5s; keep the previous 3s.
+		ReadTimeout:  3 * time.Second,
+		WriteTimeout: 3 * time.Second,
 	})
 
 	return &LogsRedisClient{
