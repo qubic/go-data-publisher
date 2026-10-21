@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"slices"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/qubic/transactions-consumer/extern"
 	"github.com/qubic/transactions-consumer/metrics"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -112,7 +112,7 @@ func (c *TransactionConsumer) consumeBatch(ctx context.Context) (int, error) {
 		var transaction Transaction
 		err := json.Unmarshal(data, &transaction)
 		if err != nil {
-			return -1, errors.Wrapf(err, "unmarshalling record value %s", string(record.Value))
+			return -1, fmt.Errorf("unmarshalling record value %s: %w", string(record.Value), err)
 		}
 
 		document := extern.EsDocument{Id: transaction.Hash, Payload: data}
@@ -134,14 +134,14 @@ func (c *TransactionConsumer) consumeBatch(ctx context.Context) (int, error) {
 	if len(ephemeralDocuments) != 0 {
 		err := c.elasticClient.BulkIndex(ctx, ephemeralDocuments, c.ephemeralIndexName)
 		if err != nil {
-			return -1, errors.Wrapf(err, "indexing [%d] documents (eph).", len(ephemeralDocuments))
+			return -1, fmt.Errorf("indexing [%d] documents (eph).: %w", len(ephemeralDocuments), err)
 		}
 	}
 
 	if len(permanentDocuments) != 0 {
 		err := c.elasticClient.BulkIndex(ctx, permanentDocuments, c.permanentIndexName)
 		if err != nil {
-			return -1, errors.Wrapf(err, "indexing [%d] documents.", len(permanentDocuments))
+			return -1, fmt.Errorf("indexing [%d] documents.: %w", len(permanentDocuments), err)
 		}
 	}
 
@@ -149,7 +149,7 @@ func (c *TransactionConsumer) consumeBatch(ctx context.Context) (int, error) {
 
 	err := c.kafkaClient.CommitUncommittedOffsets(ctx)
 	if err != nil {
-		return -1, errors.Wrap(err, "committing offsets")
+		return -1, fmt.Errorf("committing offsets: %w", err)
 	}
 	return len(permanentDocuments) + len(ephemeralDocuments), nil
 }
