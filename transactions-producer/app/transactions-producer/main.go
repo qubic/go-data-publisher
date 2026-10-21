@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/ardanlabs/conf"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/transactions-producer/domain"
@@ -124,7 +124,7 @@ func run() error {
 		kgo.WithLogger(kgo.BasicLogger(os.Stdout, kgo.LogLevelInfo, nil)),
 	)
 	if err != nil {
-		return errors.Wrap(err, "creating kafka client")
+		return fmt.Errorf("creating kafka client: %w", err)
 	}
 
 	kafkaClient := kafka.NewClient(kcl)

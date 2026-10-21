@@ -3,9 +3,10 @@ package kafka
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
 
-	"github.com/pkg/errors"
 	"github.com/qubic/tick-data-consumer/domain"
 	"github.com/qubic/tick-data-consumer/metrics"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -42,7 +43,7 @@ func (c *Client) PollMessages(ctx context.Context) ([]*domain.TickData, error) {
 		record := iter.Next()
 		tickData, err := unmarshalTickData(record)
 		if err != nil {
-			return nil, errors.Wrapf(err, "unmarshalling record %s", string(record.Value))
+			return nil, fmt.Errorf("unmarshalling record %s: %w", string(record.Value), err)
 		}
 		messages = append(messages, tickData)
 		c.consumeMetrics.IncProcessedMessages()
@@ -63,7 +64,7 @@ func (c *Client) AllowRebalance() {
 func (c *Client) Commit(ctx context.Context) error {
 	err := c.kcl.CommitUncommittedOffsets(ctx)
 	if err != nil {
-		return errors.Wrap(err, "committing offsets")
+		return fmt.Errorf("committing offsets: %w", err)
 	}
 	c.consumeMetrics.SetProcessedTick(c.lastProcessedEpoch, c.lastProcessedTick)
 	return nil
@@ -73,7 +74,7 @@ func unmarshalTickData(record *kgo.Record) (*domain.TickData, error) {
 	var tickData domain.TickData
 	err := json.Unmarshal(record.Value, &tickData)
 	if err == nil && (tickData.ComputorIndex == 0 || tickData.TickNumber == 0 || tickData.Epoch == 0) {
-		err = errors.Errorf("Tick data with missing information: %+v", tickData)
+		err = fmt.Errorf("Tick data with missing information: %+v", tickData)
 	}
 	return &tickData, nil
 }

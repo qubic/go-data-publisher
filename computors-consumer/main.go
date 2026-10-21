@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -13,7 +14,6 @@ import (
 	"github.com/ardanlabs/conf/v3"
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/computors-consumer/consume"
@@ -82,6 +82,8 @@ func run() error {
 		kgo.WithLogger(kgo.BasicLogger(os.Stdout, kgo.LogLevelInfo, nil)),
 		kgo.BlockRebalanceOnPoll(),
 		kgo.DisableAutoCommit(),
+		// franz-go v1.22 changed the default to RewindOffset(time.Minute); keep re-reading from the start on broker data loss.
+		kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()),
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -142,9 +144,6 @@ func run() error {
 			return fmt.Errorf("[ERROR] starting server: %v", err)
 		}
 	}
-
-	return nil
-
 }
 
 // calculateBackoff needs retry number because of multi threading
