@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -12,7 +13,6 @@ import (
 	"github.com/ardanlabs/conf"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jellydator/ttlcache/v3"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/qubic/go-data-publisher/status-service/archiverv1"
 	"github.com/qubic/go-data-publisher/status-service/archiverv2"
@@ -93,30 +93,30 @@ func run() error {
 		case errors.Is(err, conf.ErrHelpWanted):
 			usage, err := conf.Usage(envPrefix, &cfg)
 			if err != nil {
-				return errors.Wrap(err, "generating config usage")
+				return fmt.Errorf("generating config usage: %w", err)
 			}
 			fmt.Println(usage)
 			return nil
 		case errors.Is(err, conf.ErrVersionWanted):
 			version, err := conf.VersionString(envPrefix, &cfg)
 			if err != nil {
-				return errors.Wrap(err, "generating config version")
+				return fmt.Errorf("generating config version: %w", err)
 			}
 			fmt.Println(version)
 			return nil
 		}
-		return errors.Wrap(err, "parsing config")
+		return fmt.Errorf("parsing config: %w", err)
 	}
 
 	out, err := conf.String(&cfg)
 	if err != nil {
-		return errors.Wrap(err, "generating config for output")
+		return fmt.Errorf("generating config for output: %w", err)
 	}
 	log.Printf("main: Config :\n%v\n", out)
 
 	store, err := db.NewPebbleStore(cfg.Sync.InternalStoreFolder)
 	if err != nil {
-		return errors.Wrap(err, "creating db")
+		return fmt.Errorf("creating db: %w", err)
 	}
 	defer func(store *db.PebbleStore) {
 		err := store.Close()
@@ -128,7 +128,7 @@ func run() error {
 	// initialize last processed tick, if necessary
 	startTick, err := initializeLastProcessedTick(cfg.Sync.StartTick, store)
 	if err != nil {
-		return errors.Wrap(err, "initializing last processed tick")
+		return fmt.Errorf("initializing last processed tick: %w", err)
 	}
 	log.Printf("Resuming from tick: [%d].", startTick)
 
@@ -162,7 +162,7 @@ func run() error {
 		cl, err = archiverv2.NewClient(cfg.Archiver.Host)
 	}
 	if err != nil {
-		return errors.Wrap(err, "creating archiver client")
+		return fmt.Errorf("creating archiver client: %w", err)
 	}
 
 	m := metrics.NewMetrics(cfg.Sync.MetricsNamespace)
@@ -257,9 +257,9 @@ func run() error {
 			log.Println("main: Received shutdown signal, shutting down...")
 			return nil
 		case err := <-metricsServerError:
-			return errors.Wrapf(err, "[ERROR] starting metrics endpoint.")
+			return fmt.Errorf("[ERROR] starting metrics endpoint.: %w", err)
 		case err := <-serverError:
-			return errors.Wrapf(err, "[ERROR] starting server endpoint(s).")
+			return fmt.Errorf("[ERROR] starting server endpoint(s).: %w", err)
 		}
 	}
 }
@@ -269,7 +269,7 @@ func initializeLastProcessedTick(startTick uint32, store *db.PebbleStore) (uint3
 	if startTick > 0 || errors.Is(err, db.ErrNotFound) {
 		return startTick, store.SetLastProcessedTick(startTick)
 	} else if err != nil {
-		return 0, errors.Wrap(err, "getting last processed tick")
+		return 0, fmt.Errorf("getting last processed tick: %w", err)
 	}
 	return lastProcessedTick, nil
 }

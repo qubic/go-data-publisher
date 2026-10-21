@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -12,7 +13,6 @@ import (
 	"strconv"
 
 	"github.com/cockroachdb/pebble"
-	"github.com/pkg/errors"
 	"github.com/qubic/go-data-publisher/status-service/domain"
 	"github.com/qubic/go-data-publisher/status-service/util"
 )
@@ -71,7 +71,7 @@ func (ps *PebbleStore) GetSourceStatus() (*domain.Status, error) {
 	var target *domain.Status
 	err := ps.load(processingStatusKey, &target)
 	if err != nil {
-		return nil, errors.Wrap(err, "loading source status")
+		return nil, fmt.Errorf("loading source status: %w", err)
 	}
 	return target, nil
 }
@@ -79,12 +79,12 @@ func (ps *PebbleStore) GetSourceStatus() (*domain.Status, error) {
 func (ps *PebbleStore) AddSkippedErroneousTick(tick uint32) error {
 	skippedTicks, err := ps.loadSkippedTicksSet()
 	if err != nil {
-		return errors.Wrap(err, "getting skipped ticks")
+		return fmt.Errorf("getting skipped ticks: %w", err)
 	}
 	util.AddToSet(skippedTicks, fmt.Sprint(tick))
 	err = ps.save(skippedTicksKey, skippedTicks)
 	if err != nil {
-		return errors.Wrap(err, "saving skipped ticks")
+		return fmt.Errorf("saving skipped ticks: %w", err)
 	}
 	return nil
 }
@@ -92,7 +92,7 @@ func (ps *PebbleStore) AddSkippedErroneousTick(tick uint32) error {
 func (ps *PebbleStore) GetSkippedTicks() ([]uint32, error) {
 	skippedTicks, err := ps.loadSkippedTicksSet()
 	if err != nil {
-		return nil, errors.Wrap(err, "getting skipped ticks")
+		return nil, fmt.Errorf("getting skipped ticks: %w", err)
 	}
 	tickList := make([]uint32, 0, len(skippedTicks)) // empty array is default return value
 	// Iterate over all keys
@@ -100,7 +100,7 @@ func (ps *PebbleStore) GetSkippedTicks() ([]uint32, error) {
 		if val {
 			tickNumber, err := strconv.ParseUint(key, 10, 32)
 			if err != nil {
-				return nil, errors.Wrapf(err, "error converting [%s] to number", key)
+				return nil, fmt.Errorf("error converting [%s] to number: %w", key, err)
 			}
 			tickList = append(tickList, uint32(tickNumber))
 		}
@@ -136,14 +136,14 @@ func (ps *PebbleStore) save(keyStr string, source any) error {
 	encoder := gob.NewEncoder(buffer)
 	err := encoder.Encode(source)
 	if err != nil {
-		return errors.Wrap(err, "encoding object")
+		return fmt.Errorf("encoding object: %w", err)
 	}
 
 	// store
 	key := []byte(keyStr)
 	err = ps.db.Set(key, buffer.Bytes(), pebble.Sync) // sync to prevent data loss. lower performance.
 	if err != nil {
-		return errors.Wrap(err, "saving object")
+		return fmt.Errorf("saving object: %w", err)
 	}
 	return nil
 }
@@ -152,7 +152,7 @@ func (ps *PebbleStore) load(keyStr string, target any) error {
 	key := []byte(keyStr)
 	value, closer, err := ps.db.Get(key)
 	if err != nil {
-		return errors.Wrapf(err, "getting value for key [%s]", keyStr)
+		return fmt.Errorf("getting value for key [%s]: %w", keyStr, err)
 	}
 	defer func(closer io.Closer) {
 		err = closer.Close()
@@ -166,7 +166,7 @@ func (ps *PebbleStore) load(keyStr string, target any) error {
 	decoder := gob.NewDecoder(buffer)
 	err = decoder.Decode(target)
 	if err != nil {
-		return errors.Wrapf(err, "deserializing value for key [%s]", keyStr)
+		return fmt.Errorf("deserializing value for key [%s]: %w", keyStr, err)
 	}
 	return nil
 }
@@ -178,7 +178,7 @@ func (ps *PebbleStore) setUint32(keyStr string, value uint32) error {
 
 	err := ps.db.Set(key, val, pebble.Sync)
 	if err != nil {
-		return errors.Wrapf(err, "setting key [%s] to [%d]", keyStr, value)
+		return fmt.Errorf("setting key [%s] to [%d]: %w", keyStr, value, err)
 	}
 
 	return nil
@@ -193,7 +193,7 @@ func (ps *PebbleStore) getUint32(keyStr string) (value uint32, err error) {
 		return 0, ErrNotFound
 	}
 	if err != nil {
-		return 0, errors.Wrapf(err, "getting value for key [%s]", keyStr)
+		return 0, fmt.Errorf("getting value for key [%s]: %w", keyStr, err)
 	}
 	defer func(closer io.Closer) {
 		err = closer.Close()
