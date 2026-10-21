@@ -3,11 +3,12 @@ package consume
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
 	"strconv"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/qubic/tick-data-consumer/domain"
 	"github.com/qubic/tick-data-consumer/elastic"
 	"github.com/qubic/tick-data-consumer/metrics"
@@ -43,7 +44,7 @@ func (p *TickProcessor) Consume() error {
 		if err != nil {
 			// if there is an error consuming we abort. We need to fix the error before trying again.
 			log.Printf("Error consuming batch: %v", err)
-			return errors.Wrap(err, "consuming batch")
+			return fmt.Errorf("consuming batch: %w", err)
 		} else {
 			p.consumeMetrics.AddProcessedTicks(count)
 			log.Printf("Processed [%d] ticks.", count)
@@ -57,7 +58,7 @@ func (p *TickProcessor) consumeBatch(ctx context.Context) (int, error) {
 	defer p.kafkaClient.AllowRebalance()
 	tickDataList, err := p.kafkaClient.PollMessages(ctx)
 	if err != nil {
-		return 0, errors.Wrap(err, "poll messages")
+		return 0, fmt.Errorf("poll messages: %w", err)
 	}
 
 	// send to elastic
@@ -69,7 +70,7 @@ func (p *TickProcessor) consumeBatch(ctx context.Context) (int, error) {
 	// commit
 	err = p.kafkaClient.Commit(ctx)
 	if err != nil {
-		return 0, errors.Wrap(err, "committing batch")
+		return 0, fmt.Errorf("committing batch: %w", err)
 	}
 	return len(tickDataList), nil
 }
@@ -88,7 +89,7 @@ func (p *TickProcessor) sendToElastic(ctx context.Context, tickDataList []*domai
 	}
 	err := p.elasticClient.BulkIndex(ctx, documents)
 	if err != nil {
-		return errors.Wrap(err, "elastic indexing")
+		return fmt.Errorf("elastic indexing: %w", err)
 	}
 	return nil
 }
@@ -96,7 +97,7 @@ func (p *TickProcessor) sendToElastic(ctx context.Context, tickDataList []*domai
 func convertToDocument(tickData *domain.TickData) (*elastic.EsDocument, error) {
 	val, err := json.Marshal(tickData)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unmarshalling tick data %+v", tickData)
+		return nil, fmt.Errorf("unmarshalling tick data %+v: %w", tickData, err)
 	}
 	document := &elastic.EsDocument{
 		Id:      strconv.Itoa(int(tickData.TickNumber)), // we use the tick number as unique id
