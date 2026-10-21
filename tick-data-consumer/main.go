@@ -170,8 +170,6 @@ func run() error {
 			return fmt.Errorf("[ERROR] starting server: %v", err)
 		}
 	}
-
-	return nil
 }
 
 // calculateBackoff needs retry number because of multi threading
